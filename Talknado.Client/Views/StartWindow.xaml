@@ -1,0 +1,123 @@
+﻿<Window x:Class="Talknado.Client.Views.StartWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Talknado.Client.ViewModels"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
+        Style="{StaticResource StartWindowStyle}" WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize" StateChanged="StartWindow_StateChanged" Loaded="StartWindow_Loaded" Closed="StartWindow_Closed">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome 
+            CaptionHeight="0" 
+            ResizeBorderThickness="6"
+            CornerRadius="0"
+            GlassFrameThickness="0"
+            UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+    <Border x:Name="BorderAround"
+            Style="{StaticResource BorderAround}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="25"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0"
+                  x:Name="TitleBar"
+                  Background="{DynamicResource TitleBarBrush}"
+                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" 
+                           Text="Talknado Connect"
+                           FontFamily="{StaticResource TitleBarFont}"
+                           FontSize="{StaticResource SecondaryFontSize}"
+                           FontWeight="DemiBold"
+                           Foreground="{DynamicResource TitleBarTextBrush}"
+                           VerticalAlignment="Center" 
+                           HorizontalAlignment="Left" 
+                           Margin="12,0,0,0"/>
+
+                <Button Grid.Column="1"
+                        x:Name="MinimizeButton"
+                        Style="{DynamicResource MinimizeButtonStyle}"
+                        Click="MinimizeButton_Click"/>
+                <Button Grid.Column="2"
+                        x:Name="CloseButton"
+                        Style="{DynamicResource CloseButtonStyle}"
+                        Click="CloseButton_Click"/>
+            </Grid>
+            <Grid Grid.Row="1" 
+                  Background="{DynamicResource LeftPanelBackgroundBrush}">
+                <TabControl Style="{StaticResource StartTabControlStyle}">
+                    <TabItem Header="Клиент" 
+                                 Style="{StaticResource StartTabItemStyle}">
+                        <Border Background="{DynamicResource LeftPanelBackgroundBrush}"
+                                    CornerRadius="0,8,8,8"
+                                    Margin="0,0,0,0"
+                                    Padding="25,0">
+                            <Border.Effect>
+                                <DropShadowEffect Color="{DynamicResource BorderColor}"
+                                                      Direction="270"
+                                                      ShadowDepth="1"
+                                                      BlurRadius="2"
+                                                      Opacity="0.3"/>
+                            </Border.Effect>
+                            <StackPanel VerticalAlignment="Center"
+                                        Margin="0,-8,0,0">
+                                <TextBlock Text="Никнейм:" 
+                                           Style="{StaticResource StartLabelTextStyle}"/>
+                                <TextBox Style="{StaticResource StartInputTextBoxStyle}"
+                                         Text="{Binding UsernameTextBoxValue, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,10"/>
+                                <TextBlock Text="Ключ подключения:" 
+                                           Style="{StaticResource StartLabelTextStyle}"/>
+                                <TextBox Style="{StaticResource StartInputTextBoxStyle}"
+                                         Text="{Binding ConnectionKeyTextBoxValue, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,20"/>
+                                <Button Content="Подключиться" 
+                                            Style="{StaticResource StartConnectButtonStyle}"
+                                            HorizontalAlignment="Center"
+                                            Command="{Binding ConnectWithoutServerCommand}"/>
+                            </StackPanel>
+                        </Border>
+                    </TabItem>
+                    <TabItem Header="Сервер" 
+                             Style="{StaticResource StartTabItemStyle}"
+                             Margin="1,-1,-5,0">
+                        <Border Background="{DynamicResource LeftPanelBackgroundBrush}"
+                                Padding="25,20">
+                            <Border.Effect>
+                                <DropShadowEffect Color="{DynamicResource BorderColor}"
+                                                      Direction="270"
+                                                      ShadowDepth="1"
+                                                      BlurRadius="2"
+                                                      Opacity="0.3"/>
+                            </Border.Effect>
+                            <StackPanel VerticalAlignment="Center"
+                                        Margin="0,-8,0,0">
+                                <TextBlock Text="Никнейм:" 
+                                           Style="{StaticResource StartLabelTextStyle}"/>
+                                <TextBox Style="{StaticResource StartInputTextBoxStyle}"
+                                         Text="{Binding UsernameTextBoxValue, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,10"/>
+                                <TextBlock Text="Пароль сервера:" 
+                                           Style="{StaticResource StartLabelTextStyle}"/>
+                                <TextBox Style="{StaticResource StartInputTextBoxStyle}"
+                                         Text="{Binding PasswordTextBoxValue, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,20"/>
+                                <Button Content="Запустить сервер" 
+                                        Style="{StaticResource StartConnectButtonStyle}"
+                                        HorizontalAlignment="Center"
+                                        Command="{Binding ConnectWithServerCommand}"/>
+                            </StackPanel>
+                        </Border>
+                    </TabItem>
+                </TabControl>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

@@ -1,0 +1,470 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                    xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters">
+
+    <!-- Шрифт и размеры -->
+    
+    <FontFamily x:Key="BaseFont">pack://application:,,,/Views/Fonts/#Moderustic</FontFamily>
+    <FontFamily x:Key="TitleBarFont">Segoe UI</FontFamily>
+    <sys:Double x:Key="PrimaryFontSize">15</sys:Double>
+    <sys:Double x:Key="SecondaryFontSize">14</sys:Double>
+
+    <!-- Иконки -->
+    
+    <sys:String x:Key="WindowMinimizeIcon">—</sys:String>
+    <sys:String x:Key="WindowMaximizeIcon">▢</sys:String>
+    <sys:String x:Key="WindowRestoreIcon">❐</sys:String>
+    <sys:String x:Key="WindowCloseIcon">✕</sys:String>
+
+    <!-- Окна -->
+    
+    <Style x:Key="WindowStyle" TargetType="Window">
+        <Setter Property="AllowsTransparency" Value="True"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="WindowStyle" Value="None"/>
+        <Setter Property="UseLayoutRounding" Value="True"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
+    <Style x:Key="MainWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
+        <Setter Property="Title" Value="Talknado Client"/>
+        <Setter Property="Height" Value="367"/>
+        <Setter Property="Width" Value="765"/>
+        <Setter Property="MinHeight" Value="94"/>
+        <Setter Property="MinWidth" Value="388"/>
+    </Style>
+
+    <Style x:Key="ScreenShareWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
+        <Setter Property="Title" Value=""/>
+        <Setter Property="Height" Value="480"/>
+        <Setter Property="Width" Value="800"/>
+        <Setter Property="MinHeight" Value="480"/>
+        <Setter Property="MinWidth" Value="800"/>
+    </Style>
+
+    <!-- Границы -->
+    
+    <Style x:Key="MessageBorderStyle" TargetType="Border">
+        <Setter Property="Margin" Value="4,5,5,0"/>
+        <Setter Property="Padding" Value="10,5,10,4"/>
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="Background" Value="{DynamicResource MessageBackgroundBrush}"/>
+    </Style>
+
+    <Style x:Key="BorderAround" TargetType="Border">
+        <Setter Property="BorderThickness" Value="7"/>
+        <Setter Property="BorderBrush" Value="#01000000"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
+    </Style>
+
+
+    <!-- Текстовые блоки -->
+    
+    <Style x:Key="PrimaryTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
+        <Setter Property="FontWeight" Value="Light"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+        <Setter Property="TextWrapping" Value="WrapWithOverflow"/>
+    </Style>
+
+    <Style x:Key="SecondaryTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+        <Setter Property="TextWrapping" Value="NoWrap"/>
+    </Style>
+
+    <!-- Текстовые коробки -->
+    
+    <Style x:Key="InputTextBoxStyle" TargetType="TextBox">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="MaxLength" Value="10000"/>
+        <Setter Property="Margin" Value="5,0"/>
+        <Setter Property="MinHeight" Value="29"/>
+        <Setter Property="AcceptsReturn" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Grid>
+                        <ScrollViewer x:Name="PART_ContentHost"/>
+                        <TextBlock x:Name="Watermark"
+                                   Text="Написать сообщение..."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   Margin="3,0,0,0"
+                                   IsHitTestVisible="False"
+                                   VerticalAlignment="Center"
+                                   Visibility="Collapsed"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Text" Value="">
+                            <Setter TargetName="Watermark" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="Text" Value="{x:Null}">
+                            <Setter TargetName="Watermark" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SelectableTextStyle" TargetType="TextBox">
+        <Setter Property="Background" Value="{StaticResource MessageBackgroundBrush}"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="IsReadOnly" Value="True"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <!-- Слайдеры -->
+    
+    <cnv:SliderWidthConverter x:Key="SliderWidthConverter"/>
+
+    <Style x:Key="InvisibleRepeatButton" TargetType="RepeatButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="Transparent"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+    </Style>
+
+    <Style x:Key="ModernSliderStyle" TargetType="Slider">
+        <Setter Property="Background" Value="{DynamicResource TrackSliderBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TitleBarBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid>
+                        <Border Height="5"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="2"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"/>
+                        <Border x:Name="FillTrack"
+                                Height="5"
+                                Background="{TemplateBinding Foreground}"
+                                CornerRadius="2"
+                                HorizontalAlignment="Center"
+                                Width="{Binding Path=Value,
+                                                RelativeSource={RelativeSource AncestorType=Slider},
+                                                Converter={StaticResource SliderWidthConverter}}"/>
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource InvisibleRepeatButton}" Command="{x:Static Slider.DecreaseLarge}" Height="18"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border Width="10" Height="18" Background="{DynamicResource ThumbSliderBrush}" CornerRadius="2"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource InvisibleRepeatButton}" Command="{x:Static Slider.IncreaseLarge}" Height="18"/>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Кнопки -->
+    
+    <Style x:Key="BaseButtonStyle" TargetType="Button">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <Style x:Key="TitleBarButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
+        <Setter Property="Cursor" Value="Arrow"/>
+        <Setter Property="FontFamily" Value="{StaticResource TitleBarFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource SecondaryFontSize}"/>
+        <Setter Property="FontWeight" Value="DemiBold"/>
+        <Setter Property="Width" Value="40"/>
+        <Setter Property="Height" Value="25"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <Style x:Key="MinimizeButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonStyle}">
+        <Setter Property="Foreground" Value="{DynamicResource TitleBarTextBrush}"/>
+        <Setter Property="Content" Value="{StaticResource WindowMinimizeIcon}"/>
+    </Style>
+
+    <Style x:Key="MaximizeButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonStyle}">
+        <Setter Property="Foreground" Value="{DynamicResource TitleBarTextBrush}"/>
+        <Setter Property="Content" Value="{StaticResource WindowMaximizeIcon}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=WindowState}" Value="Maximized">
+                <Setter Property="Content" Value="{StaticResource WindowRestoreIcon}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="CloseButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonStyle}">
+        <Setter Property="Foreground" Value="{DynamicResource TitleBarTextBrush}"/>
+        <Setter Property="Content" Value="{StaticResource WindowCloseIcon}"/>
+    </Style>
+
+    <Style x:Key="UserItemButton" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
+        <Setter Property="Width" Value="32"/>
+        <Setter Property="Height" Value="28"/>
+        <Setter Property="Background" Value="{DynamicResource UserItemButtonBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Margin" Value="0,0,5,0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ControlPanelButton" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
+        <Setter Property="Width" Value="32"/>
+        <Setter Property="Height" Value="28"/>
+        <Setter Property="Background" Value="{DynamicResource ControlPanelButtonBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Bottom"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Margin" Value="0,0,5,0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="8,8,0,0">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ScreenShareButton" TargetType="Button" BasedOn="{StaticResource ControlPanelButton}">
+        <Setter Property="Background" Value="{DynamicResource UserItemButtonBrush}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding ScreenShareManager.IsSharing}" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ScreenShareOnBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="TopPanelButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
+        <Setter Property="Margin" Value="0,0,1,0"/>
+        <Setter Property="Width" Value="124"/>
+        <Setter Property="Height" Value="27"/>
+        <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="0,0,8,8">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ButtonMouseOverBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ButtonPressedBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="BottomPanelButtonStyle" TargetType="Button" BasedOn="{StaticResource TopPanelButtonStyle}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="8,8,0,0">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Я устал -->
+
+    <Style x:Key="StartWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
+        <Setter Property="Title" Value="Talknado Connect"/>
+        <Setter Property="Height" Value="305"/>
+        <Setter Property="Width" Value="321"/>
+        <Setter Property="MinHeight" Value="305"/>
+        <Setter Property="MinWidth" Value="321"/>
+    </Style>
+
+    <Style x:Key="StartTabControlStyle" TargetType="TabControl">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <Style x:Key="StartTabItemStyle" TargetType="TabItem">
+        <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
+        <Setter Property="Width" Value="151"/>
+        <Setter Property="Height" Value="27"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border Name="Border" 
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="0,0,8,8"
+                        Margin="-2,-2,0,0">
+                        <ContentPresenter x:Name="ContentSite"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Center"
+                                      ContentSource="Header"
+                                      Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{DynamicResource ButtonPressedBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
+                        </Trigger>
+
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsSelected" Value="False"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Border" Property="Background" Value="{DynamicResource ButtonMouseOverBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="StartInputTextBoxStyle" TargetType="TextBox">
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Background" Value="{DynamicResource TextBoxBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="5,0"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border Background="{TemplateBinding Background}"
+                        CornerRadius="6">
+                        <Border.Effect>
+                            <DropShadowEffect Color="{DynamicResource BorderColor}"
+                                          Direction="270"
+                                          ShadowDepth="1"
+                                          BlurRadius="1"
+                                          Opacity="0.2"/>
+                        </Border.Effect>
+                        <Grid>
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="StartPasswordBoxStyle" TargetType="PasswordBox">
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Background" Value="{DynamicResource TextBoxBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="5,0"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PasswordBox">
+                    <Border Background="{TemplateBinding Background}"
+                        CornerRadius="6">
+                        <Border.Effect>
+                            <DropShadowEffect Color="{DynamicResource BorderColor}"
+                                          Direction="270"
+                                          ShadowDepth="1"
+                                          BlurRadius="1"
+                                          Opacity="0.2"/>
+                        </Border.Effect>
+                        <Grid>
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="StartConnectButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
+        <Setter Property="Height" Value="38"/>
+        <Setter Property="Padding" Value="24,8"/>
+        <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                        CornerRadius="6">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ButtonMouseOverBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ButtonPressedBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="StartLabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+</ResourceDictionary>

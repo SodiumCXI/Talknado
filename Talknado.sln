@@ -1,0 +1,54 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35707.178
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Talknado.Client", "Talknado.Client\Talknado.Client.csproj", "{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0F4011EB-AC4D-439E-957F-428D595BF097} = {0F4011EB-AC4D-439E-957F-428D595BF097}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Talknado.Server", "Talknado.Server\Talknado.Server.csproj", "{0F4011EB-AC4D-439E-957F-428D595BF097}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Debug|x64.ActiveCfg = Debug|x64
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Debug|x64.Build.0 = Debug|x64
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Debug|x86.Build.0 = Debug|Any CPU
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Release|x64.ActiveCfg = Release|x64
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Release|x64.Build.0 = Release|x64
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Release|x86.ActiveCfg = Release|Any CPU
+		{1DFFD94D-FCB9-44E8-8DCA-3F74FB627D2C}.Release|x86.Build.0 = Release|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Debug|x64.Build.0 = Debug|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Debug|x86.Build.0 = Debug|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Release|x64.ActiveCfg = Release|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Release|x64.Build.0 = Release|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Release|x86.ActiveCfg = Release|Any CPU
+		{0F4011EB-AC4D-439E-957F-428D595BF097}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {137E6E47-2650-4163-96BC-79C5BC40DCF6}
+	EndGlobalSection
+EndGlobal
