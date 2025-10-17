@@ -233,7 +233,12 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
         }
 
         var messagePNC = Encoding.UTF8.GetBytes("#PNC");
-        _networkUtils.WritePacketAsync(stream, _cryptoSessionManager.EncryptMessage(messagePNC), token).GetAwaiter().GetResult();
+        try
+        {
+            _networkUtils.WritePacketAsync(stream, _cryptoSessionManager.EncryptMessage(messagePNC), token).GetAwaiter().GetResult();
+        }
+        catch { /* ignore */ }
+
         return false;
     }
 
