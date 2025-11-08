@@ -19,7 +19,7 @@ public sealed class ServerHost : IDisposable
         }
     }
 
-    public (string?, string?, string?) StartServer(string password)
+    public (bool, string) StartServer(string password)
     {
         var serverManager = _provider.GetRequiredService<IServerManager>();
         if (password != string.Empty)

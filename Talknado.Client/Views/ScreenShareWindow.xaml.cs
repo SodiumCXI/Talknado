@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using Talknado.Client.Models;
 using Talknado.Client.ViewModels;
 
@@ -266,7 +267,11 @@ public partial class ScreenShareWindow : Window, IScreenShareWindow, IDisposable
 
     public void Dispose()
     {
-        Close();
+        try
+        {
+            Application.Current?.Dispatcher.Invoke(Close);
+        }
+        catch { /* ignore */ }
 
         GC.SuppressFinalize(this);
     }

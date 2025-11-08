@@ -25,11 +25,13 @@ public partial class UsersInfo : ObservableObject, IUsersInfo
 
     private readonly IUsersAudioPlayer _usersAudioPlayer;
     private readonly IConnectionInfo _connectionInfo;
+    private readonly IWindowsState _windowsState;
 
-    public UsersInfo(IUsersAudioPlayer usersAudioPlayer, IConnectionInfo connectionInfo)
+    public UsersInfo(IUsersAudioPlayer usersAudioPlayer, IConnectionInfo connectionInfo, IWindowsState windowsState)
     {
         _usersAudioPlayer = usersAudioPlayer;
         _connectionInfo = connectionInfo;
+        _windowsState = windowsState;
 
         _usersAudioPlayer.UserAdded += userId => UpdateMicrophoneState(userId, true);
         _usersAudioPlayer.UserRemoved += userId => UpdateMicrophoneState(userId, false);
@@ -71,6 +73,12 @@ public partial class UsersInfo : ObservableObject, IUsersInfo
 
     public void RemoveUser(ushort userId)
     {
+        if (userId == _connectionInfo.LocalUserId)
+        {
+            MessageBox.Show("Сервер закрыл соединение с вами", "Ошибка подключения", MessageBoxButton.OK, MessageBoxImage.Error);
+            _windowsState.InvokeClientDisconnected();
+        }
+
         Application.Current.Dispatcher.Invoke(() =>
         {
             if (_userLookup.TryGetValue(userId, out var userToRemove))

@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using LiteNetLib;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 
@@ -7,57 +8,57 @@ namespace Talknado.Server.Core;
 public interface IUsersInfo
 {
     void AddUser(ushort userId, string username, TcpClient connection);
-    void UpdateUser(ushort userId, IPEndPoint? audioEndPoint, IPEndPoint? screenShareEndPoint);
+    void UpdateUserTcpClient(ushort userId, TcpClient tcpClient);
+    void UpdateUserPeer(ushort userId, NetPeer screenShareEndPoint);
     void DisconnectUser(ushort userId, bool isInitial);
     (NetworkStream, CancellationToken) GetUserStreamAndToken(ushort userId);
     HashSet<(NetworkStream, ushort)> GetUserStreamsWithId(ushort currentUserId);
-    HashSet<IPEndPoint> GetAudioEndPoints(ushort currentUserId);
-    HashSet<IPEndPoint> GetScreenShareEndPoints(ushort currentUserId);
+    HashSet<NetPeer> GetNetPeers(ushort currentUserId);
     HashSet<(ushort, string)> GetUsersPublicInfo();
-    ushort FindUserIdByEndPoint(IPEndPoint endPoint);
+    ushort FindUserIdByNetPeer(NetPeer peer);
     bool CheckUserConnection(ushort userId);
+    bool HasClient(ushort id);
 }
 
 public class UsersInfo : IUsersInfo, IDisposable
 {
     private readonly ConcurrentDictionary<ushort, UserItem> _clientsInfo = [];
 
-    public void AddUser(ushort userId, string username, TcpClient connection)
+    public void AddUser(ushort userId, string username, TcpClient client)
     {
         if (_clientsInfo.TryGetValue(userId, out var existingUser))
         {
             existingUser.IsConnected = false;
             existingUser.Username = username;
-            existingUser.Connection = connection;
-
-            existingUser.AudioEndPoint = null;
-            existingUser.ScreenShareEndPoint = null;
+            existingUser.Client = client;
+            existingUser.Peer = null;
         }
         else
         {
-            var newUser = new UserItem(username, connection);
+            var newUser = new UserItem(username, client);
 
             _clientsInfo[userId] = newUser;
         }
     }
 
-    public void UpdateUser(ushort userId, IPEndPoint? audioEndPoint, IPEndPoint? screenShareEndPoint)
+    public void UpdateUserTcpClient(ushort userId, TcpClient tcpClient)
+    {
+        if (_clientsInfo.TryGetValue(userId, out var existingUser))
+        {
+            existingUser.Client = tcpClient;
+        }
+    }
+
+    public void UpdateUserPeer(ushort userId, NetPeer udpPeer)
     {
         if (_clientsInfo.TryGetValue(userId, out var existingUser))
         {
             if (existingUser.IsConnected)
                 return;
 
-            if (audioEndPoint != null)
-                existingUser.AudioEndPoint = audioEndPoint;
-            if (screenShareEndPoint != null)
-                existingUser.ScreenShareEndPoint = screenShareEndPoint;
-
-            if (existingUser.AudioEndPoint != null && existingUser.ScreenShareEndPoint != null)
-            {
-                existingUser.RestartToken();
-                existingUser.IsConnected = true;
-            }
+            existingUser.Peer = udpPeer;
+            existingUser.RestartToken();
+            existingUser.IsConnected = true;
         }
     }
 
@@ -67,19 +68,13 @@ public class UsersInfo : IUsersInfo, IDisposable
         {
             _clientsInfo[userId].IsConnected = false;
             _clientsInfo[userId].TokenSource.Cancel();
-            _clientsInfo[userId].AudioEndPoint = null;
-            _clientsInfo[userId].ScreenShareEndPoint = null;
+            _clientsInfo[userId].Client.Dispose();
+            _clientsInfo[userId].Peer = null;
         }
         else
         {
             if (_clientsInfo.TryRemove(userId, out var userItem))
             {
-                try
-                {
-                    userItem.Connection?.Client.Shutdown(SocketShutdown.Both);
-                }
-                catch { /* ignore */ }
-
                 userItem.Dispose();
             }
         }
@@ -88,7 +83,7 @@ public class UsersInfo : IUsersInfo, IDisposable
     public (NetworkStream, CancellationToken) GetUserStreamAndToken(ushort userId)
     {
         if (_clientsInfo.TryGetValue(userId, out var userItem))
-            return (userItem.Connection.GetStream(), userItem.TokenSource.Token);
+            return (userItem.Client.GetStream(), userItem.TokenSource.Token);
 
         throw new KeyNotFoundException($"User with ID {userId} not found");
     }
@@ -97,21 +92,14 @@ public class UsersInfo : IUsersInfo, IDisposable
     {
         return [.. _clientsInfo
             .Where(kvp => kvp.Key != currentUserId)
-            .Select(kvp => (kvp.Value.Connection.GetStream(), kvp.Key))];
+            .Select(kvp => (kvp.Value.Client.GetStream(), kvp.Key))];
     }
 
-    public HashSet<IPEndPoint> GetAudioEndPoints(ushort currentUserId)
+    public HashSet<NetPeer> GetNetPeers(ushort currentUserId)
     {
         return [.. _clientsInfo
-            .Where(kvp => kvp.Key != currentUserId)
-            .Select(kvp => kvp.Value.AudioEndPoint)];
-    }
-
-    public HashSet<IPEndPoint> GetScreenShareEndPoints(ushort currentUserId)
-    {
-        return [.. _clientsInfo
-            .Where(kvp => kvp.Key != currentUserId)
-            .Select(kvp => kvp.Value.ScreenShareEndPoint)];
+            .Where(kvp => kvp.Key != currentUserId && kvp.Value.Peer != null)
+            .Select(kvp => kvp.Value.Peer)];
     }
 
     public HashSet<(ushort, string)> GetUsersPublicInfo()
@@ -120,14 +108,30 @@ public class UsersInfo : IUsersInfo, IDisposable
             .Select(kvp => (kvp.Key, kvp.Value.Username))];
     }
 
-    public ushort FindUserIdByEndPoint(IPEndPoint endPoint)
+    public ushort FindUserIdByNetPeer(NetPeer peer)
     {
         foreach (var kvp in _clientsInfo)
         {
-            if (endPoint.Equals(kvp.Value.AudioEndPoint) || endPoint.Equals(kvp.Value.ScreenShareEndPoint))
+            if (peer.Equals(kvp.Value.Peer))
                 return kvp.Key;
         }
         return 0;
+    }
+
+    public TcpClient GetTcpClientById(ushort userId)
+    {
+        foreach (var kvp in _clientsInfo)
+        {
+            if (userId.Equals(kvp.Key))
+                return kvp.Value.Client;
+        }
+
+        return null!;
+    }
+
+    public bool HasClient(ushort id)
+    {
+        return _clientsInfo.ContainsKey(id);
     }
 
     public bool CheckUserConnection(ushort userId)
@@ -149,28 +153,27 @@ public class UsersInfo : IUsersInfo, IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private class UserItem(string username, TcpClient connection) : IDisposable
+    private class UserItem(string username, TcpClient client) : IDisposable
     {
         private CancellationTokenSource _tokenSource = new();
-        private TcpClient _connection = connection;
+        private TcpClient _client = client;
         public bool IsConnected { get; set; } = false;
         public CancellationTokenSource TokenSource
         {
             get { return _tokenSource; }
         }
 
-        public TcpClient Connection
+        public TcpClient Client
         {
-            get { return _connection; }
+            get { return _client; }
             set
             {
-                _connection.Dispose();
-                _connection = value;
+                _client.Dispose();
+                _client = value;
             }
         }
         public string Username { get; set; } = username;
-        public IPEndPoint? AudioEndPoint { get; set; }
-        public IPEndPoint? ScreenShareEndPoint { get; set; }
+        public NetPeer? Peer { get; set; }
 
         public void RestartToken()
         {
@@ -182,7 +185,7 @@ public class UsersInfo : IUsersInfo, IDisposable
         {
             _tokenSource?.Cancel();
             _tokenSource?.Dispose();
-            _connection?.Dispose();
+            _client?.Dispose();
 
             GC.SuppressFinalize(this);
         }

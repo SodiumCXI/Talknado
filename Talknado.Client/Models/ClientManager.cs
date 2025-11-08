@@ -2,6 +2,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows;
@@ -13,6 +14,7 @@ namespace Talknado.Client.Models
     {
         string? TryConnect(string connectionKey, string username);
         void SendMessage(string message);
+        void CloseConnection();
         void ToggleScreenShare();
     }
 
@@ -23,7 +25,8 @@ namespace Talknado.Client.Models
         IScreenShareManager screenShareManager,
         IMessagesManager messagesManager,
         IScreenSharePlayer screenSharePlayer,
-        IAudioManager audioManager) : IClientManager, IDisposable
+        IAudioManager audioManager,
+        IWindowsState windowsState) : IClientManager, IDisposable
     {
         private readonly IUsersInfo _usersInfo = usersInfo;
         private readonly INetworkUtils _networkUtils = networkUtils;
@@ -33,16 +36,17 @@ namespace Talknado.Client.Models
         private readonly IMessagesManager _messagesManager = messagesManager;
         private readonly IScreenSharePlayer _screenSharePlayer = screenSharePlayer;
         private readonly IAudioManager _audioManager = audioManager;
+        private readonly IWindowsState _windowsState = windowsState;
 
-        private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
 
-        private volatile bool _portsConfirmed = false;
-
-        private readonly string _clientVersion = "v1.0.0";
-        private TcpClient _tcpMainClient = new(AddressFamily.InterNetwork);
+        private readonly string _clientVersion = "v1.1.0";
+        private TcpClient _tcpMainClient = null!;
 
         private readonly CancellationTokenSource _receiveCancellationTokenSource = new();
         private Thread? _receiveThread;
+
+        private bool _disconnectInitiated;
 
         public string? TryConnect(string connectionKey, string username)
         {
@@ -62,15 +66,23 @@ namespace Talknado.Client.Models
                     password = right;
                 }
 
-                var (serverIP, serverPort) = GetServerIPAndPort(connectionKey);
+                var (ipAddresses, port) = DecodeServerConnectionKey(connectionKey);
 
-                if (IsIPEndPointOpen(serverIP, serverPort))
+                foreach (var ipAddress in ipAddresses)
                 {
-                    _tcpMainClient.Connect(serverIP, serverPort);
-                    _tcpMainClient.ReceiveTimeout = 3000;
+                    if (IsIPEndPointOpen(ipAddress, port))
+                    {
+                        _connectionInfo.ServerIP = ipAddress;
+                        _connectionInfo.ServerPort = port;
+
+                        break;
+                    }
                 }
-                else
-                    throw new Exception("Сервер недоступен");
+
+                _tcpMainClient = new(AddressFamily.InterNetwork);
+                _tcpMainClient.Connect(_connectionInfo.ServerIP, _connectionInfo.ServerPort);
+                _connectionInfo.Port = ((IPEndPoint)_tcpMainClient.Client.LocalEndPoint!).Port;
+                _tcpMainClient.ReceiveTimeout = 3000;
 
                 NetworkStream stream = _tcpMainClient.GetStream();
 
@@ -80,20 +92,12 @@ namespace Talknado.Client.Models
                 _cryptoSessionManager.ReceiveAndSetSessionKey(stream, token);
                 SetClientInformation(stream, username, token);
 
-                Thread.Sleep(1); // Чтобы сервер успел обработать информацию о клиенте (костыль)
-
-                _networkUtils.ReceiveAndSetServerPorts(serverIP, stream, token).GetAwaiter().GetResult();
-                _ = StartUdpPing(token).ConfigureAwait(false);
+                Task.Run(() => StartUdpConnect(token), token);
                 ReceivePortsConfirmation(stream, token);
 
                 ReceiveClientsList(stream, token);
 
                 _tcpMainClient.ReceiveTimeout = 0;
-
-                _connectionInfo.ServerIP = serverIP;
-                _connectionInfo.ServerPort = serverPort;
-
-                _audioManager.ToggleMicrophoneStatus();
 
                 var receiveToken = _receiveCancellationTokenSource.Token;
                 _receiveThread = new(() => ReceiveMessages(receiveToken))
@@ -101,8 +105,6 @@ namespace Talknado.Client.Models
                     IsBackground = true
                 };
                 _receiveThread.Start();
-
-                Debug.WriteLine("Connected to server");
 
                 return null;
             }
@@ -119,18 +121,19 @@ namespace Talknado.Client.Models
             using var tokenSource = new CancellationTokenSource();
             var token = tokenSource.Token;
 
-            _tcpMainClient ??= new(AddressFamily.InterNetwork);
+            _tcpMainClient = new(AddressFamily.InterNetwork);
             
             try
             {
                 _tcpMainClient.Connect(_connectionInfo.ServerIP, _connectionInfo.ServerPort);
+                _connectionInfo.Port = ((IPEndPoint)_tcpMainClient.Client.LocalEndPoint!).Port;
                 _tcpMainClient.ReceiveTimeout = 3000;
 
                 NetworkStream stream = _tcpMainClient.GetStream();
 
                 SendLocalUserId(stream, token);
 
-                _ = StartUdpPing(token).ConfigureAwait(false);
+                Task.Run(() => StartUdpConnect(token), token);
                 ReceivePortsConfirmation(stream, token);
 
                 _tcpMainClient.ReceiveTimeout = 0;
@@ -178,7 +181,7 @@ namespace Talknado.Client.Models
             _networkUtils.WritePacketAsync(stream, data, token).GetAwaiter().GetResult();
 
             var answer = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
-            if (Encoding.UTF8.GetString(_cryptoSessionManager.DecryptMessage(answer)) == "#SYP")
+            if (Encoding.UTF8.GetString(_cryptoSessionManager.DecryptMessage(answer)) == "#CTU")
                 return true;
 
             return false;
@@ -204,31 +207,16 @@ namespace Talknado.Client.Models
             return SHA256.HashData(bytes);
         }
 
-        private async Task StartUdpPing(CancellationToken token)
+        private void StartUdpConnect(CancellationToken token)
         {
-            _portsConfirmed = false;
-
             var userId = _connectionInfo.LocalUserId;
             var userIdBytes = BitConverter.GetBytes(userId);
-
-            var audioPacket = _cryptoSessionManager.EncryptMessage([.. Encoding.UTF8.GetBytes("#A"), .. userIdBytes]);
-            var screenSharePacket = _cryptoSessionManager.EncryptMessage([.. Encoding.UTF8.GetBytes("#S"), .. userIdBytes]);
+            var encryptedUserId = _cryptoSessionManager.EncryptMessage(userIdBytes);
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            cts.CancelAfter(TimeSpan.FromMilliseconds(3));
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
 
-            while (!_portsConfirmed && !cts.Token.IsCancellationRequested)
-            {
-                try
-                {
-                    await _networkUtils.PingServerAccessEndPoint(audioPacket, screenSharePacket, cts.Token);
-                    await Task.Delay(200, cts.Token);
-                }
-                catch
-                {
-                    return;
-                }
-            }
+            _networkUtils.ConnectToUdp(encryptedUserId, cts.Token);
         }
 
         private void ReceivePortsConfirmation(NetworkStream stream, CancellationToken token)
@@ -236,13 +224,10 @@ namespace Talknado.Client.Models
             var packet = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
 
             var confirmation = _cryptoSessionManager.DecryptMessage(packet);
-            if (confirmation.AsSpan().SequenceEqual(Encoding.UTF8.GetBytes("#APC")))
+            if (!confirmation.AsSpan().SequenceEqual(Encoding.UTF8.GetBytes("#UCC")))
             {
-                _portsConfirmed = true;
-                _networkUtils.BindUdpClients();
+                throw new ArgumentException("Server not confirm UDP connection");
             }
-            else
-                throw new ArgumentException("Ports not confirmed by the server");
         }
 
         private void SetClientInformation(NetworkStream stream, string username, CancellationToken token)
@@ -288,7 +273,16 @@ namespace Talknado.Client.Models
         {
             try
             {
-                var encryptedMessage = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes($"#MSG{message}"));
+                var commandBytes = Encoding.UTF8.GetBytes("#MSG");
+                var userIdBytes = BitConverter.GetBytes(_connectionInfo.LocalUserId);
+                var messageBytes = Encoding.UTF8.GetBytes(message);
+                var result = new byte[commandBytes.Length + userIdBytes.Length + messageBytes.Length];
+
+                Array.Copy(commandBytes, 0, result, 0, commandBytes.Length);
+                Array.Copy(userIdBytes, 0, result, commandBytes.Length, userIdBytes.Length);
+                Array.Copy(messageBytes, 0, result, commandBytes.Length + userIdBytes.Length, messageBytes.Length);
+
+                var encryptedMessage = _cryptoSessionManager.EncryptMessage(result);
                 var stream = _tcpMainClient.GetStream();
                 var token = _receiveCancellationTokenSource.Token;
 
@@ -297,6 +291,21 @@ namespace Talknado.Client.Models
             catch
             {
                 throw new IOException("Failed to send message to server");
+            }
+        }
+
+        public void CloseConnection()
+        {
+            try
+            {
+                var stream = _tcpMainClient.GetStream();
+                var encryptedCommand = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("#END"));
+                _networkUtils.WritePacketAsync(stream, encryptedCommand, CancellationToken.None);
+            }
+            catch { /* ignore */ }
+            finally
+            {
+                _disconnectInitiated = true;
             }
         }
 
@@ -327,16 +336,22 @@ namespace Talknado.Client.Models
                 }
                 catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex))
                 {
+                    if (_disconnectInitiated)
+                        break;
+
                     if (TryReconnect() != null)
                     {
-                        return;
+                        MessageBox.Show("Потеряно соединение с сервером", "Ошибка подключения", MessageBoxButton.OK, MessageBoxImage.Error);
+                        break;
                     }
                 }
                 catch
                 {
-                    return;
+                    break;
                 }
             }
+
+            _windowsState.InvokeClientDisconnected();
         }
 
         public void ToggleScreenShare()
@@ -387,7 +402,7 @@ namespace Talknado.Client.Models
                 // Remove user
                 case var _ when command.Equals("#REM"):
 
-                    var userIdREM = BitConverter.ToUInt16(body[2..]);
+                    var userIdREM = BitConverter.ToUInt16(body);
 
                     _usersInfo.RemoveUser(userIdREM);
 
@@ -430,34 +445,45 @@ namespace Talknado.Client.Models
             }
         }
 
-        public static (string, int) GetServerIPAndPort(string connectionKey)
+        private static (List<string> ipAddresses, int port) DecodeServerConnectionKey(string key)
         {
-            ulong value = 0;
-
-            foreach (char c in connectionKey)
+            BigInteger value = 0;
+            foreach (char c in key)
             {
-                value = value * 52 + (ulong)ALPHABET.IndexOf(c);
+                int digit = ALPHABET.IndexOf(c);
+                if (digit == -1)
+                    throw new ArgumentException("Недопустимый символ в ключе");
+                value = value * 64 + digit;
             }
 
             int port = (int)(value & 0xFFFF);
             value >>= 16;
 
-            byte[] ipBytes = new byte[4];
+            byte[] globalIpBytes = new byte[4];
             for (int i = 3; i >= 0; i--)
             {
-                ipBytes[i] = (byte)(value & 0xFF);
+                globalIpBytes[i] = (byte)(value & 0xFF);
                 value >>= 8;
             }
 
-            return (new IPAddress(ipBytes).ToString(), port);
+            byte[] localIpBytes = new byte[4];
+            for (int i = 3; i >= 0; i--)
+            {
+                localIpBytes[i] = (byte)(value & 0xFF);
+                value >>= 8;
+            }
+
+            string localIp = new IPAddress(localIpBytes).ToString();
+            string globalIp = new IPAddress(globalIpBytes).ToString();
+
+            var ipAddresses = new List<string> { "127.0.0.1", localIp, globalIp };
+
+            return (ipAddresses, port);
         }
 
         public void Dispose()
         {
             _receiveCancellationTokenSource?.Cancel();
-            _receiveThread?.Join();
-            _receiveThread = null;
-            _receiveCancellationTokenSource?.Dispose();
             _tcpMainClient?.Dispose();
 
             GC.SuppressFinalize(this);

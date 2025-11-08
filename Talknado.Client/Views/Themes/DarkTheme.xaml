@@ -21,7 +21,6 @@
     <Color x:Key="MessageBackgroundColor">#313743</Color>
     <Color x:Key="UserItemColor">#373e4b</Color>
     <Color x:Key="UserItemButtonColor">#272c37</Color>
-    <Color x:Key="ControlPanelButtonColor">#263039</Color>
 
     <!-- Слайдеры -->
     <Color x:Key="TrackSliderColor">#242933</Color>
@@ -48,7 +47,6 @@
     <SolidColorBrush x:Key="MessageBackgroundBrush" Color="{StaticResource MessageBackgroundColor}"/>
     <SolidColorBrush x:Key="UserItemBrush" Color="{StaticResource UserItemColor}"/>
     <SolidColorBrush x:Key="UserItemButtonBrush" Color="{StaticResource UserItemButtonColor}"/>
-    <SolidColorBrush x:Key="ControlPanelButtonBrush" Color="{StaticResource ControlPanelButtonColor}"/>
     <SolidColorBrush x:Key="TrackSliderBrush" Color="{StaticResource TrackSliderColor}"/>
     <SolidColorBrush x:Key="ThumbSliderBrush" Color="{StaticResource ThumbSliderColor}"/>
     <SolidColorBrush x:Key="LeftPanelBackgroundBrush" Color="{StaticResource LeftPanelBackgroundColor}"/>

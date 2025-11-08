@@ -6,6 +6,7 @@ namespace Talknado.Server.Core;
 
 public interface IServerInfo
 {
+    public int Port { get; set; }
     string GetServerVersion();
     ImmutableArray<string> GetValidClientVersions();
     bool VerifyPassword(byte[] passwordHashBytes);
@@ -14,9 +15,11 @@ public interface IServerInfo
 
 public class ServerInfo : IServerInfo
 {
-    private readonly string _serverVersion = "v1.0.0";
-    private readonly ImmutableArray<string> _validClientVersions = ["v1.0.0"];
+    private readonly string _serverVersion = "v1.1.0";
+    private readonly ImmutableArray<string> _validClientVersions = ["v1.1.0"];
     private byte[]? _passwordHash;
+
+    public int Port { get; set; } = 38525;
 
     public string GetServerVersion()
     {
@@ -30,9 +33,6 @@ public class ServerInfo : IServerInfo
 
     public bool VerifyPassword(byte[] passwordHashBytes)
     {
-        if (_passwordHash == null)
-            return true;
-
         return CryptographicOperations.FixedTimeEquals(_passwordHash, passwordHashBytes);
     }
 

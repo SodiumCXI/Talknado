@@ -5,6 +5,7 @@ namespace Talknado.Client.Models;
 public interface IConnectionInfo
 {
     string ServerIP { get; set; }
+    int Port { get; set; }
     int ServerPort { get; set; }
     bool ConnectionState { get; set; }
     ushort LocalUserId { get; set; }
@@ -13,6 +14,7 @@ public interface IConnectionInfo
 public partial class ConnectionInfo : ObservableObject, IConnectionInfo
 {
     public string ServerIP { get; set; } = string.Empty;
+    public int Port { get; set; }
     public int ServerPort { get; set; }
     public bool ConnectionState { get; set; } = false;
     public ushort LocalUserId { get; set; }

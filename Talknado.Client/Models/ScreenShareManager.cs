@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO.Hashing;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Timers;
 using Talknado.Client.Models.Client.Helpers;
 using Talknado.Client.Models.Helpers;
 using Talknado.Client.Models.Helpers.ScreenShare;
@@ -21,11 +22,8 @@ namespace Talknado.Client.Models
 
     public partial class ScreenShareManager : ObservableObject, IScreenShareManager, IDisposable
     {
-        private const int TARGET_FPS = 15;
+        private const int TARGET_FPS = 30;
         private const int AUDIO_FRAME_SIZE = (int)(48000 * 2 * (1.0 / TARGET_FPS));
-        private const int MAX_DIMENSION = 1280;
-        private const int TILE_GRID_CELL_COUNT = 16;
-        private const int TILE_SIZE = MAX_DIMENSION / TILE_GRID_CELL_COUNT;
 
         private readonly INetworkUtils _networkUtils;
         private readonly ICryptoSessionManager _cryptoSessionManager;
@@ -40,17 +38,10 @@ namespace Talknado.Client.Models
 
         private WasapiLoopbackCapture? _audioCapture;
 
-        private uint[,] _previousTiles = null!;
-
         [ObservableProperty]
         private bool _isSharing = false;
 
-        private volatile bool _withAudio;
-
-        private byte _currentPacketId = 0;
-        private int _consecutiveHighLoss;
-        private DateTime _lastQualityDecrease = DateTime.MinValue;
-        private DateTime _lastGoodStats = DateTime.UtcNow;
+        private bool _withAudio;
 
         public ScreenShareManager(
             INetworkUtils networkUtils,
@@ -77,7 +68,6 @@ namespace Talknado.Client.Models
 
             IsSharing = true;
             _withAudio = withAudio;
-            _currentPacketId = 0;
 
             _sendCancellationTokenSource = new CancellationTokenSource();
 
@@ -157,69 +147,30 @@ namespace Talknado.Client.Models
             Buffer.BlockCopy(audioData, 0, packet, headerBytes.Length, audioData.Length);
 
             var encryptedPacket = _cryptoSessionManager.EncryptMessage(packet);
-            _networkUtils.SendScreenSharePacketAsync(encryptedPacket, token).GetAwaiter().GetResult();
-
-            _currentPacketId = (byte)((_currentPacketId + 1) % 3);
+            _networkUtils.SendScreenSharePacketAsync(encryptedPacket).GetAwaiter().GetResult();
         }
 
         private void ShareScreenLoop(CancellationToken token)
         {
             const int INTERVAL = 1000 / TARGET_FPS;
-            const int WIDTH_TO_RESIZE = 1280;
-            const int HEIGHT_TO_RESIZE = 720;
-            const int TILES_X = 16;
-            const int TILES_Y = 9;
 
-            // Pre-calculated values
-            var tileBounds = new (int x, int y, int w, int h)[TILES_X, TILES_Y];
-            for (int yy = 0; yy < TILES_Y; yy++)
-            {
-                for (int xx = 0; xx < TILES_X; xx++)
-                {
-                    int tx = xx * TILE_SIZE;
-                    int ty = yy * TILE_SIZE;
-                    tileBounds[xx, yy] = (
-                        tx, ty,
-                        Math.Min(TILE_SIZE, WIDTH_TO_RESIZE - tx),
-                        Math.Min(TILE_SIZE, HEIGHT_TO_RESIZE - ty)
-                    );
-                }
-            }
-
-            _previousTiles = new uint[TILE_GRID_CELL_COUNT, TILE_GRID_CELL_COUNT];
+            _ = ScreenGrabber.CaptureFrame(out int w, out int h);
+            H264Encoder.Initialize(w, h);
 
             while (!token.IsCancellationRequested)
             {
                 var sw = Stopwatch.StartNew();
 
-                byte[] screenFrame = null!;
-                byte[] resizedFrame = null!;
+                var screenFrame = ScreenGrabber.CaptureFrame(out _, out _);
+                CursorRenderer.OverlayCursorOnByteBuffer(screenFrame, w, h);
+                var encodedFrame = H264Encoder.Encode(screenFrame);
 
-                try
+                if (encodedFrame != null)
                 {
-                    screenFrame = ScreenGrabber.CaptureFrame(out int w, out int h, out int screenStride);
-                    CursorRenderer.OverlayCursorOnByteBuffer(screenFrame, w, h);
-                    resizedFrame = FrameResizer.ResizeFrame(screenFrame, w, h, WIDTH_TO_RESIZE, HEIGHT_TO_RESIZE, out int resizedStride);
+                    SendFramePacket(encodedFrame, token);
 
-                    Parallel.For(0, TILES_X * TILES_Y, linearIndex =>
-                    {
-                        if (token.IsCancellationRequested)
-                            return;
-
-                        int yy = linearIndex / TILES_X;
-                        int xx = linearIndex % TILES_X;
-
-                        var (tx, ty, tw, th) = tileBounds[xx, yy];
-                        ProcessTile(resizedFrame, resizedStride, tx, ty, tw, th, xx, yy, token);
-                    });
+                    ProcessFrame(encodedFrame, token);
                 }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(screenFrame);
-                    ArrayPool<byte>.Shared.Return(resizedFrame);
-                }
-
-                _currentPacketId = (byte)((_currentPacketId + 1) % 3);
 
                 int delay = INTERVAL - (int)sw.ElapsedMilliseconds;
                 if (delay > 0)
@@ -229,55 +180,21 @@ namespace Talknado.Client.Models
             }
         }
 
-        private unsafe void ProcessTile(
-            byte[] screenBuf, int screenStride,
-            int tileX, int tileY, int w, int h,
-            int gridX, int gridY, CancellationToken token)
-        {
-            fixed (byte* basePtr = screenBuf)
-            {
-                byte* tilePtr = basePtr + tileY * screenStride + tileX * 4;
-
-                var crc32 = new Crc32();
-                for (int row = 0; row < h; row++)
-                {
-                    byte* srcRow = tilePtr + row * screenStride;
-                    crc32.Append(new ReadOnlySpan<byte>(srcRow, w * 4));
-                }
-
-                uint crc = BinaryPrimitives.ReadUInt32BigEndian(crc32.GetCurrentHash());
-
-                uint slot = _previousTiles[gridX, gridY];
-                if (Volatile.Read(ref slot) != crc)
-                {
-                    byte[] webp = WebPCodec.Encode(tilePtr, w, h, screenStride, 90f);
-                    SendTilePacket(webp, gridX, gridY, token);
-
-                    Volatile.Write(ref slot, crc);
-                    _previousTiles[gridX, gridY] = slot;
-                }
-            }
-        }
-
-        private void SendTilePacket(byte[] webpData, int x, int y, CancellationToken token)
+        private void SendFramePacket(byte[] frameData, CancellationToken token)
         {
             var header = new PacketHeader
             {
-                IsAudio = 0,
-                TileX = (byte)x,
-                TileY = (byte)y,
-                PacketId = _currentPacketId
+                IsAudio = 0
             };
 
             var headerBytes = header.ToBytes();
-            var packet = new byte[PacketHeader.SIZE + webpData.Length];
+            var packet = new byte[PacketHeader.SIZE + frameData.Length];
             Buffer.BlockCopy(headerBytes, 0, packet, 0, headerBytes.Length);
-            Buffer.BlockCopy(webpData, 0, packet, headerBytes.Length, webpData.Length);
+            Buffer.BlockCopy(frameData, 0, packet, headerBytes.Length, frameData.Length);
 
             var encryptedPacket = _cryptoSessionManager.EncryptMessage(packet);
-            _networkUtils.SendScreenSharePacketAsync(encryptedPacket, token).GetAwaiter().GetResult();
 
-            ProcessImage(webpData, header, token);
+            _networkUtils.SendScreenSharePacketAsync(encryptedPacket).GetAwaiter().GetResult();
         }
 
         private void HandleReceiveScreenShare(CancellationToken token)
@@ -286,17 +203,16 @@ namespace Talknado.Client.Models
             {
                 try
                 {
-                    //if (_screenSharePlayer.IsWindowVisible)
-                    //{
+                    if (_screenSharePlayer.IsWindowVisible)
+                    {
                         var packet = _networkUtils.ReceiveScreenSharePacketAsync(token).GetAwaiter().GetResult();
-                        var decryptedPacket = _cryptoSessionManager.DecryptMessage(packet);
 
-                        ProcessPacket(decryptedPacket, token);
-                    //}
-                    //else
-                    //{
-                    //    Thread.Sleep(50);
-                    //}
+                        ProcessPacket(packet, token);
+                    }
+                    else
+                    {
+                        Thread.Sleep(50);
+                    }
                 }
                 catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex))
                 {
@@ -319,19 +235,24 @@ namespace Talknado.Client.Models
             }
             else
             {
-                ProcessImage(data, header, token);
+                ProcessFrame(data, token);
             }
         }
 
-        private void ProcessImage(byte[] imageData, PacketHeader header, CancellationToken token)
+        private void ProcessFrame(byte[] imageData, CancellationToken token)
         {
-            Task.Run(() => _screenSharePlayer.UpdateTile(header.PacketId, imageData, header.TileX, header.TileY), token);
+            _screenSharePlayer.UpdateFrame(imageData, token);
         }
 
         public void Dispose()
         {
+            _receiveCancellationTokenSource.Cancel();
+            _screenShareReceiveThread.Join();
+            _receiveCancellationTokenSource.Dispose();
+
             StopSharing();
-            _audioCapture?.Dispose();
+            H264Encoder.Cleanup();
+
             GC.SuppressFinalize(this);
         }
 
@@ -339,11 +260,8 @@ namespace Talknado.Client.Models
         private struct PacketHeader
         {
             public byte IsAudio;
-            public byte TileX;
-            public byte TileY;
-            public byte PacketId;
 
-            public const int SIZE = 4;
+            public const int SIZE = 1;
 
             public readonly byte[] ToBytes()
             {

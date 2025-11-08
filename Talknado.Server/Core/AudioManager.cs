@@ -34,11 +34,11 @@ public class AudioManager : IDisposable
                 var userId = dataWithId.Value.Item2;
                 _networkUtils.BroadcastAudioPacket(userId, data, token).GetAwaiter().GetResult();
             }
-            catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex))
+            catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex)) { /* ignore */ }
+            catch
             {
-                return;
+                break;
             }
-            catch { /* ignore */ }
         }
     }
 

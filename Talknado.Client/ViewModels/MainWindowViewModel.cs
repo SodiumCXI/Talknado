@@ -43,6 +43,12 @@ public partial class MainWindowViewModel(IClientManager clientManager,
     }
 
     [RelayCommand]
+    private void CloseConnection()
+    {
+        _clientManager.CloseConnection();
+    }
+
+    [RelayCommand]
     private void ToggleMicrophone()
     {
         _audioManager.ToggleMicrophoneStatus();

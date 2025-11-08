@@ -29,6 +29,12 @@ public sealed class ClientHost : IDisposable
         return result;
     }
 
+    public void CloseConnection()
+    {
+        var clientManager = _provider.GetRequiredService<IClientManager>();
+        clientManager.CloseConnection();
+    }
+
     public void SubscribeToClientDisconnected(Action action)
     {
         var windowsState = _provider.GetRequiredService<IWindowsState>();

@@ -120,7 +120,7 @@ namespace Talknado.Client.Models
 
                 try
                 {
-                    _networkUtils.SendAudioPacketAsync(encryptedAudioPacket, token).GetAwaiter().GetResult();
+                    _networkUtils.SendAudioPacketAsync(encryptedAudioPacket).GetAwaiter().GetResult();
                 }
                 catch { /* ignore */ }
 

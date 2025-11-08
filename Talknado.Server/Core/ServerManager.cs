@@ -1,21 +1,21 @@
-﻿using System.Diagnostics;
-using System.Net;
+﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Numerics;
 using System.Text;
 
 namespace Talknado.Server.Core;
 
 public interface IServerManager
 {
-    (string?, string?, string?) Start(string? password);
+    (bool, string) Start(string? password);
 }
 
 public class ServerManager(INetworkUtils networkUtils,
     IServerInfo serverInfo, IClientManager clientManager,
     ICryptoSessionManager cryptoSessionManager) : IServerManager, IDisposable
 {
-    private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
 
     private readonly CancellationTokenSource _mainTokenSource = new();
     private Thread? _serverThread;
@@ -26,36 +26,38 @@ public class ServerManager(INetworkUtils networkUtils,
     private readonly IClientManager _clientManager = clientManager;
     private readonly ICryptoSessionManager _cryptoSessionManager = cryptoSessionManager;
 
-    public (string?, string?, string?) Start(string? password)
+    public (bool, string) Start(string? password)
     {
         try
         {
-            _listener = new(IPAddress.Any, 0);
+            var port = _serverInfo.Port;
+
+            _listener = new(IPAddress.Any, port);
             _listener.Start(5);
 
-            int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            var localIP = GetLocalNetworkIP();
+            var globalIP = GetGlobalNetworkIP();
 
-            var ip = GetOutboundIP();
+            var connectionKey = GetServerConnectionKey(localIP, globalIP, port);
 
-            var connectionKey = GetServerConnectionKey(ip, port);
-            var localConnectionKey = GetServerConnectionKey("127.0.0.1", port);
             if (password != null)
-            {
                 connectionKey += $"?{password}";
-                localConnectionKey += $"?{password}";
-            }
 
-            _serverThread = new Thread(() => ServerHandle(password, _mainTokenSource.Token))
+            var token = _mainTokenSource.Token;
+
+            _networkUtils.Start(token);
+
+            _serverThread = new Thread(() => ServerHandle(password, token))
             {
                 IsBackground = true
             };
             _serverThread.Start();
 
-            return (null, localConnectionKey, connectionKey);
+            return (false, connectionKey);
         }
         catch (Exception ex)
         {
-            return (ex.Message, null, null);
+            return (true, ex.Message);
         }
 
     }
@@ -91,18 +93,60 @@ public class ServerManager(INetworkUtils networkUtils,
                 }
                 catch
                 {
+                    if (token.IsCancellationRequested)
+                        break;
+
                     continue;
                 }
             }
         }
         finally
         {
-            _listener.Stop();
             _listener.Dispose();
         }
     }
 
-    private static string GetOutboundIP()
+    private static string GetLocalNetworkIP()
+    {
+        var ni = NetworkInterface.GetAllNetworkInterfaces()
+            .Where(n =>
+                n.OperationalStatus == OperationalStatus.Up &&
+                n.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                n.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
+            .Select(n => new
+            {
+                Interface = n,
+                IPProps = n.GetIPProperties(),
+                Priority = GetInterfacePriority(n.NetworkInterfaceType)
+            })
+            .Where(x => x.IPProps.GatewayAddresses.Any(g => !g.Address.ToString().StartsWith("0.0.0.0")))
+            .Where(x => x.IPProps.UnicastAddresses.Any(a =>
+                a.Address.AddressFamily == AddressFamily.InterNetwork))
+            .OrderByDescending(x => x.Priority)
+            .ThenByDescending(x => x.Interface.Speed)
+            .FirstOrDefault()
+            ?? throw new IOException("No internet connection detected");
+
+        var ipProps = ni.IPProps;
+        var outwardIp = ipProps.UnicastAddresses
+            .FirstOrDefault(a => a.Address.AddressFamily == AddressFamily.InterNetwork)?.Address.ToString()
+            ?? throw new IOException("No internet connection detected");
+
+        return outwardIp;
+    }
+
+    static int GetInterfacePriority(NetworkInterfaceType type)
+    {
+        return type switch
+        {
+            NetworkInterfaceType.Ethernet => 3,
+            NetworkInterfaceType.Wireless80211 => 2,
+            NetworkInterfaceType.GigabitEthernet => 3,
+            _ => 1
+        };
+    }
+
+    private static string GetGlobalNetworkIP()
     {
         using var client = new HttpClient();
         try
@@ -150,29 +194,40 @@ public class ServerManager(INetworkUtils networkUtils,
         }
     }
 
-    private static string GetServerConnectionKey(string ip, int port)
+    private static string GetServerConnectionKey(string localIp, string globalIp, int port)
     {
-        byte[] ipBytes = IPAddress.Parse(ip).GetAddressBytes();
-        ulong value = 0;
+        byte[] localIpBytes = IPAddress.Parse(localIp).GetAddressBytes();
+        byte[] globalIpBytes = IPAddress.Parse(globalIp).GetAddressBytes();
+
+        BigInteger value = 0;
 
         for (int i = 0; i < 4; i++)
-            value = (value << 8) | ipBytes[i];
+            value = (value << 8) | localIpBytes[i];
+
+        for (int i = 0; i < 4; i++)
+            value = (value << 8) | globalIpBytes[i];
+
         value = (value << 16) | (ushort)port;
+
+        if (value == 0) return "A";
 
         var result = "";
         while (value > 0)
         {
-            int digit = (int)(value % 52);
+            int digit = (int)(value % 64);
             result = ALPHABET[digit] + result;
-            value /= 52;
+            value /= 64;
         }
 
-        return result.PadLeft(9, 'A');
+        return result;
     }
 
     public void Dispose()
     {
-        _mainTokenSource?.Cancel();
+        _mainTokenSource.Cancel();
+        _listener.Stop();
+        _serverThread?.Join();
+        _mainTokenSource.Dispose();
 
         GC.SuppressFinalize(this);
     }

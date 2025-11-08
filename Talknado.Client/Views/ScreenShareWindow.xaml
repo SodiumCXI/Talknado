@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="{Binding ScreenSharePlayer.ScreenShareUsername}"
         Style="{StaticResource ScreenShareWindowStyle}" WindowStartupLocation="CenterScreen"
         StateChanged="ScreenShareWindow_StateChanged" Loaded="ScreenShareWindow_Loaded">
     <shell:WindowChrome.WindowChrome>
@@ -46,7 +47,7 @@
                     <TextBlock Style="{DynamicResource PrimaryTextStyle}"
                                VerticalAlignment="Center"
                                FontWeight="DemiBold"
-                               Text="{Binding ScreenSharePlayer.FlushCallsPerSecond}"/>
+                               Text="{Binding ScreenSharePlayer.FramesPerSecond}"/>
                     <TextBlock Style="{DynamicResource PrimaryTextStyle}"
                                VerticalAlignment="Center"
                                FontWeight="DemiBold"
@@ -67,7 +68,7 @@
                     Click="CloseButton_Click"/>
                 </Grid>
             <Grid Grid.Row="1" Background="{DynamicResource LeftPanelBackgroundBrush}">
-                <Image Source="{Binding DisplayImage}"
+                <Image Source="{Binding ScreenSharePlayer.DisplayImage}"
                        Stretch="Uniform"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center"/>

@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using LiteNetLib;
+using LiteNetLib.Utils;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -7,107 +8,139 @@ namespace Talknado.Client.Models;
 
 public interface INetworkUtils
 {
-    Task ReceiveAndSetServerPorts(string serverIP, NetworkStream stream, CancellationToken token);
-    Task PingServerAccessEndPoint(byte[] audioPacket, byte[] screenSharePacket, CancellationToken token);
-    void BindUdpClients();
-    Task SendAudioPacketAsync(byte[] packet, CancellationToken token);
+    void ConnectToUdp(byte[] udpKey, CancellationToken token);
+    Task SendAudioPacketAsync(byte[] packet);
     Task<byte[]> ReceiveAudioPacketAsync(CancellationToken token);
-    Task SendScreenSharePacketAsync(byte[] packet, CancellationToken token);
+    Task SendScreenSharePacketAsync(byte[] packet);
     Task<byte[]> ReceiveScreenSharePacketAsync(CancellationToken token);
     Task WritePacketAsync(NetworkStream stream, byte[] data, CancellationToken token);
     Task<byte[]> ReadPacketAsync(NetworkStream stream, CancellationToken token);
 }
 
-public class NetworkUtils : INetworkUtils
+public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetEventListener, IDisposable
 {
-    private IPEndPoint? _serverAccessEndPoint;
-    private IPEndPoint? _serverAudioEndPoint;
-    private IPEndPoint? _serverScreenShareEndPoint;
+    private readonly IConnectionInfo _connectionInfo = connectionInfo;
 
-    private UdpClient _udpAudioClient = new(0);
-    private UdpClient _udpScreenShareClient = new(0);
+    private NetManager? _netManager;
+    private NetPeer? _serverPeer;
 
-    public async Task ReceiveAndSetServerPorts(string serverIP, NetworkStream stream, CancellationToken token)
+    private readonly Queue<byte[]> _audioPackets = new();
+    private readonly Queue<byte[]> _screenSharePackets = new();
+    private readonly SemaphoreSlim _audioSemaphore = new(0);
+    private readonly SemaphoreSlim _screenShareSemaphore = new(0);
+    private readonly object _audioLock = new();
+    private readonly object _screenLock = new();
+
+    private const byte AudioChannel = 0;
+    private const byte ScreenShareChannel = 1;
+
+    private CancellationTokenSource? _pollLoopTokenSourse = null!;
+
+    public void ConnectToUdp(byte[] udpKey, CancellationToken token)
     {
-        var portsData = await ReadPacketAsync(stream, token);
+        _pollLoopTokenSourse?.Cancel();
+        _pollLoopTokenSourse?.Dispose();
 
-        using var ms = new MemoryStream(portsData);
-        using var reader = new BinaryReader(ms);
+        _pollLoopTokenSourse = CancellationTokenSource.CreateLinkedTokenSource(token);
+        var pollLoopToken = _pollLoopTokenSourse.Token;
 
-        var accessPort = reader.ReadInt32();
-        var audioPort = reader.ReadInt32();
-        var screenSharePort = reader.ReadInt32();
+        var serverEndPoint = IPEndPoint.Parse($"{_connectionInfo.ServerIP}:{_connectionInfo.ServerPort}");
 
-        SetServerEndPoints(serverIP, accessPort, audioPort, screenSharePort);
-    }
-
-    private void SetServerEndPoints(string serverIP, int accessPort, int audioPort, int screenSharePort)
-    {
-        var serverAccessEndPoint = IPEndPoint.Parse($"{serverIP}:{accessPort}");
-        var serverAudioEndPoint = IPEndPoint.Parse($"{serverIP}:{audioPort}");
-        var serverScreenShareEndPoint = IPEndPoint.Parse($"{serverIP}:{screenSharePort}");
-
-        _serverAccessEndPoint = serverAccessEndPoint;
-        _serverAudioEndPoint = serverAudioEndPoint;
-        _serverScreenShareEndPoint = serverScreenShareEndPoint;
-    }
-
-    public async Task PingServerAccessEndPoint(byte[] audioPacket, byte[] screenSharePacket, CancellationToken token)
-    {
-        ArgumentNullException.ThrowIfNull(_serverAccessEndPoint);
-
-        if (_udpAudioClient.Client.Connected || _udpScreenShareClient.Client.Connected)
+        _netManager?.Stop();
+        _netManager = new NetManager(this)
         {
-            _udpAudioClient.Dispose();
-            _udpAudioClient = new();
+            AutoRecycle = true,
+            ChannelsCount = 2,
+        };
+        _netManager.Start(_connectionInfo.Port);
 
-            _udpScreenShareClient.Dispose();
-            _udpScreenShareClient = new();
-        }
+        _ = Task.Run(() => PollLoop(pollLoopToken), pollLoopToken).ConfigureAwait(false);
 
-        await _udpAudioClient.SendAsync(audioPacket, _serverAccessEndPoint, token);
-        await _udpScreenShareClient.SendAsync(screenSharePacket, _serverAccessEndPoint, token);
-    }
-
-    public void BindUdpClients()
-    {
-        ArgumentNullException.ThrowIfNull(_serverAudioEndPoint);
-        ArgumentNullException.ThrowIfNull(_serverScreenShareEndPoint);
-
-        _udpAudioClient.Connect(_serverAudioEndPoint);
-        _udpScreenShareClient.Connect(_serverScreenShareEndPoint);
-    }
-
-    public async Task SendAudioPacketAsync(byte[] packet, CancellationToken token)
-    {
         try
         {
-            await _udpAudioClient.SendAsync(packet, token);
+            var writer = new NetDataWriter();
+            writer.Put(udpKey);
+            _serverPeer = _netManager.Connect(serverEndPoint, writer);
+        }
+        catch
+        {
+            throw new IOException("Unable connect to UDP");
+        }
+
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        while (DateTime.UtcNow < deadline && !pollLoopToken.IsCancellationRequested)
+        {
+            if (_serverPeer?.ConnectionState == ConnectionState.Connected)
+            {
+                Console.WriteLine("[Client] Successfully connected!");
+                return;
+            }
+
+            Thread.Sleep(50);
+        }
+    }
+
+    private async Task PollLoop(CancellationToken token)
+    {
+        while (_netManager != null && !token.IsCancellationRequested)
+        {
+            _netManager?.PollEvents();
+            await Task.Delay(10, token);
+        }
+    }
+
+    public async Task SendAudioPacketAsync(byte[] packet)
+    {
+        if (_serverPeer?.ConnectionState != ConnectionState.Connected)
+            return;
+
+        try
+        {
+            var writer = new NetDataWriter();
+            writer.Put(packet);
+            _serverPeer.Send(writer, AudioChannel, DeliveryMethod.ReliableOrdered);
+            _netManager?.PollEvents();
         }
         catch { /* ignore */ }
+
+        await Task.CompletedTask;
     }
 
     public async Task<byte[]> ReceiveAudioPacketAsync(CancellationToken token)
     {
-        var result = await _udpAudioClient.ReceiveAsync(token);
+        await _audioSemaphore.WaitAsync(token);
 
-        return result.Buffer;
+        lock (_audioLock)
+        {
+            return _audioPackets.Dequeue();
+        }
     }
 
-    public async Task SendScreenSharePacketAsync(byte[] packet, CancellationToken token)
+    public async Task SendScreenSharePacketAsync(byte[] packet)
     {
+        if (_serverPeer?.ConnectionState != ConnectionState.Connected)
+            return;
+
         try
         {
-            await _udpScreenShareClient.SendAsync(packet, token);
+            var writer = new NetDataWriter();
+            writer.Put(packet);
+            _serverPeer.Send(writer, ScreenShareChannel, DeliveryMethod.ReliableOrdered);
+            _netManager?.PollEvents();
         }
         catch { /* ignore */ }
+
+        await Task.CompletedTask;
     }
 
     public async Task<byte[]> ReceiveScreenSharePacketAsync(CancellationToken token)
     {
-        var result = await _udpScreenShareClient.ReceiveAsync(token);
+        await _screenShareSemaphore.WaitAsync(token);
 
-        return result.Buffer;
+        lock (_screenLock)
+        {
+            return _screenSharePackets.Dequeue();
+        }
     }
 
     public async Task WritePacketAsync(NetworkStream stream, byte[] data, CancellationToken token)
@@ -154,5 +187,61 @@ public class NetworkUtils : INetworkUtils
         }
 
         return buffer;
+    }
+
+    public void OnPeerConnected(NetPeer peer)
+    {
+    }
+
+    public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
+    {
+    }
+
+    public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
+    {
+    }
+
+    public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+    {
+        var data = reader.GetRemainingBytes();
+
+        if (channelNumber == AudioChannel)
+        {
+            lock (_audioLock)
+            {
+                _audioPackets.Enqueue(data);
+            }
+            _audioSemaphore.Release();
+        }
+        else if (channelNumber == ScreenShareChannel)
+        {
+            lock (_screenLock)
+            {
+                _screenSharePackets.Enqueue(data);
+            }
+            _screenShareSemaphore.Release();
+        }
+    }
+
+    public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
+    {
+    }
+
+    public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
+    {
+    }
+
+    public void OnConnectionRequest(ConnectionRequest request)
+    {
+    }
+    
+    public void Dispose()
+    {
+        _pollLoopTokenSourse?.Cancel();
+
+        _netManager?.Stop();
+        _netManager = null;
+
+        GC.SuppressFinalize(this);
     }
 }

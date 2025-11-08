@@ -6,6 +6,8 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
+using Talknado.Client.ViewModels;
 
 namespace Talknado.Client.Views;
 
@@ -289,6 +291,9 @@ public partial class MainWindow : Window, IMainWindow, IDisposable
     }
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
+        var vm = DataContext as MainWindowViewModel;
+        vm?.CloseConnectionCommand.Execute(null);
+
         Application.Current.Shutdown();
     }
     private void ToggleMaximizeRestore()
@@ -380,7 +385,11 @@ public partial class MainWindow : Window, IMainWindow, IDisposable
 
     public void Dispose()
     {
-        Close();
+        try
+        {
+            Application.Current?.Dispatcher.Invoke(Close);
+        }
+        catch { /* ignore */ }
 
         GC.SuppressFinalize(this);
     }

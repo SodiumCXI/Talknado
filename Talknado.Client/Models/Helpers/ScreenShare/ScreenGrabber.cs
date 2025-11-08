@@ -38,7 +38,7 @@ public static class ScreenGrabber
     /// <param name="height">Высота кадра в пикселях.</param>
     /// <param name="stride">Шаг (RowPitch) в байтах.</param>
     /// <returns>Указатель на начало буфера B8G8R8A8 (не густой Alpha), валиден до следующего вызова.</returns>
-    public static byte[] CaptureFrame(out int width, out int height, out int stride)
+    public static byte[] CaptureFrame(out int width, out int height)
     {
         Resource dxgiResource = null!;
 
@@ -76,9 +76,8 @@ public static class ScreenGrabber
                 height = _stagingTex.Description.Height;
                 int srcStride = dataBox.RowPitch;
                 int dstStride = width * 4;
-                stride = dstStride;
 
-                byte[] linear = ArrayPool<byte>.Shared.Rent(dstStride * height);
+                byte[] linear = new byte[dstStride * height];
 
                 unsafe
                 {

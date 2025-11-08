@@ -1,118 +1,132 @@
-﻿using System.Net;
+﻿using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
-using System.Reflection.Metadata.Ecma335;
+using LiteNetLib;
+using LiteNetLib.Utils;
 
 namespace Talknado.Server.Core
 {
     public interface INetworkUtils
     {
-        Task SendServerPorts(NetworkStream stream, CancellationToken token);
-        Task<(byte[], IPEndPoint)?> ReceiveAccessPacketAsync(CancellationToken token);
+        void Start(CancellationToken token);
         Task BroadcastAudioPacket(ushort currentUserId, byte[] data, CancellationToken token);
-        Task SendAudioPacketAsync(byte[] packet, IPEndPoint endPoint, CancellationToken token);
         Task<(byte[], ushort)?> ReceiveAudioPacketAsync(CancellationToken token);
         Task BroadcastScreenSharePacket(ushort currentUserId, byte[] data, CancellationToken token);
-        Task SendScreenSharePacketAsync(byte[] packet, IPEndPoint endPoint, CancellationToken token);
         Task<(byte[], ushort)?> ReceiveScreenSharePacketAsync(CancellationToken token);
         Task BroadcastMessage(ushort currentUserId, byte[] data, CancellationToken token);
         Task WritePacketAsync(NetworkStream stream, byte[] data, CancellationToken token);
         Task<byte[]> ReadPacketAsync(NetworkStream stream, CancellationToken token);
     }
 
-    public class NetworkUtils(IUsersInfo usersInfo) : INetworkUtils
+    public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
     {
-        private readonly UdpClient _udpAccessClient = new(0);
-        private readonly UdpClient _udpAudioClient = new(0);
-        private readonly UdpClient _udpScreenShareClient = new(0);
+        private readonly IUsersInfo _usersInfo;
+        private readonly IServerInfo _serverInfo;
+        private readonly ICryptoSessionManager _cryptoSessionManager;
 
-        private readonly IUsersInfo _usersInfo = usersInfo;
+        private readonly NetManager _netManager;
 
-        public async Task SendServerPorts(NetworkStream stream, CancellationToken token)
+        private Dictionary<IPEndPoint, ushort> _pendingConnections = new();
+
+        private readonly Queue<(byte[], ushort)> _audioPackets = new();
+        private readonly Queue<(byte[], ushort)> _screenSharePackets = new();
+        private readonly SemaphoreSlim _audioSemaphore = new(0);
+        private readonly SemaphoreSlim _screenSemaphore = new(0);
+        private readonly object _audioLock = new();
+        private readonly object _screenLock = new();
+
+        private const byte AudioChannel = 0;
+        private const byte ScreenShareChannel = 1;
+
+        public NetworkUtils(IUsersInfo usersInfo, IServerInfo serverInfo, ICryptoSessionManager cryptoSessionManager)
         {
-            var accessPort = (_udpAccessClient.Client.LocalEndPoint as IPEndPoint)!.Port;
-            var audioPort = (_udpAudioClient.Client.LocalEndPoint as IPEndPoint)!.Port;
-            var screenSharePort = (_udpScreenShareClient.Client.LocalEndPoint as IPEndPoint)!.Port;
+            _usersInfo = usersInfo;
+            _serverInfo = serverInfo;
+            _cryptoSessionManager = cryptoSessionManager;
 
-            using var ms = new MemoryStream();
-            using var writer = new BinaryWriter(ms);
-
-            writer.Write(accessPort);
-            writer.Write(audioPort);
-            writer.Write(screenSharePort);
-
-            var portsData = ms.ToArray();
-
-            await WritePacketAsync(stream, portsData, token);
+            _netManager = new NetManager(this)
+            {
+                AutoRecycle = true,
+                ChannelsCount = 2
+            };
         }
 
-        public async Task<(byte[], IPEndPoint)?> ReceiveAccessPacketAsync(CancellationToken token)
+        public void Start(CancellationToken token)
         {
-            var result = await _udpAccessClient.ReceiveAsync(token);
+            _netManager.Start(IPAddress.Any, IPAddress.IPv6Any, _serverInfo.Port);
 
-            if (result.Buffer == null)
-                return null;
+            _ = Task.Run(() => PollLoop(token), token);
+        }
 
-            return (result.Buffer, result.RemoteEndPoint);
+        private async Task PollLoop(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                _netManager?.PollEvents();
+                await Task.Delay(10, token);
+            }
         }
 
         public async Task BroadcastAudioPacket(ushort currentUserId, byte[] data, CancellationToken token)
         {
-            foreach (var whiteEndPoint in _usersInfo.GetAudioEndPoints(currentUserId))
+            foreach (var peer in _usersInfo.GetNetPeers(currentUserId))
             {
-                await SendAudioPacketAsync(data, whiteEndPoint, token);
+                await SendAudioPacketAsync(data, peer, token);
             }
         }
 
-        public async Task SendAudioPacketAsync(byte[] packet, IPEndPoint endPoint, CancellationToken token)
+        private static async Task SendAudioPacketAsync(byte[] packet, NetPeer peer, CancellationToken token)
         {
             try
             {
-                await _udpAudioClient.SendAsync(packet, endPoint, token);
+                var writer = new NetDataWriter();
+                writer.Put(packet);
+                peer.Send(writer, AudioChannel, DeliveryMethod.ReliableOrdered);
             }
             catch { /* ignore */ }
+
+            await Task.CompletedTask;
         }
 
         public async Task<(byte[], ushort)?> ReceiveAudioPacketAsync(CancellationToken token)
         {
-            var result = await _udpAudioClient.ReceiveAsync(token);
+            await _audioSemaphore.WaitAsync(token);
 
-            IPEndPoint endPoint = result.RemoteEndPoint;
-
-            var userId = _usersInfo.FindUserIdByEndPoint(endPoint);
-            if (userId == 0)
-                return null;
-
-            return (result.Buffer, userId);
+            lock (_audioLock)
+            {
+                return _audioPackets.Dequeue();
+            }
         }
 
         public async Task BroadcastScreenSharePacket(ushort currentUserId, byte[] data, CancellationToken token)
         {
-            foreach (var whiteEndPoint in _usersInfo.GetScreenShareEndPoints(currentUserId))
+            foreach (var peer in _usersInfo.GetNetPeers(currentUserId))
             {
-                await SendScreenSharePacketAsync(data, whiteEndPoint, token);
+                await SendScreenSharePacketAsync(data, peer, token);
             }
         }
 
-        public async Task SendScreenSharePacketAsync(byte[] packet, IPEndPoint endPoint, CancellationToken token)
+        private static async Task SendScreenSharePacketAsync(byte[] packet, NetPeer peer, CancellationToken token)
         {
             try
             {
-                await _udpScreenShareClient.SendAsync(packet, endPoint, token);
+                var writer = new NetDataWriter();
+                writer.Put(packet);
+                peer.Send(writer, ScreenShareChannel, DeliveryMethod.ReliableOrdered);
             }
             catch { /* ignore */ }
+
+            await Task.CompletedTask;
         }
 
         public async Task<(byte[], ushort)?> ReceiveScreenSharePacketAsync(CancellationToken token)
         {
-            var result = await _udpScreenShareClient.ReceiveAsync(token);
+            await _screenSemaphore.WaitAsync(token);
 
-            IPEndPoint endPoint = result.RemoteEndPoint;
-
-            var userId = _usersInfo.FindUserIdByEndPoint(endPoint);
-            if (userId == 0)
-                return null;
-
-            return (result.Buffer, userId);
+            lock (_screenLock)
+            {
+                return _screenSharePackets.Dequeue();
+            }
         }
 
         public async Task BroadcastMessage(ushort currentUserId, byte[] data, CancellationToken token)
@@ -176,6 +190,99 @@ namespace Talknado.Server.Core
             }
 
             return buffer;
+        }
+
+        public void OnPeerConnected(NetPeer peer)
+        {
+            if (_pendingConnections.TryGetValue(IPEndPoint.Parse($"{peer.Address}:{peer.Port}"), out var userId))
+            {
+                _usersInfo.UpdateUserPeer(userId, peer);
+                _pendingConnections.Remove(peer);
+            }
+        }
+
+        public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
+        {
+            var userId = _usersInfo.FindUserIdByNetPeer(peer);
+            if (userId != 0)
+            {
+                _usersInfo.DisconnectUser(userId, true);
+            }
+
+            _pendingConnections.Remove(peer);
+        }
+
+        public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
+        {
+        }
+
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+        {
+            var data = reader.GetRemainingBytes();
+            var userId = _usersInfo.FindUserIdByNetPeer(peer);
+
+            if (userId == 0)
+                return;
+
+            if (channelNumber == AudioChannel)
+            {
+                lock (_audioLock)
+                {
+                    _audioPackets.Enqueue((data, userId));
+                }
+                _audioSemaphore.Release();
+            }
+            else if (channelNumber == ScreenShareChannel)
+            {
+                lock (_screenLock)
+                {
+                    _screenSharePackets.Enqueue((data, userId));
+                }
+                _screenSemaphore.Release();
+            }
+        }
+
+        public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
+        {
+        }
+
+        public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
+        {
+        }
+
+        public void OnConnectionRequest(ConnectionRequest request)
+        {
+            var key = request.Data.GetRemainingBytes();
+            ushort userId;
+
+            try
+            {
+                var userIdBytes = _cryptoSessionManager.DecryptMessage(key);
+                userId = BitConverter.ToUInt16(userIdBytes);
+            }
+            catch
+            {
+                request.Reject();
+                return;
+            }
+
+            if (userId != 0 && _usersInfo.HasClient(userId))
+            {
+                _pendingConnections[request.RemoteEndPoint] = userId;
+                request.Accept();
+            }
+            else
+            {
+                request.Reject();
+            }
+        }
+
+        public void Dispose()
+        {
+            _netManager?.Stop();
+            _pendingConnections?.Clear();
+
+            GC.SuppressFinalize(this);
         }
     }
 }

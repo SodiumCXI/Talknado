@@ -31,20 +31,19 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
 
         try
         {
-            _cryptoSessionManager.SharedSecretExchange(stream, userId, token);
+            SharedSecretExchange(stream, userId, token);
 
             if (!ValidatePassword(stream, userId, token))
                 throw new ArgumentException("Incorrect password");
 
-            _cryptoSessionManager.SendSessionKey(stream, userId, token);
+            SendSessionKey(stream, userId, token);
             ClientInfoExchange(stream, userId, token, out var username);
             _usersInfo.AddUser(userId, username, tcpClient);
-            _networkUtils.SendServerPorts(stream, token);
 
             if (!WaitUntil(() => _usersInfo.CheckUserConnection(userId),
-                TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(200),
+                TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(100),
                 stream, token))
-                throw new TimeoutException("User did not ping the access port");
+                throw new TimeoutException("User did not connect to UDP");
 
             BroadcastAddNewUser(userId, username, token);
 
@@ -62,22 +61,19 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
     public void ReconnectClient(TcpClient tcpClient, ushort userId, CancellationToken token)
     {
         var stream = tcpClient.GetStream();
+
         try
         {
-            var data = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("SYP"));
-            _networkUtils.WritePacketAsync(stream, data, token).GetAwaiter().GetResult();
+            _usersInfo.UpdateUserTcpClient(userId, tcpClient);
 
-            if (!WaitUntil(() => _usersInfo.CheckUserConnection(userId),
-                TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(200),
-                stream, token))
-                throw new IOException("User did not ping the access port");
+            var data = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("CTU"));
+            _networkUtils.WritePacketAsync(stream, data, token).GetAwaiter().GetResult();
         }
         catch
         {
             DisconnectClient(userId);
             throw;
         }
-
     }
 
     private bool ValidatePassword(NetworkStream stream, ushort userId, CancellationToken token)
@@ -147,6 +143,21 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
         _networkUtils.BroadcastMessage(userId, _cryptoSessionManager.EncryptMessage(message), token);
     }
 
+    public void SharedSecretExchange(NetworkStream stream, ushort userId, CancellationToken token)
+    {
+        var serverPublicKey = _cryptoSessionManager.GetServerPublicKey();
+        _networkUtils.WritePacketAsync(stream, serverPublicKey, token).GetAwaiter().GetResult();
+
+        var data = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult() ?? throw new IOException("Stream exception");
+        _cryptoSessionManager.SetSharedSecret(userId, data);
+    }
+
+    public void SendSessionKey(NetworkStream stream, ushort userId, CancellationToken token)
+    {
+        var encryptedSessionKey = _cryptoSessionManager.GetEncryptedSessionKey(userId);
+        _networkUtils.WritePacketAsync(stream, encryptedSessionKey, token).GetAwaiter().GetResult();
+    }
+
     private void HandleClient(ushort userId)
     {
         while (true)
@@ -164,7 +175,7 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
                     lock (_lockCommandExecution)
                     {
                         if (command.StartsWith("#MSG"))
-                            _networkUtils.BroadcastMessage(userId, data, token).GetAwaiter().GetResult();
+                            _networkUtils.BroadcastMessage(userId, encryptedData, token).GetAwaiter().GetResult();
                         else
                             ExecuteCommand(stream, userId, command, data.AsSpan()[4..], token);
                     }
@@ -174,9 +185,14 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
             {
                 _usersInfo.DisconnectUser(userId, true);
 
-                if (!WaitUntil(() => _usersInfo.CheckUserConnection(userId),
-                    TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(200),
-                    stream, token))
+                try
+                {
+                    if (!WaitUntil(() => _usersInfo.CheckUserConnection(userId),
+                        TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(100),
+                        stream, token))
+                        break;
+                }
+                catch
                 {
                     break;
                 }
@@ -224,7 +240,7 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
         {
             if (condition())
             {
-                var messageAPC = Encoding.UTF8.GetBytes("#APC");
+                var messageAPC = Encoding.UTF8.GetBytes("#UCC");
                 _networkUtils.WritePacketAsync(stream, _cryptoSessionManager.EncryptMessage(messageAPC), token);
                 return true;
             }
@@ -232,7 +248,7 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
             Thread.Sleep(pollInterval);
         }
 
-        var messagePNC = Encoding.UTF8.GetBytes("#PNC");
+        var messagePNC = Encoding.UTF8.GetBytes("#UNC");
         try
         {
             _networkUtils.WritePacketAsync(stream, _cryptoSessionManager.EncryptMessage(messagePNC), token).GetAwaiter().GetResult();
@@ -256,8 +272,7 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
         {
             case var _ when command.Equals("#END"):
 
-                DisconnectClient(userId);
-                break;
+                throw new OperationCanceledException("User initiated disconnect");
 
             case var _ when command.Equals("#CIS"):
 

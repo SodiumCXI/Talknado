@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using System.Collections.ObjectModel;
+using System.Windows;
 
 namespace Talknado.Client.Models
 {
@@ -22,17 +23,20 @@ namespace Talknado.Client.Models
                 return;
             }
 
-            string timestamp = DateTime.Now.ToString("HH:mm");
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                string timestamp = DateTime.Now.ToString("HH:mm");
 
-            if (Messages.Count > 0 && Messages[^1].UserId == userId && Messages[^1].Timestamp == timestamp)
-            {
-                Messages[^1].Text += "\n" + message;
-            }
-            else
-            {
-                var username = _usersInfo.GetUsernameByUserId(userId);
-                Messages.Add(new(userId, username, message, DateTime.Now.ToString("HH:mm")));
-            }
+                if (Messages.Count > 0 && Messages[^1].UserId == userId && Messages[^1].Timestamp == timestamp)
+                {
+                    Messages[^1].Text += "\n" + message;
+                }
+                else
+                {
+                    var username = _usersInfo.GetUsernameByUserId(userId);
+                    Messages.Add(new(userId, username, message, DateTime.Now.ToString("HH:mm")));
+                }
+            });
         }
 
         public partial class Message : ObservableObject

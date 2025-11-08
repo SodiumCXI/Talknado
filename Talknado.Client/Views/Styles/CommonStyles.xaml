@@ -252,7 +252,7 @@
     <Style x:Key="ControlPanelButton" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
         <Setter Property="Width" Value="32"/>
         <Setter Property="Height" Value="28"/>
-        <Setter Property="Background" Value="{DynamicResource ControlPanelButtonBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource UserItemButtonBrush}"/>
         <Setter Property="VerticalAlignment" Value="Bottom"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Margin" Value="0,0,5,0"/>
@@ -335,7 +335,7 @@
         <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
         <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
         <Setter Property="FontWeight" Value="Medium"/>
-        <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TabItem">
@@ -352,7 +352,7 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Border" Property="Background" Value="{DynamicResource ButtonPressedBrush}"/>
-                            <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
                         </Trigger>
 
                         <MultiTrigger>
@@ -361,7 +361,7 @@
                                 <Condition Property="IsSelected" Value="False"/>
                             </MultiTrigger.Conditions>
                             <Setter TargetName="Border" Property="Background" Value="{DynamicResource ButtonMouseOverBrush}"/>
-                            <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
                         </MultiTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

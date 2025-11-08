@@ -6,8 +6,9 @@ namespace Talknado.Server.Core;
 
 public interface ICryptoSessionManager
 {
-    void SharedSecretExchange(NetworkStream stream, ushort userId, CancellationToken token);
-    void SendSessionKey(NetworkStream stream, ushort userId, CancellationToken token);
+    byte[] GetEncryptedSessionKey(ushort userId);
+    byte[] GetServerPublicKey();
+    void SetSharedSecret(ushort userId, byte[] userPublicKey);
     void TryRemoveSharedSecret(ushort userId);
     byte[] EncryptMessage(byte[] message);
     byte[] DecryptMessage(byte[] encryptedMessage);
@@ -21,12 +22,8 @@ public class CryptoSessionManager : ICryptoSessionManager
 
     private byte[] _sessionKey = new byte[32];
 
-    private readonly INetworkUtils _networkUtils;
-
-    public CryptoSessionManager(INetworkUtils networkUtils)
+    public CryptoSessionManager()
     {
-        _networkUtils = networkUtils;
-
         GenerateSessionKey();
     }
 
@@ -38,22 +35,7 @@ public class CryptoSessionManager : ICryptoSessionManager
         _sessionKey = aes.Key;
     }
 
-    public void SharedSecretExchange(NetworkStream stream, ushort userId, CancellationToken token)
-    {
-        var serverPublicKey = GetServerPublicKey();
-        _networkUtils.WritePacketAsync(stream, serverPublicKey, token).GetAwaiter().GetResult();
-
-        var data = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult() ?? throw new IOException("Stream exception");
-        SetSharedSecret(userId, data);
-    }
-
-    public void SendSessionKey(NetworkStream stream, ushort userId, CancellationToken token)
-    {
-        var encryptedSessionKey = GetEncryptedSessionKey(userId);
-        _networkUtils.WritePacketAsync(stream, encryptedSessionKey, token).GetAwaiter().GetResult();
-    }
-
-    private byte[] GetEncryptedSessionKey(ushort userId)
+    public byte[] GetEncryptedSessionKey(ushort userId)
     {
         byte[] encryptedSessionKey = new byte[32];
         byte[] sharedSecret = _sharedSecrets[userId];
@@ -65,12 +47,12 @@ public class CryptoSessionManager : ICryptoSessionManager
         return encryptedSessionKey;
     }
 
-    private byte[] GetServerPublicKey()
+    public byte[] GetServerPublicKey()
     {
         return _serverECDH.PublicKey.ExportSubjectPublicKeyInfo();
     }
 
-    private void SetSharedSecret(ushort userId, byte[] userPublicKey)
+    public void SetSharedSecret(ushort userId, byte[] userPublicKey)
     {
         using ECDiffieHellman clientECDH = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
 

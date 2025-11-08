@@ -9,7 +9,4 @@ public partial class ScreenShareViewModel(IScreenSharePlayer screenSharingPlayer
     private readonly IScreenSharePlayer _screenSharingPlayer = screenSharingPlayer;
 
     public IScreenSharePlayer ScreenSharePlayer => _screenSharingPlayer;
-
-    public ImageSource DisplayImage => _screenSharingPlayer.DisplayImage;
-    public int FlushCallsPerSecond => _screenSharingPlayer.FlushCallsPerSecond;
 }
