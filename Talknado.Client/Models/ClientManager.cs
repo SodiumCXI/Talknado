@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.IO;
+﻿using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Numerics;
@@ -25,7 +24,6 @@ namespace Talknado.Client.Models
         IScreenShareManager screenShareManager,
         IMessagesManager messagesManager,
         IScreenSharePlayer screenSharePlayer,
-        IAudioManager audioManager,
         IWindowsState windowsState) : IClientManager, IDisposable
     {
         private readonly IUsersInfo _usersInfo = usersInfo;
@@ -35,7 +33,6 @@ namespace Talknado.Client.Models
         private readonly IScreenShareManager _screenShareManager = screenShareManager;
         private readonly IMessagesManager _messagesManager = messagesManager;
         private readonly IScreenSharePlayer _screenSharePlayer = screenSharePlayer;
-        private readonly IAudioManager _audioManager = audioManager;
         private readonly IWindowsState _windowsState = windowsState;
 
         private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";

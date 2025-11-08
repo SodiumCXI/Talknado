@@ -1,8 +1,9 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
+using System.Windows;
+using System.Diagnostics;
 using Talknado.Client.Models;
-using Talknado.Client.Views;
 
 namespace Talknado.Client.ViewModels;
 
@@ -70,5 +71,22 @@ public partial class MainWindowViewModel(IClientManager clientManager,
     private void SoftReboot()
     {
         _windowsState.InvokeClientDisconnected();
+    }
+
+    [RelayCommand]
+    private static void OpenLink()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "https://github.com/SodiumCXI/Talknado",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Не удалось открыть ссылку: {ex.Message}");
+        }
     }
 }

@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        xmlns:controls="clr-namespace:TalknadoClientWPF.Views.Controls"
-        xmlns:triggers="clr-namespace:TalknadoClientWPF.Views.Triggers"
+        xmlns:controls="clr-namespace:Talknado.Client.Views.Controls"
+        xmlns:triggers="clr-namespace:Talknado.Client.Views.Triggers"
         xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
         xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
         Style="{StaticResource MainWindowStyle}" WindowStartupLocation="CenterScreen"
@@ -79,7 +79,7 @@
                                         Style="{DynamicResource TopPanelButtonStyle}"/>
                                 <Button Content="О программе" 
                                         Style="{DynamicResource TopPanelButtonStyle}"
-                                        Command="{Binding StartScreenShareCommand}"/>
+                                        Command="{Binding OpenLinkCommand}"/>
                             </StackPanel>
                             <Border DockPanel.Dock="Bottom"
                                     Background="{DynamicResource TitleBarBrush}"

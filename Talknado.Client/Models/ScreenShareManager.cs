@@ -1,12 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using NAudio.Wave;
-using System.Buffers;
-using System.Buffers.Binary;
 using System.Diagnostics;
-using System.IO.Hashing;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Timers;
 using Talknado.Client.Models.Client.Helpers;
 using Talknado.Client.Models.Helpers;
 using Talknado.Client.Models.Helpers.ScreenShare;

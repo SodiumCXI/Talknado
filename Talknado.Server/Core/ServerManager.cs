@@ -35,15 +35,15 @@ public class ServerManager(INetworkUtils networkUtils,
             _listener = new(IPAddress.Any, port);
             _listener.Start(5);
 
+            var token = _mainTokenSource.Token;
+
             var localIP = GetLocalNetworkIP();
-            var globalIP = GetGlobalNetworkIP();
+            var globalIP = GetGlobalNetworkIP(token);
 
             var connectionKey = GetServerConnectionKey(localIP, globalIP, port);
 
             if (password != null)
                 connectionKey += $"?{password}";
-
-            var token = _mainTokenSource.Token;
 
             _networkUtils.Start(token);
 
@@ -146,12 +146,15 @@ public class ServerManager(INetworkUtils networkUtils,
         };
     }
 
-    private static string GetGlobalNetworkIP()
+    private static string GetGlobalNetworkIP(CancellationToken token)
     {
         using var client = new HttpClient();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        cts.CancelAfter(TimeSpan.FromSeconds(3));
+
         try
         {
-            var response = client.GetStringAsync("https://api.ipify.org").GetAwaiter().GetResult();
+            var response = client.GetStringAsync("https://api.ipify.org", cts.Token).GetAwaiter().GetResult();
             return response.Trim();
         }
         catch

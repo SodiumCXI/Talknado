@@ -1,5 +1,4 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
-using System.Windows.Media;
 using Talknado.Client.Models;
 
 namespace Talknado.Client.ViewModels;

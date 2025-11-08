@@ -1,6 +1,5 @@
 ﻿using NAudio.Wave;
 using System.Collections.Concurrent;
-using System.Windows.Input;
 
 namespace Talknado.Client.Models
 {

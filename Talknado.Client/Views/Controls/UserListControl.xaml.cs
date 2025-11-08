@@ -5,7 +5,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Talknado.Client.ViewModels;
 
-namespace TalknadoClientWPF.Views.Controls;
+namespace Talknado.Client.Views.Controls;
 
 public partial class UserListControl : UserControl
 {

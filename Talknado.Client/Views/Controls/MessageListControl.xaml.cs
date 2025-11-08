@@ -1,6 +1,6 @@
 ﻿using System.Windows.Controls;
 
-namespace TalknadoClientWPF.Views.Controls;
+namespace Talknado.Client.Views.Controls;
 
 public partial class MessageListControl : UserControl
 {
