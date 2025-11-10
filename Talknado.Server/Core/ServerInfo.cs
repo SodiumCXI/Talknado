@@ -15,9 +15,9 @@ public interface IServerInfo
 
 public class ServerInfo : IServerInfo
 {
-    private readonly string _serverVersion = "v1.1.0";
-    private readonly ImmutableArray<string> _validClientVersions = ["v1.1.0"];
-    private byte[]? _passwordHash;
+    private readonly string _serverVersion = "v1.1.1";
+    private readonly ImmutableArray<string> _validClientVersions = ["v1.1.1"];
+    private byte[]? _passwordHash = null;
 
     public int Port { get; set; } = 38525;
 
@@ -33,12 +33,16 @@ public class ServerInfo : IServerInfo
 
     public bool VerifyPassword(byte[] passwordHashBytes)
     {
+        if (_passwordHash == null)
+            return true;
+
         return CryptographicOperations.FixedTimeEquals(_passwordHash, passwordHashBytes);
     }
 
-    public void SetServerPassword(string password)
+    public void SetServerPassword(string? password)
     {
-        _passwordHash = GetSha256Bytes(password);
+        if (password != null)
+            _passwordHash = GetSha256Bytes(password);
     }
 
     private static byte[] GetSha256Bytes(string password)

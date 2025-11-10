@@ -37,7 +37,7 @@ namespace Talknado.Client.Models
 
         private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
 
-        private readonly string _clientVersion = "v1.1.0";
+        private readonly string _clientVersion = "v1.1.1";
         private TcpClient _tcpMainClient = null!;
 
         private readonly CancellationTokenSource _receiveCancellationTokenSource = new();
