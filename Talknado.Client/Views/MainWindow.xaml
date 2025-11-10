@@ -105,7 +105,7 @@
                                              MaxWidth="250"
                                              TextWrapping="NoWrap"
                                              Background="Transparent"
-                                             Text="{Binding ConnectionInfo.ConnectionKey}" 
+                                             Text="{Binding ConnectionInfo.FormattedConnectionKey}" 
                                              VerticalAlignment="Center"
                                              Margin="2,0,0,0"
                                              PreviewMouseDown="TextBox_MouseDown"

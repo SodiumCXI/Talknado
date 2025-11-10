@@ -10,6 +10,7 @@ public interface IConnectionInfo
     bool ConnectionState { get; set; }
     ushort LocalUserId { get; set; }
     string ConnectionKey { get; set; }
+    string FormattedConnectionKey { get; set; }
 }
 public partial class ConnectionInfo : ObservableObject, IConnectionInfo
 {
@@ -21,4 +22,26 @@ public partial class ConnectionInfo : ObservableObject, IConnectionInfo
 
     [ObservableProperty]
     private string _connectionKey = string.Empty;
+
+    [ObservableProperty]
+    private string _formattedConnectionKey = string.Empty;
+
+    partial void OnConnectionKeyChanged(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            FormattedConnectionKey = string.Empty;
+            return;
+        }
+
+        int questionMarkIndex = value.IndexOf('?');
+        if (questionMarkIndex >= 0)
+        {
+            FormattedConnectionKey = value.Substring(0, questionMarkIndex + 1) + "...";
+        }
+        else
+        {
+            FormattedConnectionKey = value;
+        }
+    }
 }

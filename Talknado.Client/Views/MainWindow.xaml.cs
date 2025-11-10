@@ -21,6 +21,8 @@ public partial class MainWindow : Window, IMainWindow, IDisposable
     private readonly Thickness _defaultMargin;
     private readonly Thickness _increasedMargin;
 
+    private CancellationTokenSource? _copyFeedbackCts;
+
     private double _actualTop;
     private WindowState _previousWindowState;
 
@@ -38,21 +40,32 @@ public partial class MainWindow : Window, IMainWindow, IDisposable
 
     private void TextBox_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        CopyTextWithFeedback((TextBox)sender, "Скопировано!");
+        var mwvm = DataContext as MainWindowViewModel;
+        var connectionKey = mwvm!.ConnectionInfo.ConnectionKey;
+        var formattedConnectionKey = mwvm!.ConnectionInfo.FormattedConnectionKey;
+
+        CopyTextWithFeedback((TextBox)sender, connectionKey, formattedConnectionKey, "Скопировано!");
     }
 
-    private static async void CopyTextWithFeedback(TextBox textBox, string copiedText)
+    private async void CopyTextWithFeedback(TextBox textBox, string textToCopy, string originalText, string copiedText)
     {
-        var originalText = textBox.Text;
+        _copyFeedbackCts?.Cancel();
+        _copyFeedbackCts = new CancellationTokenSource();
+        var token = _copyFeedbackCts.Token;
 
-        Clipboard.SetText(originalText);
+        Clipboard.SetText(textToCopy);
         textBox.Text = copiedText;
 
-        await Task.Delay(1000);
-        if (textBox.Text == copiedText)
+        try
         {
-            textBox.Text = originalText;
+            await Task.Delay(1000, token);
+
+            if (!token.IsCancellationRequested && textBox.Text == copiedText)
+            {
+                textBox.Text = originalText;
+            }
         }
+        catch (TaskCanceledException) { /* ignore */ }
     }
 
     private void InputTextBox_TextChanged(object sender, TextChangedEventArgs e)
