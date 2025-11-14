@@ -1,11 +1,12 @@
-﻿<Window x:Class="Talknado.Client.Views.StartWindow"
+﻿<local:TalknadoWindow x:Class="Talknado.Client.Views.StartWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Talknado.Client.Views"
         xmlns:vm="clr-namespace:Talknado.Client.ViewModels"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
         Style="{StaticResource StartWindowStyle}" WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize" StateChanged="StartWindow_StateChanged" Loaded="StartWindow_Loaded" Closed="StartWindow_Closed">
+        ResizeMode="NoResize">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome 
             CaptionHeight="0" 
@@ -120,4 +121,4 @@
             </Grid>
         </Grid>
     </Border>
-</Window>
+</local:TalknadoWindow>

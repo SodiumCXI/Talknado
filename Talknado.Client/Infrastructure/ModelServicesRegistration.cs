@@ -22,7 +22,7 @@ public static class ModelServicesRegistration
         services.AddSingleton<IScreenSharePlayer, ScreenSharePlayer>();
 
         services.AddSingleton<ScreenShareViewModel>();
-        services.AddSingleton<IScreenShareWindow>(sp => new ScreenShareWindow
+        services.AddSingleton(sp => new ScreenShareWindow
         {
             DataContext = sp.GetRequiredService<ScreenShareViewModel>()
         });

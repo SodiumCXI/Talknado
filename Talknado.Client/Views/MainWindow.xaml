@@ -1,14 +1,14 @@
-﻿<Window x:Class="Talknado.Client.Views.MainWindow"
+﻿<local:TalknadoWindow x:Class="Talknado.Client.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Talknado.Client.Views"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:controls="clr-namespace:Talknado.Client.Views.Controls"
         xmlns:triggers="clr-namespace:Talknado.Client.Views.Triggers"
         xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
         xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
-        Style="{StaticResource MainWindowStyle}" WindowStartupLocation="CenterScreen"
-        StateChanged="MainWindow_StateChanged" Loaded="MainWindow_Loaded">
+        Style="{StaticResource MainWindowStyle}" WindowStartupLocation="CenterScreen">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome 
             CaptionHeight="0" 
@@ -17,9 +17,9 @@
             GlassFrameThickness="0"
             UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
-    <Window.Resources>
+    <local:TalknadoWindow.Resources>
         <cnv:InputTextBoxMaxHeightConverter x:Key="InputTextBoxMaxHeightConverter"/>
-    </Window.Resources>
+    </local:TalknadoWindow.Resources>
     <Border x:Name="BorderAround"
             Style="{StaticResource BorderAround}">
         <Grid Grid.RowSpan="2">
@@ -186,4 +186,4 @@
             <Canvas x:Name="AnimationCanvas" IsHitTestVisible="False"/>
         </Grid>
     </Border>
-</Window>
+</local:TalknadoWindow>

@@ -1,11 +1,11 @@
-﻿<Window x:Class="Talknado.Client.Views.ScreenShareWindow"
+﻿<local:TalknadoWindow x:Class="Talknado.Client.Views.ScreenShareWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Talknado.Client.Views"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="{Binding ScreenSharePlayer.ScreenShareUsername}"
-        Style="{StaticResource ScreenShareWindowStyle}" WindowStartupLocation="CenterScreen"
-        StateChanged="ScreenShareWindow_StateChanged" Loaded="ScreenShareWindow_Loaded">
+        Style="{StaticResource ScreenShareWindowStyle}" WindowStartupLocation="CenterScreen">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome 
         CaptionHeight="0" 
@@ -75,4 +75,4 @@
             </Grid>
         </Grid>
     </Border>
-</Window>
+</local:TalknadoWindow>
