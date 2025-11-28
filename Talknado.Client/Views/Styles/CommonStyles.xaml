@@ -45,6 +45,22 @@
         <Setter Property="MinWidth" Value="800"/>
     </Style>
 
+    <Style x:Key="StartWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
+        <Setter Property="Title" Value="Talknado Connect"/>
+        <Setter Property="Height" Value="355"/>
+        <Setter Property="Width" Value="321"/>
+        <Setter Property="MinHeight" Value="355"/>
+        <Setter Property="MinWidth" Value="321"/>
+    </Style>
+
+    <Style x:Key="SettingsWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
+        <Setter Property="Title" Value="Настройки"/>
+        <Setter Property="Height" Value="300"/>
+        <Setter Property="Width" Value="320"/>
+        <Setter Property="MinHeight" Value="300"/>
+        <Setter Property="MinWidth" Value="320"/>
+    </Style>
+
     <!-- Границы -->
     
     <Style x:Key="MessageBorderStyle" TargetType="Border">
@@ -215,11 +231,43 @@
     <Style x:Key="MinimizeButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonStyle}">
         <Setter Property="Foreground" Value="{DynamicResource TitleBarTextBrush}"/>
         <Setter Property="Content" Value="{StaticResource WindowMinimizeIcon}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Root"
+                        Background="{TemplateBinding Background}">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource TitleBarButtonMouseOverBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="MaximizeButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonStyle}">
         <Setter Property="Foreground" Value="{DynamicResource TitleBarTextBrush}"/>
         <Setter Property="Content" Value="{StaticResource WindowMaximizeIcon}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Root"
+                Background="{TemplateBinding Background}">
+                        <ContentPresenter HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource TitleBarButtonMouseOverBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
         <Style.Triggers>
             <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=WindowState}" Value="Maximized">
                 <Setter Property="Content" Value="{StaticResource WindowRestoreIcon}"/>
@@ -230,6 +278,22 @@
     <Style x:Key="CloseButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonStyle}">
         <Setter Property="Foreground" Value="{DynamicResource TitleBarTextBrush}"/>
         <Setter Property="Content" Value="{StaticResource WindowCloseIcon}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Root"
+                Background="{TemplateBinding Background}">
+                        <ContentPresenter HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource TitleBarCloseButtonMouseOverBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="UserItemButton" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
@@ -314,14 +378,6 @@
     </Style>
 
     <!-- Я устал -->
-
-    <Style x:Key="StartWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
-        <Setter Property="Title" Value="Talknado Connect"/>
-        <Setter Property="Height" Value="305"/>
-        <Setter Property="Width" Value="321"/>
-        <Setter Property="MinHeight" Value="305"/>
-        <Setter Property="MinWidth" Value="321"/>
-    </Style>
 
     <Style x:Key="StartTabControlStyle" TargetType="TabControl">
         <Setter Property="Background" Value="Transparent"/>
@@ -467,4 +523,172 @@
         <Setter Property="Margin" Value="0,0,0,8"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
+
+    <Style x:Key="ErrorLabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
+        <Setter Property="Margin" Value="0,0,0,20"/>
+        <Setter Property="FontWeight" Value="Light"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="Foreground" Value="{DynamicResource ErrorMessageBrush}"/>
+        <Setter Property="TextWrapping" Value="WrapWithOverflow"/>
+    </Style>
+
+    <!-- Я устал x2 -->
+
+    <Style x:Key="SettingsCheckBoxStyle" TargetType="CheckBox">
+        <Setter Property="Margin" Value="0,12,0,0"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource SecondaryFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <CheckBox Grid.Column="0" 
+                                  IsChecked="{Binding IsChecked, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,8,0"/>
+                        <TextBlock Grid.Column="1" 
+                                   Text="{TemplateBinding Content}" 
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="LabelStyle" TargetType="TextBlock">
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource SecondaryFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+    </Style>
+
+    <Style x:Key="ComboStyle" TargetType="ComboBox">
+        <Setter Property="Background" Value="{StaticResource UserItemBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource SecondaryFontSize}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="Padding" Value="6,0"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Canvas>
+                        <Border x:Name="Border"
+                            Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                            Height="{Binding ActualHeight, RelativeSource={RelativeSource TemplatedParent}}"
+                            CornerRadius="4"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}">
+                            <DockPanel LastChildFill="True">
+                                <Border DockPanel.Dock="Right" 
+                                    Width="28" 
+                                    Background="Transparent">
+                                    <Path x:Name="Arrow"
+                                      Data="M0 0 L5 5 L10 0 Z"
+                                      Fill="{StaticResource SecondaryTextBrush}"
+                                      Width="12" 
+                                      Height="6"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                                </Border>
+                                <ContentPresenter Margin="8,0"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Left"
+                                            Content="{TemplateBinding SelectionBoxItem}"
+                                            ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                            IsHitTestVisible="False"/>
+                            </DockPanel>
+                        </Border>
+                        <ToggleButton Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                  Height="{Binding ActualHeight, RelativeSource={RelativeSource TemplatedParent}}"
+                                  Background="Transparent"
+                                  BorderThickness="0"
+                                  Focusable="False"
+                                  ClickMode="Press"
+                                  IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border Background="Transparent"/>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <Popup x:Name="PART_Popup"
+                           Placement="Bottom"
+                           AllowsTransparency="True"
+                           IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                           StaysOpen="False"
+                           PlacementTarget="{Binding ElementName=Border}">
+                            <Border Background="{StaticResource MessageBackgroundBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                MinWidth="{Binding ActualWidth, ElementName=Border}">
+                                <ScrollViewer VerticalScrollBarVisibility="Hidden"
+                                        HorizontalScrollBarVisibility="Hidden">
+                                    <ItemsPresenter/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Canvas>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Border" Property="Background" 
+                                Value="{StaticResource MessageBackgroundBrush}"/>
+                            <Setter TargetName="Border" Property="BorderBrush" 
+                                Value="{StaticResource PrimaryTextBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsDropDownOpen" Value="True">
+                            <Setter TargetName="Border" Property="BorderBrush" 
+                                Value="{StaticResource PrimaryTextBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ComboItemStyle" TargetType="ComboBoxItem">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource SecondaryFontSize}"/>
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBoxItem">
+                    <Border x:Name="ItemBorder"
+                        Background="{TemplateBinding Background}"
+                        Padding="{TemplateBinding Padding}">
+                        <ContentPresenter/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ItemBorder" Property="Background" 
+                                Value="{StaticResource UserItemBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="ItemBorder" Property="Background" 
+                                Value="{StaticResource UserItemBrush}"/>
+                            <Setter TargetName="ItemBorder" Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+
 </ResourceDictionary>

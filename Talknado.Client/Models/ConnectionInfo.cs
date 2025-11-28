@@ -22,7 +22,6 @@ public partial class ConnectionInfo : ObservableObject, IConnectionInfo
 
     [ObservableProperty]
     private string _connectionKey = string.Empty;
-
     [ObservableProperty]
     private string _formattedConnectionKey = string.Empty;
 

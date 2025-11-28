@@ -76,7 +76,8 @@
                                         Style="{DynamicResource TopPanelButtonStyle}"
                                         Command="{Binding SoftRebootCommand}"/>
                                 <Button Content="Настройки" 
-                                        Style="{DynamicResource TopPanelButtonStyle}"/>
+                                        Style="{DynamicResource TopPanelButtonStyle}"
+                                        Command="{Binding ViewSettingsCommand}"/>
                                 <Button Content="О программе" 
                                         Style="{DynamicResource TopPanelButtonStyle}"
                                         Command="{Binding OpenLinkCommand}"/>

@@ -9,6 +9,8 @@
     <Color x:Key="TitleBarColor">#3B4A57</Color>
     <Color x:Key="TitleBarTextColor">#E8EAF0</Color>
     <Color x:Key="ScreenShareOnColor">#123d20</Color>
+    <Color x:Key="TitleBarButtonMouseOverColor">#5a7185</Color>
+    <Color x:Key="TitleBarCloseButtonMouseOverColor">#D64550</Color>
 
     <!-- Поля ввода -->
     <Color x:Key="TextBoxColor">#2f3640</Color>
@@ -16,11 +18,13 @@
     <!-- Текст -->
     <Color x:Key="PrimaryTextColor">#CED2E6</Color>
     <Color x:Key="SecondaryTextColor">#A7ADB9</Color>
+    <Color x:Key="SelectedDeviceColor">#23783f</Color>
 
     <!-- Сообщения и элементы -->
     <Color x:Key="MessageBackgroundColor">#313743</Color>
     <Color x:Key="UserItemColor">#373e4b</Color>
     <Color x:Key="UserItemButtonColor">#272c37</Color>
+    <Color x:Key="ErrorMessageColor">#e4848b</Color>
 
     <!-- Слайдеры -->
     <Color x:Key="TrackSliderColor">#242933</Color>
@@ -29,6 +33,7 @@
     <!-- Панели -->
     <Color x:Key="LeftPanelBackgroundColor">#1E2328</Color>
     <Color x:Key="RightPanelBackgroundColor">#20252A</Color>
+    <Color x:Key="SettingsBackgroundColor">#1F2429</Color>
 
     <!-- Границы -->
     <Color x:Key="BorderColor">#484C57</Color>
@@ -44,13 +49,18 @@
     <SolidColorBrush x:Key="TextBoxBrush" Color="{StaticResource TextBoxColor}"/>
     <SolidColorBrush x:Key="PrimaryTextBrush" Color="{StaticResource PrimaryTextColor}"/>
     <SolidColorBrush x:Key="SecondaryTextBrush" Color="{StaticResource SecondaryTextColor}"/>
+    <SolidColorBrush x:Key="SelectedDeviceBrush" Color="{StaticResource SelectedDeviceColor}"/>
     <SolidColorBrush x:Key="MessageBackgroundBrush" Color="{StaticResource MessageBackgroundColor}"/>
     <SolidColorBrush x:Key="UserItemBrush" Color="{StaticResource UserItemColor}"/>
     <SolidColorBrush x:Key="UserItemButtonBrush" Color="{StaticResource UserItemButtonColor}"/>
+    <SolidColorBrush x:Key="ErrorMessageBrush" Color="{StaticResource ErrorMessageColor}"/>
     <SolidColorBrush x:Key="TrackSliderBrush" Color="{StaticResource TrackSliderColor}"/>
     <SolidColorBrush x:Key="ThumbSliderBrush" Color="{StaticResource ThumbSliderColor}"/>
     <SolidColorBrush x:Key="LeftPanelBackgroundBrush" Color="{StaticResource LeftPanelBackgroundColor}"/>
     <SolidColorBrush x:Key="RightPanelBackgroundBrush" Color="{StaticResource RightPanelBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsBackgroundBrush" Color="{StaticResource SettingsBackgroundColor}"/>
     <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="TitleBarButtonMouseOverBrush" Color="{StaticResource TitleBarButtonMouseOverColor}"/>
+    <SolidColorBrush x:Key="TitleBarCloseButtonMouseOverBrush" Color="{StaticResource TitleBarCloseButtonMouseOverColor}"/>
 
 </ResourceDictionary>

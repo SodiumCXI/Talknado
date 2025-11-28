@@ -2,6 +2,7 @@
 using NAudio.Wave;
 using Talknado.Client.Models.Helpers;
 using Talknado.Client.Models.Helpers.Audio;
+using static Talknado.Client.Models.UsersAudioPlayer;
 
 namespace Talknado.Client.Models
 {
@@ -17,6 +18,7 @@ namespace Talknado.Client.Models
         private readonly ICryptoSessionManager _cryptoSessionManager;
         private readonly IConnectionInfo _connectionInfo;
         private readonly IUsersAudioPlayer _usersAudioPlayer;
+        private readonly ISettingsManager _settingsManager;
 
         private readonly CancellationTokenSource _receiveCancellationTokenSource;
         private CancellationTokenSource? _sendCancellationTokenSource;
@@ -31,13 +33,17 @@ namespace Talknado.Client.Models
             IUsersInfo usersInfo,
             ICryptoSessionManager cryptoSessionManager,
             IConnectionInfo connectionInfo,
-            IUsersAudioPlayer usersAudioPlayer)
+            IUsersAudioPlayer usersAudioPlayer,
+            ISettingsManager settingsManager)
         {
             _networkUtils = networkUtils;
             _usersInfo = usersInfo;
             _cryptoSessionManager = cryptoSessionManager;
             _connectionInfo = connectionInfo;
             _usersAudioPlayer = usersAudioPlayer;
+            _settingsManager = settingsManager;
+
+            _settingsManager.InputDeviceChanged += HandleInputDeviceChanged;
 
             _receiveCancellationTokenSource = new CancellationTokenSource();
             _audioReceiveThread = new(() => HandleReceiveAudio(_receiveCancellationTokenSource.Token))
@@ -46,6 +52,7 @@ namespace Talknado.Client.Models
             };
             _audioReceiveThread.Start();
         }
+
         public void ToggleMicrophoneStatus()
         {
             IsMicrophoneActive = !IsMicrophoneActive;
@@ -59,15 +66,18 @@ namespace Talknado.Client.Models
                 StopRecording();
             }
         }
+
         private void StartRecording()
         {
+            var deviceIndex = ResolveDeviceIndex(_settingsManager.SelectedInputDevice);
             _sendCancellationTokenSource = new CancellationTokenSource();
-            _audioSendThread = new(() => HandleSendAudio(_sendCancellationTokenSource.Token))
+            _audioSendThread = new(() => HandleSendAudio(deviceIndex, _sendCancellationTokenSource.Token))
             {
                 IsBackground = true
             };
             _audioSendThread.Start();
         }
+
         private void StopRecording()
         {
             _sendCancellationTokenSource?.Cancel();
@@ -75,6 +85,31 @@ namespace Talknado.Client.Models
             _sendCancellationTokenSource?.Dispose();
             _sendCancellationTokenSource = null;
         }
+
+        private static int ResolveDeviceIndex(string? deviceName)
+        {
+            if (string.IsNullOrEmpty(deviceName) || deviceName == "Устройство по умолчанию")
+                return -1;
+
+            for (int i = 0; i < WaveIn.DeviceCount; i++)
+            {
+                var caps = WaveIn.GetCapabilities(i);
+                if (caps.ProductName == deviceName)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        private void HandleInputDeviceChanged()
+        {
+            if (IsMicrophoneActive)
+            {
+                StopRecording();
+                StartRecording();
+            }
+        }
+
         private void HandleReceiveAudio(CancellationToken token)
         {
             while (!token.IsCancellationRequested)
@@ -98,10 +133,12 @@ namespace Talknado.Client.Models
                 catch { /* ignore */ }
             }
         }
-        private void HandleSendAudio(CancellationToken token)
+
+        private void HandleSendAudio(int deviceIndex, CancellationToken token)
         {
             using var waveIn = new WaveInEvent
             {
+                DeviceNumber = deviceIndex,
                 WaveFormat = new WaveFormat(48000, 16, 1),
                 BufferMilliseconds = 10
             };

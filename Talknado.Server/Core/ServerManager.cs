@@ -111,15 +111,13 @@ public class ServerManager(INetworkUtils networkUtils,
         var ni = NetworkInterface.GetAllNetworkInterfaces()
             .Where(n =>
                 n.OperationalStatus == OperationalStatus.Up &&
-                n.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
-                n.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
+                n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
             .Select(n => new
             {
                 Interface = n,
                 IPProps = n.GetIPProperties(),
-                Priority = GetInterfacePriority(n.NetworkInterfaceType)
+                Priority = GetInterfacePriority(n)
             })
-            .Where(x => x.IPProps.GatewayAddresses.Any(g => !g.Address.ToString().StartsWith("0.0.0.0")))
             .Where(x => x.IPProps.UnicastAddresses.Any(a =>
                 a.Address.AddressFamily == AddressFamily.InterNetwork))
             .OrderByDescending(x => x.Priority)
@@ -135,13 +133,21 @@ public class ServerManager(INetworkUtils networkUtils,
         return outwardIp;
     }
 
-    static int GetInterfacePriority(NetworkInterfaceType type)
+    private static int GetInterfacePriority(NetworkInterface networkInterface)
     {
-        return type switch
+        if (networkInterface.Name.Contains("ZeroTier", StringComparison.OrdinalIgnoreCase))
+            return 10;
+
+        var hasGateway = networkInterface.GetIPProperties().GatewayAddresses
+            .Any(g => !g.Address.ToString().StartsWith("0.0.0.0") &&
+                      g.Address.AddressFamily == AddressFamily.InterNetwork);
+
+        return networkInterface.NetworkInterfaceType switch
         {
+            NetworkInterfaceType.Ethernet when hasGateway => 5,
+            NetworkInterfaceType.Wireless80211 when hasGateway => 4,
             NetworkInterfaceType.Ethernet => 3,
             NetworkInterfaceType.Wireless80211 => 2,
-            NetworkInterfaceType.GigabitEthernet => 3,
             _ => 1
         };
     }
@@ -159,7 +165,7 @@ public class ServerManager(INetworkUtils networkUtils,
         }
         catch
         {
-            throw new IOException("No internet connection detected");
+            return "0.0.0.0";
         }
     }
 

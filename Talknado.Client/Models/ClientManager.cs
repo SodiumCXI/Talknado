@@ -24,7 +24,8 @@ namespace Talknado.Client.Models
         IScreenShareManager screenShareManager,
         IMessagesManager messagesManager,
         IScreenSharePlayer screenSharePlayer,
-        IWindowsState windowsState) : IClientManager, IDisposable
+        IWindowsState windowsState,
+        ISettingsManager settingsManager) : IClientManager, IDisposable
     {
         private readonly IUsersInfo _usersInfo = usersInfo;
         private readonly INetworkUtils _networkUtils = networkUtils;
@@ -34,10 +35,11 @@ namespace Talknado.Client.Models
         private readonly IMessagesManager _messagesManager = messagesManager;
         private readonly IScreenSharePlayer _screenSharePlayer = screenSharePlayer;
         private readonly IWindowsState _windowsState = windowsState;
+        private readonly ISettingsManager _settingsManager = settingsManager;
 
         private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
 
-        private readonly string _clientVersion = "v1.1.1";
+        private readonly string _clientVersion = "v1.2.0";
         private TcpClient _tcpMainClient = null!;
 
         private readonly CancellationTokenSource _receiveCancellationTokenSource = new();
@@ -75,6 +77,9 @@ namespace Talknado.Client.Models
                         break;
                     }
                 }
+
+                if (_connectionInfo.ServerIP == string.Empty || _connectionInfo.ServerPort == 0)
+                    throw new IOException("Сервер не найден");
 
                 _tcpMainClient = new(AddressFamily.InterNetwork);
                 _tcpMainClient.Connect(_connectionInfo.ServerIP, _connectionInfo.ServerPort);
@@ -408,7 +413,7 @@ namespace Talknado.Client.Models
                 // Start Screen Sharing
                 case var _ when command.Equals("#YYC"):
 
-                    _screenShareManager.StartSharing();
+                    _screenShareManager.StartSharing(_settingsManager.ScreenShareWithAudio);
 
                     break;
 
@@ -419,6 +424,9 @@ namespace Talknado.Client.Models
 
                     _screenSharePlayer.ScreenShareUsername = _usersInfo.GetUsernameByUserId(userIdSSS);
                     _usersInfo.UpdateScreenSharingState(userIdSSS, true);
+                    if (_settingsManager.AutoOpenScreenShareWindow)
+                        Application.Current.Dispatcher.Invoke(() =>
+                            _screenSharePlayer.IsWindowVisible = true);
 
                     break;
 

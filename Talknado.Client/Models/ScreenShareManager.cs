@@ -1,16 +1,18 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Talknado.Client.Models.Client.Helpers;
 using Talknado.Client.Models.Helpers;
+using Talknado.Client.Models.Helpers.Audio;
 using Talknado.Client.Models.Helpers.ScreenShare;
 
 namespace Talknado.Client.Models
 {
     public interface IScreenShareManager
     {
-        void StartSharing(bool withAudio = false);
+        void StartSharing(bool withAudio);
         void StopSharing();
         bool IsSharing { get; }
     }
@@ -31,12 +33,14 @@ namespace Talknado.Client.Models
         private readonly Thread _screenShareReceiveThread;
         private Thread? _screenShareSendThread;
 
-        private WasapiLoopbackCapture? _audioCapture;
+        private WasapiLoopbackCaptureWithProcessExclusion? _audioCapture;
 
         [ObservableProperty]
         private bool _isSharing = false;
 
         private bool _withAudio;
+        private byte[] _audioBuffer = [];
+        private int _audioBufferOffset = 0;
 
         public ScreenShareManager(
             INetworkUtils networkUtils,
@@ -57,7 +61,7 @@ namespace Talknado.Client.Models
             _screenShareReceiveThread.Start();
         }
 
-        public void StartSharing(bool withAudio = false)
+        public void StartSharing(bool withAudio)
         {
             if (IsSharing) return;
 
@@ -68,7 +72,7 @@ namespace Talknado.Client.Models
 
             if (withAudio)
             {
-                InitializeAudio(_sendCancellationTokenSource.Token);
+                InitializeAudio();
             }
 
             _screenShareSendThread = new(() => ShareScreenLoop(_sendCancellationTokenSource.Token))
@@ -94,9 +98,9 @@ namespace Talknado.Client.Models
             }
         }
 
-        private void InitializeAudio(CancellationToken token)
+        private void InitializeAudio()
         {
-            _audioCapture = new WasapiLoopbackCapture
+            _audioCapture = new WasapiLoopbackCaptureWithProcessExclusion
             {
                 WaveFormat = new WaveFormat(48000, 16, 1)
             };
@@ -107,11 +111,28 @@ namespace Talknado.Client.Models
 
                 try
                 {
-                    if (e.BytesRecorded >= AUDIO_FRAME_SIZE)
+                    int bytesAvailable = e.BytesRecorded;
+                    int bytesProcessed = 0;
+
+                    while (bytesAvailable > 0)
                     {
-                        var buffer = new byte[AUDIO_FRAME_SIZE];
-                        Buffer.BlockCopy(e.Buffer, 0, buffer, 0, AUDIO_FRAME_SIZE);
-                        SendAudioPacket(buffer, token);
+                        int bytesNeeded = AUDIO_FRAME_SIZE - _audioBufferOffset;
+                        int bytesToCopy = Math.Min(bytesNeeded, bytesAvailable);
+
+                        if (_audioBuffer.Length < AUDIO_FRAME_SIZE)
+                            _audioBuffer = new byte[AUDIO_FRAME_SIZE];
+
+                        Buffer.BlockCopy(e.Buffer, bytesProcessed, _audioBuffer, _audioBufferOffset, bytesToCopy);
+
+                        _audioBufferOffset += bytesToCopy;
+                        bytesProcessed += bytesToCopy;
+                        bytesAvailable -= bytesToCopy;
+
+                        if (_audioBufferOffset >= AUDIO_FRAME_SIZE)
+                        {
+                            SendAudioPacket(_audioBuffer);
+                            _audioBufferOffset = 0;
+                        }
                     }
                 }
                 catch { /* ignore */ }
@@ -129,7 +150,7 @@ namespace Talknado.Client.Models
             _audioCapture.StartRecording();
         }
 
-        private void SendAudioPacket(byte[] audioData, CancellationToken token)
+        private void SendAudioPacket(byte[] audioData)
         {
             var header = new PacketHeader
             {
@@ -162,9 +183,10 @@ namespace Talknado.Client.Models
 
                 if (encodedFrame != null)
                 {
-                    SendFramePacket(encodedFrame, token);
+                    SendFramePacket(encodedFrame);
 
-                    ProcessFrame(encodedFrame, token);
+                    if (_screenSharePlayer.IsWindowVisible)
+                        ProcessFrame(encodedFrame, token);
                 }
 
                 int delay = INTERVAL - (int)sw.ElapsedMilliseconds;
@@ -175,7 +197,7 @@ namespace Talknado.Client.Models
             }
         }
 
-        private void SendFramePacket(byte[] frameData, CancellationToken token)
+        private void SendFramePacket(byte[] frameData)
         {
             var header = new PacketHeader
             {
@@ -244,6 +266,7 @@ namespace Talknado.Client.Models
             _receiveCancellationTokenSource.Cancel();
             _screenShareReceiveThread.Join();
             _receiveCancellationTokenSource.Dispose();
+            _audioCapture?.Dispose();
 
             StopSharing();
             H264Encoder.Cleanup();
