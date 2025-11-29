@@ -33,7 +33,7 @@ namespace Talknado.Client.Models
         private readonly Thread _screenShareReceiveThread;
         private Thread? _screenShareSendThread;
 
-        private WasapiLoopbackCaptureWithProcessExclusion? _audioCapture;
+        private WasapiLoopbackCapture? _audioCapture;
 
         [ObservableProperty]
         private bool _isSharing = false;
@@ -100,7 +100,7 @@ namespace Talknado.Client.Models
 
         private void InitializeAudio()
         {
-            _audioCapture = new WasapiLoopbackCaptureWithProcessExclusion
+            _audioCapture = new WasapiLoopbackCapture
             {
                 WaveFormat = new WaveFormat(48000, 16, 1)
             };
