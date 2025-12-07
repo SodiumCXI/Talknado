@@ -57,5 +57,14 @@ namespace Talknado.Client.Views
             else
                 Hide();
         }
+
+        protected override void OnDeactivated(EventArgs e)
+        {
+            base.OnDeactivated(e);
+            if (DataContext is SettingsWindowViewModel ssvm)
+            {
+                ssvm.SettingManager.IsWindowVisible = false;
+            }
+        }
     }
 }

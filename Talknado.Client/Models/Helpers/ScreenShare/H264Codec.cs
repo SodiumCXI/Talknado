@@ -43,29 +43,13 @@ public static unsafe class H264Encoder
             _codecContext->time_base = new AVRational { num = 1, den = 30 };
             _codecContext->framerate = new AVRational { num = 30, den = 1 };
             _codecContext->pix_fmt = AVPixelFormat.AV_PIX_FMT_YUV420P;
-            _codecContext->gop_size = 30; // I-frame каждую 1 секунду
-            _codecContext->max_b_frames = 0; // Без B-frames
+            _codecContext->gop_size = 30;
+            _codecContext->max_b_frames = 0;
 
-            if (codecName.Contains("nvenc"))
-            {
-                ffmpeg.av_opt_set(_codecContext->priv_data, "preset", "p4", 0);
-                ffmpeg.av_opt_set(_codecContext->priv_data, "tune", "hq", 0);
-                ffmpeg.av_opt_set(_codecContext->priv_data, "rc", "cqp", 0);
-                ffmpeg.av_opt_set(_codecContext->priv_data, "cq", "28", 0);
-            }
-            else if (codecName.Contains("amf"))
-            {
-                ffmpeg.av_opt_set(_codecContext->priv_data, "usage", "lowlatency", 0);
-                ffmpeg.av_opt_set(_codecContext->priv_data, "quality", "balanced", 0);
-                ffmpeg.av_opt_set(_codecContext->priv_data, "rc", "cqp", 0);
-                ffmpeg.av_opt_set(_codecContext->priv_data, "qp_i", "28", 0);
-                ffmpeg.av_opt_set(_codecContext->priv_data, "qp_p", "28", 0);
-            }
-            else
+            if (codecName.Contains("libx264"))
             {
                 ffmpeg.av_opt_set(_codecContext->priv_data, "preset", "ultrafast", 0);
                 ffmpeg.av_opt_set(_codecContext->priv_data, "tune", "zerolatency", 0);
-                ffmpeg.av_opt_set(_codecContext->priv_data, "crf", "28", 0);
             }
 
             _ret = ffmpeg.avcodec_open2(_codecContext, _codec, null);

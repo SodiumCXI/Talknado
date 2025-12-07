@@ -2,7 +2,6 @@
 using NAudio.Wave;
 using Talknado.Client.Models.Helpers;
 using Talknado.Client.Models.Helpers.Audio;
-using static Talknado.Client.Models.UsersAudioPlayer;
 
 namespace Talknado.Client.Models
 {
@@ -147,13 +146,13 @@ namespace Talknado.Client.Models
             {
                 if (token.IsCancellationRequested) return;
 
-                byte[] microphoneData = new byte[e.BytesRecorded];
+                var microphoneData = new byte[e.BytesRecorded];
                 Array.Copy(e.Buffer, microphoneData, e.BytesRecorded);
 
-                byte[] audioData = NoiseSuppressor.Denoise(microphoneData);
+                var audioData = NoiseSuppressor.Denoise(microphoneData);
 
-                byte[] audioPacket = AddIdToAudioPacket(audioData, _connectionInfo.LocalUserId);
-                byte[] encryptedAudioPacket = _cryptoSessionManager.EncryptMessage(audioPacket);
+                var audioPacket = AddIdToAudioPacket(audioData, _connectionInfo.LocalUserId);
+                var encryptedAudioPacket = _cryptoSessionManager.EncryptMessage(audioPacket);
 
                 try
                 {

@@ -16,10 +16,10 @@ public interface IServerInfo
 public class ServerInfo : IServerInfo
 {
     private readonly string _serverVersion = "v1.1.2";
-    private readonly ImmutableArray<string> _validClientVersions = ["v1.2.0", "v1.2.1"];
+    private readonly ImmutableArray<string> _validClientVersions = ["v1.2.0", "v1.2.1", "v1.2.2"];
     private byte[]? _passwordHash = null;
 
-    public int Port { get; set; } = 38525;
+    public int Port { get; set; } = 37535;
 
     public string GetServerVersion()
     {
