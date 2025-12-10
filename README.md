@@ -27,8 +27,11 @@ A lightweight low-latency application for real-time communication consisting of 
 - Symmetric encryption with session keys
 - Optional server join password
 
-## Purpose
-Team communication tool emphasizing simple deployment and hardware-accelerated video.
+## How to Use Over the Internet
+To use Talknado over a global network, all participants must join the same **ZeroTier** virtual network:
+1. Install ZeroTier on each device.
+2. Join the same ZeroTier network using its Network ID.
+3. Enjoy!
 
 ---
 
@@ -59,5 +62,8 @@ Team communication tool emphasizing simple deployment and hardware-accelerated v
 - Симметричное шифрование с сессионными ключами
 - Опциональный пароль для подключения к серверу
 
-## Назначение
-Инструмент для командного общения с акцентом на простоту развертывания и аппаратное ускорение видео.
+## Как использовать через интернет
+Чтобы использовать Talknado через глобальную сеть, всем участникам необходимо подключиться к одной и той же виртуальной сети **ZeroTier**:
+1. Установите ZeroTier на каждое устройство.
+2. Подключитесь к одной и той же сети ZeroTier, используя её Network ID.
+3. Пользуйтесь!
