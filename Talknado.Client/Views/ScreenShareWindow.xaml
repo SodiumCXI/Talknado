@@ -32,8 +32,8 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0"
-                            Orientation="Horizontal">
+                <DockPanel Grid.Column="0"
+                            LastChildFill="False">
                     <TextBlock Style="{DynamicResource PrimaryTextStyle}"
                                VerticalAlignment="Center"
                                FontWeight="DemiBold"
@@ -53,7 +53,14 @@
                                FontWeight="DemiBold"
                                Margin="4,0"
                                Text="FPS"/>
-                </StackPanel>
+                    <Slider Style="{DynamicResource ModernSliderStyle}"
+                            Width="100"
+                            Minimum="0" Maximum="100"
+                            Value="{Binding UsersInfo.ScreenShareVolume}"
+                            Margin="10,0"
+                            VerticalAlignment="Center"
+                            DockPanel.Dock="Right"/>
+                </DockPanel>
                 <Button Grid.Column="1"
                     x:Name="MinimizeButton"
                     Style="{DynamicResource MinimizeButtonStyle}"

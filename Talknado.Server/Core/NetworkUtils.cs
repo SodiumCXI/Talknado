@@ -8,9 +8,9 @@ namespace Talknado.Server.Core
     public interface INetworkUtils
     {
         void Start(CancellationToken token);
-        Task BroadcastAudioPacket(ushort currentUserId, byte[] data, CancellationToken token);
+        Task BroadcastAudioPacket(ushort currentUserId, byte[] data);
         Task<(byte[], ushort)?> ReceiveAudioPacketAsync(CancellationToken token);
-        Task BroadcastScreenSharePacket(ushort currentUserId, byte[] data, CancellationToken token);
+        Task BroadcastScreenSharePacket(ushort currentUserId, byte[] data);
         Task<(byte[], ushort)?> ReceiveScreenSharePacketAsync(CancellationToken token);
         Task BroadcastMessage(ushort currentUserId, byte[] data, CancellationToken token);
         Task WritePacketAsync(NetworkStream stream, byte[] data, CancellationToken token);
@@ -25,7 +25,7 @@ namespace Talknado.Server.Core
 
         private readonly NetManager _netManager;
 
-        private Dictionary<IPEndPoint, ushort> _pendingConnections = new();
+        private readonly Dictionary<IPEndPoint, ushort> _pendingConnections = [];
 
         private readonly Queue<(byte[], ushort)> _audioPackets = new();
         private readonly Queue<(byte[], ushort)> _screenSharePackets = new();
@@ -66,21 +66,21 @@ namespace Talknado.Server.Core
             }
         }
 
-        public async Task BroadcastAudioPacket(ushort currentUserId, byte[] data, CancellationToken token)
+        public async Task BroadcastAudioPacket(ushort currentUserId, byte[] data)
         {
             foreach (var peer in _usersInfo.GetNetPeers(currentUserId))
             {
-                await SendAudioPacketAsync(data, peer, token);
+                await SendAudioPacketAsync(data, peer);
             }
         }
 
-        private static async Task SendAudioPacketAsync(byte[] packet, NetPeer peer, CancellationToken token)
+        private static async Task SendAudioPacketAsync(byte[] packet, NetPeer peer)
         {
             try
             {
                 var writer = new NetDataWriter();
                 writer.Put(packet);
-                peer.Send(writer, AudioChannel, DeliveryMethod.ReliableOrdered);
+                peer.Send(writer, AudioChannel, DeliveryMethod.ReliableSequenced);
             }
             catch { /* ignore */ }
 
@@ -97,15 +97,15 @@ namespace Talknado.Server.Core
             }
         }
 
-        public async Task BroadcastScreenSharePacket(ushort currentUserId, byte[] data, CancellationToken token)
+        public async Task BroadcastScreenSharePacket(ushort currentUserId, byte[] data)
         {
             foreach (var peer in _usersInfo.GetNetPeers(currentUserId))
             {
-                await SendScreenSharePacketAsync(data, peer, token);
+                await SendScreenSharePacketAsync(data, peer);
             }
         }
 
-        private static async Task SendScreenSharePacketAsync(byte[] packet, NetPeer peer, CancellationToken token)
+        private static async Task SendScreenSharePacketAsync(byte[] packet, NetPeer peer)
         {
             try
             {

@@ -43,7 +43,7 @@ public class ScreenShareManager : IScreenShareManager, IDisposable
                     continue;
 
                 var data = dataWithId.Value.Item1;
-                _networkUtils.BroadcastScreenSharePacket(userId, data, token).GetAwaiter().GetResult();
+                _networkUtils.BroadcastScreenSharePacket(userId, data).GetAwaiter().GetResult();
             }
             catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex)) { /* ignore */ }
             catch

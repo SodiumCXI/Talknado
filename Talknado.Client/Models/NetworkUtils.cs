@@ -98,7 +98,7 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
         {
             var writer = new NetDataWriter();
             writer.Put(packet);
-            _serverPeer.Send(writer, AudioChannel, DeliveryMethod.ReliableOrdered);
+            _serverPeer.Send(writer, AudioChannel, DeliveryMethod.ReliableSequenced);
             _netManager?.PollEvents();
         }
         catch { /* ignore */ }

@@ -44,8 +44,6 @@ namespace Talknado.Client.Models
             _usersAudioPlayer = usersAudioPlayer;
             _screenSharePlayer = screenSharePlayer;
 
-            AudioCapture.SendAudioPacket = SendAudioPacket;
-
             _receiveCancellationTokenSource = new CancellationTokenSource();
             _screenShareReceiveThread = new(() => HandleReceiveScreenShare(_receiveCancellationTokenSource.Token))
             {
@@ -83,24 +81,6 @@ namespace Talknado.Client.Models
             _sendCancellationTokenSource = null;
 
             AudioCapture.Stop();
-        }
-
-        private void SendAudioPacket(byte[] audioData)
-        {
-            var header = new PacketHeader
-            {
-                IsAudio = 1
-            };
-
-            var headerBytes = header.ToBytes();
-            var packet = new byte[PacketHeader.SIZE + audioData.Length];
-            Buffer.BlockCopy(headerBytes, 0, packet, 0, headerBytes.Length);
-            Buffer.BlockCopy(audioData, 0, packet, headerBytes.Length, audioData.Length);
-
-            var encryptedPacket = _cryptoSessionManager.EncryptMessage(packet);
-            _networkUtils.SendScreenSharePacketAsync(encryptedPacket).GetAwaiter().GetResult();
-
-            _usersAudioPlayer.Play(0, audioData);
         }
 
         private void ShareScreenLoop(CancellationToken token)

@@ -32,7 +32,7 @@ public class AudioManager : IDisposable
 
                 var data = dataWithId.Value.Item1;
                 var userId = dataWithId.Value.Item2;
-                _networkUtils.BroadcastAudioPacket(userId, data, token).GetAwaiter().GetResult();
+                _networkUtils.BroadcastAudioPacket(userId, data).GetAwaiter().GetResult();
             }
             catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex)) { /* ignore */ }
             catch

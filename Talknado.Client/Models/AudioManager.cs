@@ -18,6 +18,7 @@ namespace Talknado.Client.Models
         private readonly IConnectionInfo _connectionInfo;
         private readonly IUsersAudioPlayer _usersAudioPlayer;
         private readonly ISettingsManager _settingsManager;
+        private readonly IScreenSharePlayer _screenSharePlayer;
 
         private readonly CancellationTokenSource _receiveCancellationTokenSource;
         private CancellationTokenSource? _sendCancellationTokenSource;
@@ -33,7 +34,8 @@ namespace Talknado.Client.Models
             ICryptoSessionManager cryptoSessionManager,
             IConnectionInfo connectionInfo,
             IUsersAudioPlayer usersAudioPlayer,
-            ISettingsManager settingsManager)
+            ISettingsManager settingsManager,
+            IScreenSharePlayer screenSharePlayer)
         {
             _networkUtils = networkUtils;
             _usersInfo = usersInfo;
@@ -41,6 +43,7 @@ namespace Talknado.Client.Models
             _connectionInfo = connectionInfo;
             _usersAudioPlayer = usersAudioPlayer;
             _settingsManager = settingsManager;
+            _screenSharePlayer = screenSharePlayer;
 
             _settingsManager.InputDeviceChanged += HandleInputDeviceChanged;
 
@@ -50,6 +53,8 @@ namespace Talknado.Client.Models
                 IsBackground = true
             };
             _audioReceiveThread.Start();
+
+            AudioCapture.SendAudioPacket = SendScreenShareAudioPacket;
         }
 
         public void ToggleMicrophoneStatus()
@@ -120,6 +125,9 @@ namespace Talknado.Client.Models
                     byte[] decryptedData = _cryptoSessionManager.DecryptMessage(packet);
                     SplitAudioPacket(decryptedData, out byte[] audioData, out ushort userId);
 
+                    if (userId == 0 && !_screenSharePlayer.IsWindowVisible)
+                        continue;
+
                     if (AdjustTrackBarVolume(audioData, userId))
                         _usersAudioPlayer.Play(userId, audioData);
                     else
@@ -151,19 +159,7 @@ namespace Talknado.Client.Models
 
                 var audioData = NoiseSuppressor.Denoise(microphoneData);
 
-                var audioPacket = AddIdToAudioPacket(audioData, _connectionInfo.LocalUserId);
-                var encryptedAudioPacket = _cryptoSessionManager.EncryptMessage(audioPacket);
-
-                try
-                {
-                    _networkUtils.SendAudioPacketAsync(encryptedAudioPacket).GetAwaiter().GetResult();
-                }
-                catch { /* ignore */ }
-
-                if (AdjustTrackBarVolume(audioData, _connectionInfo.LocalUserId))
-                    _usersAudioPlayer.Play(_connectionInfo.LocalUserId, audioData);
-                else
-                    _usersAudioPlayer.Play(_connectionInfo.LocalUserId, null);
+                SendAudioPacket(audioData, _connectionInfo.LocalUserId);
             }
 
             waveIn.DataAvailable += OnDataAvailable;
@@ -177,6 +173,31 @@ namespace Talknado.Client.Models
             {
                 waveIn.DataAvailable -= OnDataAvailable;
                 waveIn.StopRecording();
+            }
+        }
+
+        private void SendScreenShareAudioPacket(byte[] audioData)
+        {
+            SendAudioPacket(audioData, 0);
+        }
+
+        private void SendAudioPacket(byte[] audioData, ushort userId)
+        {
+            var audioPacket = AddIdToAudioPacket(audioData, userId);
+            var encryptedAudioPacket = _cryptoSessionManager.EncryptMessage(audioPacket);
+
+            try
+            {
+                _networkUtils.SendAudioPacketAsync(encryptedAudioPacket).GetAwaiter().GetResult();
+            }
+            catch { /* ignore */ }
+
+            if (userId != 0)
+            {
+                if (AdjustTrackBarVolume(audioData, userId))
+                    _usersAudioPlayer.Play(userId, audioData);
+                else
+                    _usersAudioPlayer.Play(userId, null);
             }
         }
 

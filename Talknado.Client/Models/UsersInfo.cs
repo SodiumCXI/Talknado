@@ -22,6 +22,9 @@ public partial class UsersInfo : ObservableObject, IUsersInfo
     private ObservableCollection<UserItem> _users = [];
     private readonly ConcurrentDictionary<ushort, UserItem> _userLookup = [];
 
+    [ObservableProperty]
+    private float _screenShareVolume = 50f;
+
     private readonly IUsersAudioPlayer _usersAudioPlayer;
     private readonly IConnectionInfo _connectionInfo;
     private readonly IWindowsState _windowsState;
@@ -38,7 +41,10 @@ public partial class UsersInfo : ObservableObject, IUsersInfo
 
     public float GetVolumeByUserId(ushort userId)
     {
-        return _userLookup.TryGetValue(userId, out var user) ? user.Volume : 0f;
+        if (userId == 0)
+            return ScreenShareVolume;
+        else
+            return _userLookup.TryGetValue(userId, out var user) ? user.Volume : 0f;
     }
 
     public string GetUsernameByUserId(ushort userId)
@@ -113,16 +119,16 @@ public partial class UsersInfo : ObservableObject, IUsersInfo
     public partial class UserItem : ObservableObject
     {
         [ObservableProperty]
-        public string _username;
+        private string _username;
 
         [ObservableProperty]
-        public bool _isMicrophoneActive;
+        private bool _isMicrophoneActive;
 
         [ObservableProperty]
-        public bool _isScreenShareActive;
+        private bool _isScreenShareActive;
 
         [ObservableProperty]
-        public float _volume = 50f;
+        private float _volume = 50f;
 
         public UserItem(string username, bool isMicrophoneActive, bool isScreenSharingActive)
         {
