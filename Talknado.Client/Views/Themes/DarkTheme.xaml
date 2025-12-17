@@ -29,6 +29,7 @@
     <!-- Слайдеры -->
     <Color x:Key="TrackSliderColor">#242933</Color>
     <Color x:Key="ThumbSliderColor">#506475</Color>
+    <Color x:Key="SecondaryThumbSliderColor">#5A7184</Color>
 
     <!-- Панели -->
     <Color x:Key="LeftPanelBackgroundColor">#1E2328</Color>
@@ -56,6 +57,7 @@
     <SolidColorBrush x:Key="ErrorMessageBrush" Color="{StaticResource ErrorMessageColor}"/>
     <SolidColorBrush x:Key="TrackSliderBrush" Color="{StaticResource TrackSliderColor}"/>
     <SolidColorBrush x:Key="ThumbSliderBrush" Color="{StaticResource ThumbSliderColor}"/>
+    <SolidColorBrush x:Key="SecondaryThumbSliderBrush" Color="{StaticResource SecondaryThumbSliderColor}"/>
     <SolidColorBrush x:Key="LeftPanelBackgroundBrush" Color="{StaticResource LeftPanelBackgroundColor}"/>
     <SolidColorBrush x:Key="RightPanelBackgroundBrush" Color="{StaticResource RightPanelBackgroundColor}"/>
     <SolidColorBrush x:Key="SettingsBackgroundBrush" Color="{StaticResource SettingsBackgroundColor}"/>

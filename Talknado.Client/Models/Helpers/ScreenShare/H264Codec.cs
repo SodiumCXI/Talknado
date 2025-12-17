@@ -28,7 +28,7 @@ public static unsafe class H264Encoder
 
         _frameCount = 0;
 
-        string[] codecNames = { "h264_nvenc", "h264_amf", "libx264" };
+        string[] codecNames = { "h264_nvenc", "libx264" };
         bool codecOpened = false;
 
         foreach (var codecName in codecNames)
@@ -46,10 +46,18 @@ public static unsafe class H264Encoder
             _codecContext->gop_size = 30;
             _codecContext->max_b_frames = 0;
 
-            if (codecName.Contains("libx264"))
+            if (codecName.Contains("nvenc"))
+            {
+                ffmpeg.av_opt_set(_codecContext->priv_data, "preset", "p4", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "tune", "hq", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "rc", "cqp", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "cq", "28", 0);
+            }
+            else if (codecName.Contains("libx"))
             {
                 ffmpeg.av_opt_set(_codecContext->priv_data, "preset", "ultrafast", 0);
                 ffmpeg.av_opt_set(_codecContext->priv_data, "tune", "zerolatency", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "crf", "28", 0);
             }
 
             _ret = ffmpeg.avcodec_open2(_codecContext, _codec, null);

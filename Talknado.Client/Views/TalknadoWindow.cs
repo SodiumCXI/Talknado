@@ -143,8 +143,8 @@ namespace Talknado.Client.Views
             {
                 if (borderAround != null)
                 {
-                    MaxWidth = SystemParameters.WorkArea.Width + (borderAround.BorderThickness.Left + borderAround.BorderThickness.Right);
-                    MaxHeight = SystemParameters.WorkArea.Height + (borderAround.BorderThickness.Top + borderAround.BorderThickness.Bottom);
+                    MaxWidth = SystemParameters.WorkArea.Width + (borderAround.BorderThickness.Left + borderAround.BorderThickness.Right) + 1;
+                    MaxHeight = SystemParameters.WorkArea.Height + (borderAround.BorderThickness.Top + borderAround.BorderThickness.Bottom) + 1;
                 }
                 else
                 {

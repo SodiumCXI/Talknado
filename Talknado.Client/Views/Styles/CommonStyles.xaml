@@ -48,9 +48,9 @@
     <Style x:Key="StartWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
         <Setter Property="Title" Value="Talknado Connect"/>
         <Setter Property="Height" Value="355"/>
-        <Setter Property="Width" Value="321"/>
+        <Setter Property="Width" Value="319"/>
         <Setter Property="MinHeight" Value="355"/>
-        <Setter Property="MinWidth" Value="321"/>
+        <Setter Property="MinWidth" Value="319"/>
     </Style>
 
     <Style x:Key="SettingsWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
@@ -71,7 +71,7 @@
     </Style>
 
     <Style x:Key="BorderAround" TargetType="Border">
-        <Setter Property="BorderThickness" Value="7"/>
+        <Setter Property="BorderThickness" Value="6"/>
         <Setter Property="BorderBrush" Value="#01000000"/>
         <Setter Property="HorizontalAlignment" Value="Stretch"/>
         <Setter Property="VerticalAlignment" Value="Stretch"/>
@@ -166,24 +166,24 @@
 
     <Style x:Key="ModernSliderStyle" TargetType="Slider">
         <Setter Property="Background" Value="{DynamicResource TrackSliderBrush}"/>
-        <Setter Property="Foreground" Value="{DynamicResource TitleBarBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThumbSliderBrush}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Slider">
                     <Grid>
                         <Border Height="5"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="2"
-                                BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="1"/>
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="2"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"/>
                         <Border x:Name="FillTrack"
-                                Height="5"
-                                Background="{TemplateBinding Foreground}"
-                                CornerRadius="2"
-                                HorizontalAlignment="Center"
-                                Width="{Binding Path=Value,
-                                                RelativeSource={RelativeSource AncestorType=Slider},
-                                                Converter={StaticResource SliderWidthConverter}}"/>
+                            Height="5"
+                            Background="{TemplateBinding Foreground}"
+                            CornerRadius="2"
+                            HorizontalAlignment="Center"
+                            Width="{Binding Path=Value,
+                                            RelativeSource={RelativeSource AncestorType=Slider},
+                                            Converter={StaticResource SliderWidthConverter}}"/>
                         <Track x:Name="PART_Track">
                             <Track.DecreaseRepeatButton>
                                 <RepeatButton Style="{StaticResource InvisibleRepeatButton}" Command="{x:Static Slider.DecreaseLarge}" Height="18"/>
@@ -192,7 +192,11 @@
                                 <Thumb>
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <Border Width="10" Height="18" Background="{DynamicResource ThumbSliderBrush}" CornerRadius="2"/>
+                                            <Border Width="10" 
+                                                Height="18" 
+                                                CornerRadius="2"
+                                                Background="{Binding Foreground, 
+                                                         RelativeSource={RelativeSource AncestorType=Slider}}"/>
                                         </ControlTemplate>
                                     </Thumb.Template>
                                 </Thumb>

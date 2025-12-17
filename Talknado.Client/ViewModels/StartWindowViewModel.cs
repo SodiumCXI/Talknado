@@ -43,6 +43,12 @@ public partial class StartWindowViewModel : ObservableObject
             ErrorMessage = usernameError;
             return;
         }
+        var passwordError = CheckPassword(PasswordTextBoxValue);
+        if (passwordError != null)
+        {
+            ErrorMessage = passwordError;
+            return;
+        }
 
         _serverHost = new ServerHost();
 
@@ -103,6 +109,13 @@ public partial class StartWindowViewModel : ObservableObject
             return "Никнейм не может содержать пробелы в начале и в конце";
         else if (username.Length > 20)
             return "Никнейм не может быть длиннее 20 символов";
+        return null;
+    }
+
+    private static string? CheckPassword(string password)
+    {
+        if (password.Contains(' '))
+            return "Пароль не может содержать пробелы";
         return null;
     }
 
