@@ -20,7 +20,7 @@ A lightweight low-latency real-time communication application. Provides **voice 
 - H.264 encoding/decoding
 - TCP/UDP network client
 
-### Embedded Server (DLL inside client)
+### Embedded Server (DLL .NET 8)
 - Session and user management
 - Media relaying between clients
 
@@ -56,7 +56,7 @@ To use Talknado over a global network, all participants must join the same **Zer
 - Кодирование/декодирование H.264
 - Сетевой клиент TCP/UDP
 
-### Встроенный сервер (DLL внутри клиента)
+### Встроенный сервер (DLL .NET 8)
 - Управление сессиями и пользователями
 - Ретрансляция медиа между клиентами
 
