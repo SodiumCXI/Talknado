@@ -57,6 +57,8 @@ public partial class ScreenShareWindow : TalknadoWindow, IDisposable
 
     public void Dispose()
     {
+        UseCustomClose = false;
+
         try
         {
             Application.Current?.Dispatcher.Invoke(Close);

@@ -32,6 +32,8 @@ public partial class MainWindowViewModel(IClientManager clientManager,
     [ObservableProperty]
     private string _inputTextBoxValue = string.Empty;
 
+    public bool UseDisconnect { get; set; } = false;
+
     [RelayCommand]
     private void SendMessage()
     {
@@ -77,6 +79,7 @@ public partial class MainWindowViewModel(IClientManager clientManager,
     [RelayCommand]
     private void SoftReboot()
     {
+        UseDisconnect = true;
         _windowsState.InvokeClientDisconnected();
     }
 

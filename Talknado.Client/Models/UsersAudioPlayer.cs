@@ -13,7 +13,7 @@ namespace Talknado.Client.Models
     public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
     {
         private readonly ConcurrentDictionary<ushort, UserAudioStream> _userAudioStreams = [];
-        private readonly TimeSpan _streamTimeout = TimeSpan.FromMilliseconds(100);
+        private readonly TimeSpan _streamTimeout = TimeSpan.FromMilliseconds(150);
         private readonly Timer _cleanupTimer;
 
         public event Action<ushort>? UserAdded;
@@ -25,7 +25,7 @@ namespace Talknado.Client.Models
         {
             _settingsManager = settingsManager;
 
-            _cleanupTimer = new(CheckInactiveStreams, null, 0, 1000);
+            _cleanupTimer = new(CheckInactiveStreams, null, 0, 200);
             _cleanupTimer.ConfigureAwait(false);
 
             _settingsManager.OutputDeviceChanged += HandleOutputDeviceChanged;

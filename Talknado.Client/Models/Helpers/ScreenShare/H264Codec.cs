@@ -28,7 +28,7 @@ public static unsafe class H264Encoder
 
         _frameCount = 0;
 
-        string[] codecNames = { "h264_nvenc", "libx264" };
+        string[] codecNames = { "h264_nvenc", "h264_amf", "libx264" };
         bool codecOpened = false;
 
         foreach (var codecName in codecNames)
@@ -51,13 +51,26 @@ public static unsafe class H264Encoder
                 ffmpeg.av_opt_set(_codecContext->priv_data, "preset", "p4", 0);
                 ffmpeg.av_opt_set(_codecContext->priv_data, "tune", "hq", 0);
                 ffmpeg.av_opt_set(_codecContext->priv_data, "rc", "cqp", 0);
-                ffmpeg.av_opt_set(_codecContext->priv_data, "cq", "28", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "cq", "30", 0);
+            }
+            else if (codecName.Contains("amf"))
+            {
+                ffmpeg.av_opt_set(_codecContext->priv_data, "usage", "lowlatency", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "rc", "cqp", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "qp_i", "30", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "qp_p", "32", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "profile", "high", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "bf", "0", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "lowlatency", "true", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "quality", "speed", 0);
             }
             else if (codecName.Contains("libx"))
             {
                 ffmpeg.av_opt_set(_codecContext->priv_data, "preset", "ultrafast", 0);
                 ffmpeg.av_opt_set(_codecContext->priv_data, "tune", "zerolatency", 0);
-                ffmpeg.av_opt_set(_codecContext->priv_data, "crf", "28", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "crf", "32", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "x264-params", "nal-hrd=cbr:force-cfr=1:aq-mode=0:ref=1", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "intra-refresh", "1", 0);
             }
 
             _ret = ffmpeg.avcodec_open2(_codecContext, _codec, null);
@@ -96,14 +109,14 @@ public static unsafe class H264Encoder
 
     private static void CalculateScaledDimensions(int inputWidth, int inputHeight, out int width, out int height)
     {
-        const int maxPixels = 2073600;
+        const int MAX_PIXELS = 921600;
 
         width = inputWidth;
         height = inputHeight;
 
-        if (width * height > maxPixels)
+        if (width * height > MAX_PIXELS)
         {
-            double scale = Math.Sqrt((double)maxPixels / (width * height));
+            double scale = Math.Sqrt((double)MAX_PIXELS / (width * height));
             width = (int)(width * scale);
             height = (int)(height * scale);
 

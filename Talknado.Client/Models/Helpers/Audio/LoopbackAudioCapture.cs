@@ -2,7 +2,7 @@
 
 namespace Talknado.Client.Models.Helpers.Audio;
 
-public partial class AudioCapture
+public partial class LoopbackAudioCapture
 {
     private delegate void AudioCallback(IntPtr data, int length);
 

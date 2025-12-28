@@ -32,7 +32,8 @@ public partial class MainWindow : TalknadoWindow, IMainWindow, IDisposable
         var vm = DataContext as MainWindowViewModel;
         vm?.CloseConnectionCommand.Execute(null);
 
-        Application.Current.Shutdown();
+        if (vm?.UseDisconnect != true)
+            Application.Current.Shutdown();
     }
 
     private void TextBox_MouseDown(object sender, MouseButtonEventArgs e)
@@ -194,6 +195,8 @@ public partial class MainWindow : TalknadoWindow, IMainWindow, IDisposable
 
     public void Dispose()
     {
+        UseCustomClose = false;
+
         try
         {
             Application.Current?.Dispatcher.Invoke(Close);

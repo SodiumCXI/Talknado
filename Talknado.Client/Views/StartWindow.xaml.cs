@@ -3,7 +3,7 @@ using Talknado.Client.ViewModels;
 
 namespace Talknado.Client.Views;
 
-public partial class StartWindow : TalknadoWindow
+public partial class StartWindow : TalknadoWindow, IDisposable
 {
     public StartWindow()
     {
@@ -19,5 +19,23 @@ public partial class StartWindow : TalknadoWindow
                 Visibility = startWindowViewModel.IsVisible ? Visibility.Visible : Visibility.Collapsed;
             }
         };
+    }
+
+    protected override void OnCloseButtonClick()
+    {
+        Application.Current.Shutdown();
+    }
+
+    public void Dispose()
+    {
+        UseCustomClose = false;
+
+        try
+        {
+            Application.Current?.Dispatcher.Invoke(Close);
+        }
+        catch { /* ignore */ }
+
+        GC.SuppressFinalize(this);
     }
 }

@@ -8,7 +8,7 @@ namespace Talknado.Client.Views
     /// <summary>
     /// Логика взаимодействия для SettingsWindow.xaml
     /// </summary>
-    public partial class SettingsWindow : TalknadoWindow
+    public partial class SettingsWindow : TalknadoWindow, IDisposable
     {
         public SettingsWindow()
         {
@@ -65,6 +65,19 @@ namespace Talknado.Client.Views
             {
                 ssvm.SettingManager.IsWindowVisible = false;
             }
+        }
+
+        public void Dispose()
+        {
+            UseCustomClose = false;
+
+            try
+            {
+                Application.Current?.Dispatcher.Invoke(Close);
+            }
+            catch { /* ignore */ }
+
+            GC.SuppressFinalize(this);
         }
     }
 }

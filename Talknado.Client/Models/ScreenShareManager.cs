@@ -62,7 +62,7 @@ namespace Talknado.Client.Models
 
             if (withAudio)
             {
-                AudioCapture.InitializeAudio();
+                LoopbackAudioCapture.InitializeAudio();
             }
 
             _screenShareSendThread = new(() => ShareScreenLoop(_sendCancellationTokenSource.Token))
@@ -80,7 +80,7 @@ namespace Talknado.Client.Models
             _sendCancellationTokenSource?.Dispose();
             _sendCancellationTokenSource = null;
 
-            AudioCapture.Stop();
+            LoopbackAudioCapture.Stop();
         }
 
         private void ShareScreenLoop(CancellationToken token)
@@ -186,7 +186,7 @@ namespace Talknado.Client.Models
 
             StopSharing();
 
-            AudioCapture.Dispose();
+            LoopbackAudioCapture.Dispose();
             H264Encoder.Cleanup();
 
             GC.SuppressFinalize(this);

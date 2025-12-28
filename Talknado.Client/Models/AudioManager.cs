@@ -54,7 +54,7 @@ namespace Talknado.Client.Models
             };
             _audioReceiveThread.Start();
 
-            AudioCapture.SendAudioPacket = SendScreenShareAudioPacket;
+            LoopbackAudioCapture.SendAudioPacket = SendScreenShareAudioPacket;
         }
 
         public void ToggleMicrophoneStatus()
@@ -121,9 +121,11 @@ namespace Talknado.Client.Models
                 try
                 {
                     var packet = _networkUtils.ReceiveAudioPacketAsync(token).GetAwaiter().GetResult();
+                    var opusPacket = _cryptoSessionManager.DecryptMessage(packet);
 
-                    byte[] decryptedData = _cryptoSessionManager.DecryptMessage(packet);
-                    SplitAudioPacket(decryptedData, out byte[] audioData, out ushort userId);
+                    SplitAudioPacket(opusPacket, out byte[] opusData, out ushort userId);
+
+                    var audioData = OpusCodec.Decode(opusData);
 
                     if (userId == 0 && !_screenSharePlayer.IsWindowVisible)
                         continue;
@@ -159,7 +161,9 @@ namespace Talknado.Client.Models
 
                 var audioData = NoiseSuppressor.Denoise(microphoneData);
 
-                SendAudioPacket(audioData, _connectionInfo.LocalUserId);
+                var opusData = OpusCodec.Encode(audioData);
+
+                SendAudioPacket(opusData, audioData, _connectionInfo.LocalUserId);
             }
 
             waveIn.DataAvailable += OnDataAvailable;
@@ -178,24 +182,28 @@ namespace Talknado.Client.Models
 
         private void SendScreenShareAudioPacket(byte[] audioData)
         {
-            SendAudioPacket(audioData, 0);
+            var opusData = OpusCodec.Encode(audioData);
+
+            SendAudioPacket(opusData, audioData, 0);
         }
 
-        private void SendAudioPacket(byte[] audioData, ushort userId)
+        private void SendAudioPacket(byte[] opusData, byte[] audioData, ushort userId)
         {
-            var audioPacket = AddIdToAudioPacket(audioData, userId);
-            var encryptedAudioPacket = _cryptoSessionManager.EncryptMessage(audioPacket);
+            var opusPacket = AddIdToAudioPacket(opusData, userId);
+            var encryptedOpusPacket = _cryptoSessionManager.EncryptMessage(opusPacket);
 
             try
             {
-                _networkUtils.SendAudioPacketAsync(encryptedAudioPacket).GetAwaiter().GetResult();
+                _networkUtils.SendAudioPacketAsync(encryptedOpusPacket).GetAwaiter().GetResult();
             }
             catch { /* ignore */ }
 
             if (userId != 0)
             {
                 if (AdjustTrackBarVolume(audioData, userId))
+                {
                     _usersAudioPlayer.Play(userId, audioData);
+                }
                 else
                     _usersAudioPlayer.Play(userId, null);
             }
@@ -212,27 +220,26 @@ namespace Talknado.Client.Models
             return result;
         }
 
-        private static void SplitAudioPacket(byte[] audioPacket, out byte[] audioData, out ushort userId, int audioDataLength = 960)
+        private static void SplitAudioPacket(byte[] audioPacket, out byte[] audioData, out ushort userId)
         {
-            if (audioPacket.Length < audioDataLength + sizeof(ushort))
-                throw new ArgumentException("Invalid audio packet length.", nameof(audioPacket));
-
             userId = BitConverter.ToUInt16(audioPacket, 0);
 
+            var audioDataLength = audioPacket.Length - sizeof(ushort);
             audioData = new byte[audioDataLength];
+
             Array.Copy(audioPacket, sizeof(ushort), audioData, 0, audioDataLength);
         }
 
         private bool AdjustTrackBarVolume(byte[] audioData, ushort userId)
         {
-            short[] samples = new short[audioData.Length / 2];
-            Buffer.BlockCopy(audioData, 0, samples, 0, audioData.Length);
             float userVolumeMultiplier = _usersInfo.GetVolumeByUserId(userId);
-
             if (userVolumeMultiplier == 0f)
             {
                 return false;
             }
+
+            short[] samples = new short[audioData.Length / 2];
+            Buffer.BlockCopy(audioData, 0, samples, 0, audioData.Length);
 
             for (int i = 0; i < samples.Length; i++)
             {

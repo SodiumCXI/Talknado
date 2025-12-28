@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -12,6 +13,8 @@ namespace Talknado.Client.Views
         private double _actualTop;
         private WindowState _previousWindowState;
 
+        protected bool UseCustomClose { get; set; } = true;
+
         [LibraryImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static partial bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, [MarshalAs(UnmanagedType.Bool)] bool bRepaint);
@@ -20,6 +23,7 @@ namespace Talknado.Client.Views
         {
             Loaded += OnWindowLoaded;
             StateChanged += OnWindowStateChanged;
+            Closing += OnWindowClosing;
         }
 
         protected void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -230,6 +234,15 @@ namespace Talknado.Client.Views
             double dpiScaleY = dpiInfo.DpiScaleY;
             Point currentPos = PointToScreen(new Point(0, 0));
             _actualTop = currentPos.Y / dpiScaleY;
+        }
+
+        private void OnWindowClosing(object? sender, CancelEventArgs e)
+        {
+            if (UseCustomClose)
+            {
+                e.Cancel = true;
+                Dispatcher.BeginInvoke(new Action(OnCloseButtonClick));
+            }
         }
     }
 }
