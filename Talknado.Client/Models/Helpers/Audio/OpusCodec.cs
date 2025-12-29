@@ -20,7 +20,7 @@ namespace Talknado.Client.Models.Helpers.Audio
             _encoder.Bitrate = 24000;
 
             _shortBuffer = new short[FrameSize];
-            _opusBuffer = new byte[250];
+            _opusBuffer = new byte[480];
         }
 
         public static byte[] Encode(byte[] pcm)
