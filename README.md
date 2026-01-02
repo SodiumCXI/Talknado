@@ -28,7 +28,7 @@ A lightweight low-latency real-time communication application. Provides **voice 
 - Not part of this repository
 - Provides the same session and media relaying functionality as the embedded server
 - Install using:
-```
+```bash
 curl -fsSL https://raw.githubusercontent.com/SodiumCXI/talknado-server-linux/main/install.sh | bash
 ```
 

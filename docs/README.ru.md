@@ -28,7 +28,7 @@
 - Не входит в этот репозиторий
 - Обеспечивает те же функции управления сессиями и ретрансляции медиа, что и встроенный сервер
 - Установить с помощью:
-```
+```bash
 curl -fsSL https://raw.githubusercontent.com/SodiumCXI/talknado-server-linux/main/install.sh | bash
 ```
 

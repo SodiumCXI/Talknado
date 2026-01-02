@@ -28,7 +28,7 @@
 - 不包含在本仓库中
 - 提供与内置服务器相同的会话管理和媒体中继功能
 - 安装方式：
-```
+```bash
 curl -fsSL https://raw.githubusercontent.com/SodiumCXI/talknado-server-linux/main/install.sh | bash
 ```
 
