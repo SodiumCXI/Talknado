@@ -45,9 +45,9 @@
 
     <Style x:Key="StartWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
         <Setter Property="Title" Value="Talknado Connect"/>
-        <Setter Property="Height" Value="425"/>
+        <Setter Property="Height" Value="350"/>
         <Setter Property="Width" Value="319"/>
-        <Setter Property="MinHeight" Value="425"/>
+        <Setter Property="MinHeight" Value="350"/>
         <Setter Property="MinWidth" Value="319"/>
     </Style>
 

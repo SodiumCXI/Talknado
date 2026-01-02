@@ -58,6 +58,11 @@ namespace Talknado.Client.Views
                 Hide();
         }
 
+        protected override void OnMaximizeButtonClick()
+        {
+            return;
+        }
+
         protected override void OnDeactivated(EventArgs e)
         {
             base.OnDeactivated(e);

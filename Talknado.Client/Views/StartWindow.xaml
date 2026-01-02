@@ -62,9 +62,7 @@
                             Style="{StaticResource StartTabControlStyle}">
                     <TabItem Header="{x:Static l:Strings.ClientChoice}" 
                              Style="{StaticResource StartTabItemStyle}">
-                        <Border CornerRadius="0,8,8,8"
-                                Margin="0,0,0,0"
-                                Padding="25,0">
+                        <Border Padding="25,20">
                             <Border.Effect>
                                 <DropShadowEffect Color="{DynamicResource BorderColor}"
                                                   Direction="270"
@@ -72,8 +70,8 @@
                                                   BlurRadius="2"
                                                   Opacity="0.3"/>
                             </Border.Effect>
-                            <StackPanel VerticalAlignment="Center"
-                                        Margin="0,-8,0,0">
+                            <StackPanel VerticalAlignment="Top"
+                                        Margin="0,0,0,0">
                                 <TextBlock Text="{x:Static l:Strings.NicknameLabel}" 
                                            Style="{StaticResource StartLabelTextStyle}"/>
                                 <TextBox Style="{StaticResource StartInputTextBoxStyle}"
@@ -107,8 +105,7 @@
                                                   BlurRadius="2"
                                                   Opacity="0.3"/>
                             </Border.Effect>
-                            <StackPanel VerticalAlignment="Center"
-                                        Margin="0,-8,0,0">
+                            <StackPanel VerticalAlignment="Top">
                                 <TextBlock Text="{x:Static l:Strings.NicknameLabel}" 
                                            Style="{StaticResource StartLabelTextStyle}"/>
                                 <TextBox Style="{StaticResource StartInputTextBoxStyle}"
