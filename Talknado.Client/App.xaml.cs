@@ -1,16 +1,38 @@
 ﻿using System.Windows;
 using Talknado.Client.Views;
+using Talknado.Client.Properties;
 
-namespace Talknado.Client
+namespace Talknado.Client;
+
+public partial class App : Application
 {
-    public partial class App : Application
+    protected override void OnStartup(StartupEventArgs e)
     {
-        protected override void OnStartup(StartupEventArgs e)
-        {
-            base.OnStartup(e);
+        var lang = Settings.Default.Language;
 
-            var window = new StartWindow();
-            window.Show();
+        // Если язык не сохранен - определить по системе
+        if (string.IsNullOrEmpty(lang))
+        {
+            var systemLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+
+            if (systemLang == "ru")
+                lang = "ru";
+            else if (systemLang == "zh")
+                lang = "zh";
+            else
+                lang = "en";
+
+            // Сохранить выбор
+            Settings.Default.Language = lang;
+            Settings.Default.Save();
         }
+
+        Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo(lang);
+        Thread.CurrentThread.CurrentUICulture = new System.Globalization.CultureInfo(lang);
+
+        base.OnStartup(e);
+
+        var window = new StartWindow();
+        window.Show();
     }
 }

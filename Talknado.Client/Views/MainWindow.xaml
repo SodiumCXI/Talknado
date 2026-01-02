@@ -1,6 +1,7 @@
 ﻿<local:TalknadoWindow x:Class="Talknado.Client.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Talknado.Client.Properties.Localization"
         xmlns:local="clr-namespace:Talknado.Client.Views"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
@@ -72,13 +73,13 @@
                         <DockPanel LastChildFill="True">
                             <StackPanel DockPanel.Dock="Top"
                                     Orientation="Horizontal">
-                                <Button Content="Отключиться"
+                                <Button Content="{x:Static l:Strings.DisconnectButton}"
                                         Style="{DynamicResource TopPanelButtonStyle}"
                                         Command="{Binding SoftRebootCommand}"/>
-                                <Button Content="Настройки" 
+                                <Button Content="{x:Static l:Strings.SettingsButton}" 
                                         Style="{DynamicResource TopPanelButtonStyle}"
                                         Command="{Binding ViewSettingsCommand}"/>
-                                <Button Content="О программе" 
+                                <Button Content="{x:Static l:Strings.AboutButton}" 
                                         Style="{DynamicResource TopPanelButtonStyle}"
                                         Command="{Binding OpenLinkCommand}"/>
                             </StackPanel>
@@ -94,12 +95,11 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-
                                     <TextBlock Grid.Column="0"
                                                Style="{DynamicResource PrimaryTextStyle}"
                                                FontWeight="Bold"
                                                Margin="9,0,0,0"
-                                               Text="Ключ:" 
+                                               Text="{x:Static l:Strings.KeyLabel}" 
                                                VerticalAlignment="Center"/>
                                     <TextBox Grid.Column="1"
                                              Style="{DynamicResource SelectableTextStyle}"

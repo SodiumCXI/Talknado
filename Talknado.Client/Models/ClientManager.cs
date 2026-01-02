@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Windows;
 using Talknado.Client.Models.Helpers;
+using Talknado.Client.Properties.Localization;
 
 namespace Talknado.Client.Models
 {
@@ -39,7 +40,7 @@ namespace Talknado.Client.Models
 
         private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
 
-        private readonly string _clientVersion = "v1.2.5";
+        private readonly string _clientVersion = "v1.3.0";
         private TcpClient _tcpMainClient = null!;
 
         private readonly CancellationTokenSource _receiveCancellationTokenSource = new();
@@ -79,7 +80,7 @@ namespace Talknado.Client.Models
                 }
 
                 if (_connectionInfo.ServerIP == string.Empty || _connectionInfo.ServerPort == 0)
-                    throw new IOException("Сервер не найден");
+                    throw new IOException(Strings.ServerNotFoundText);
 
                 _tcpMainClient = new(AddressFamily.InterNetwork);
                 _tcpMainClient.Connect(_connectionInfo.ServerIP, _connectionInfo.ServerPort);
@@ -200,7 +201,7 @@ namespace Talknado.Client.Models
 
             var answer = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
             if (!answer.AsSpan().SequenceEqual(Encoding.UTF8.GetBytes("#PIC")))
-                throw new ArgumentException("Incorrect password");
+                throw new ArgumentException(Strings.IncorrectPassword);
         }
 
         private static byte[] GetSha256Bytes(string password)
@@ -228,7 +229,7 @@ namespace Talknado.Client.Models
             var confirmation = _cryptoSessionManager.DecryptMessage(packet);
             if (!confirmation.AsSpan().SequenceEqual(Encoding.UTF8.GetBytes("#UCC")))
             {
-                throw new ArgumentException("Server not confirm UDP connection");
+                throw new ArgumentException(Strings.ServerNotConfirmUdpText);
             }
         }
 
@@ -343,7 +344,7 @@ namespace Talknado.Client.Models
 
                     if (TryReconnect() != null)
                     {
-                        MessageBox.Show("Потеряно соединение с сервером", "Ошибка подключения", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show(Strings.ConnectionLostText, Strings.ConnectionErrorText, MessageBoxButton.OK, MessageBoxImage.Error);
                         break;
                     }
                 }
@@ -413,7 +414,7 @@ namespace Talknado.Client.Models
                 // Start Screen Sharing
                 case var _ when command.Equals("#YYC"):
 
-                    _screenShareManager.StartSharing(_settingsManager.ScreenShareWithAudio);
+                    _screenShareManager.StartSharing(_settingsManager.ShareScreenWithAudio);
 
                     break;
 
@@ -457,7 +458,7 @@ namespace Talknado.Client.Models
             {
                 int digit = ALPHABET.IndexOf(c);
                 if (digit == -1)
-                    throw new ArgumentException("Недопустимый символ в ключе");
+                    throw new ArgumentException(Strings.InvalidCharacterInKeyText);
                 value = value * 64 + digit;
             }
 

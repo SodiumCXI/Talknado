@@ -10,28 +10,9 @@
 	<Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
 	<ApplicationIcon>Resources\talknado_1.ico</ApplicationIcon>
-	<Version>1.2.5</Version>
+	<Version>1.3.0</Version>
 	<Authors>SodiumCXI</Authors>
   </PropertyGroup>
-
-  <ItemGroup>
-    <None Remove="Resources\expand.svg" />
-    <None Remove="Resources\expand_white.svg" />
-    <None Remove="Resources\mic_off_white.svg" />
-    <None Remove="Resources\mic_on_white.svg" />
-    <None Remove="Resources\screen_share_white.svg" />
-    <None Remove="Resources\speaker_high_white.svg" />
-    <None Remove="Resources\speaker_mute_white.svg" />
-    <None Remove="Resources\volume_off_white.svg" />
-    <None Remove="Resources\volume_up_white.svg" />
-    <None Remove="Views\Fonts\Moderustic-Bold.ttf" />
-    <None Remove="Views\Fonts\Moderustic-ExtraBold.ttf" />
-    <None Remove="Views\Fonts\Moderustic-Light.ttf" />
-    <None Remove="Views\Fonts\Moderustic-Medium.ttf" />
-    <None Remove="Views\Fonts\Moderustic-Regular.ttf" />
-    <None Remove="Views\Fonts\Moderustic-SemiBold.ttf" />
-    <None Remove="Resources\screen_share.svg" />
-  </ItemGroup>
 
   <ItemGroup>
     <Content Include="Resources\talknado_1.ico" />
@@ -122,18 +103,18 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
-    <Compile Update="Views\Converters\InputTextBoxMaxHeightConverter.cs">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    <Compile Update="Properties\Localization\Strings.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Strings.resx</DependentUpon>
     </Compile>
-    <Compile Update="Views\Converters\SliderWidthConverter.cs">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Compile>
-    <Compile Update="Views\TalknadoWindow.cs">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Compile>
-    <Compile Update="Views\Triggers\EnterKeyTrigger.cs">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Localization\Strings.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+      <LastGenOutput>Strings.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
@@ -144,12 +125,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Page Update="Views\Controls\MessageListControl.xaml">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Page>
-    <Page Update="Views\Controls\UserListControl.xaml">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Page>
+    <None Include="lib\*.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>%(Filename)%(Extension)</Link>
+    </None>
   </ItemGroup>
 
 </Project>

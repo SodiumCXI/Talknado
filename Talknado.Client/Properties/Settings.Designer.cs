@@ -38,12 +38,12 @@ namespace Talknado.Client.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool ScreenShareWithAudio {
+        public bool ShareScreenWithAudio {
             get {
-                return ((bool)(this["ScreenShareWithAudio"]));
+                return ((bool)(this["ShareScreenWithAudio"]));
             }
             set {
-                this["ScreenShareWithAudio"] = value;
+                this["ShareScreenWithAudio"] = value;
             }
         }
         
@@ -68,6 +68,18 @@ namespace Talknado.Client.Properties {
             }
             set {
                 this["SelectedOutputDevice"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string Language {
+            get {
+                return ((string)(this["Language"]));
+            }
+            set {
+                this["Language"] = value;
             }
         }
     }

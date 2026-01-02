@@ -1,25 +1,23 @@
 ﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:l="clr-namespace:Talknado.Client.Properties.Localization"
                     xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib"
                     xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters">
 
-    <!-- Шрифт и размеры -->
-    
-    <FontFamily x:Key="BaseFont">pack://application:,,,/Views/Fonts/#Moderustic</FontFamily>
+    <!-- Fonts and sizes -->
+    <FontFamily x:Key="BaseFont">pack://application:,,,/Views/Fonts/#Moderustic, Microsoft YaHei UI</FontFamily>
     <FontFamily x:Key="TitleBarFont">Segoe UI</FontFamily>
     <sys:Double x:Key="PrimaryFontSize">15</sys:Double>
     <sys:Double x:Key="SecondaryFontSize">14</sys:Double>
 
-    <!-- Иконки -->
-    
+    <!-- Icons -->
     <sys:String x:Key="WindowMinimizeIcon">—</sys:String>
     <sys:String x:Key="WindowMaximizeIcon">▢</sys:String>
     <sys:String x:Key="WindowRestoreIcon">❐</sys:String>
     <sys:String x:Key="WindowCloseIcon">✕</sys:String>
 
-    <!-- Окна -->
-    
+    <!-- Window styles -->
     <Style x:Key="WindowStyle" TargetType="Window">
         <Setter Property="AllowsTransparency" Value="True"/>
         <Setter Property="Background" Value="Transparent"/>
@@ -47,22 +45,21 @@
 
     <Style x:Key="StartWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
         <Setter Property="Title" Value="Talknado Connect"/>
-        <Setter Property="Height" Value="355"/>
+        <Setter Property="Height" Value="425"/>
         <Setter Property="Width" Value="319"/>
-        <Setter Property="MinHeight" Value="355"/>
+        <Setter Property="MinHeight" Value="425"/>
         <Setter Property="MinWidth" Value="319"/>
     </Style>
 
     <Style x:Key="SettingsWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
-        <Setter Property="Title" Value="Настройки"/>
-        <Setter Property="Height" Value="300"/>
+        <Setter Property="Title" Value="{x:Static l:Strings.SettingsButton}"/>
+        <Setter Property="Height" Value="290"/>
         <Setter Property="Width" Value="320"/>
-        <Setter Property="MinHeight" Value="300"/>
+        <Setter Property="MinHeight" Value="290"/>
         <Setter Property="MinWidth" Value="320"/>
     </Style>
 
-    <!-- Границы -->
-    
+    <!-- Border styles -->
     <Style x:Key="MessageBorderStyle" TargetType="Border">
         <Setter Property="Margin" Value="4,5,5,0"/>
         <Setter Property="Padding" Value="10,5,10,4"/>
@@ -77,9 +74,7 @@
         <Setter Property="VerticalAlignment" Value="Stretch"/>
     </Style>
 
-
-    <!-- Текстовые блоки -->
-    
+    <!-- TextBlock styles -->
     <Style x:Key="PrimaryTextStyle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
         <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
@@ -96,8 +91,27 @@
         <Setter Property="TextWrapping" Value="NoWrap"/>
     </Style>
 
-    <!-- Текстовые коробки -->
-    
+    <Style x:Key="StartLabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style x:Key="ErrorLabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
+        <Setter Property="Margin" Value="0,0,0,20"/>
+        <Setter Property="FontWeight" Value="Light"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="Foreground" Value="{DynamicResource ErrorMessageBrush}"/>
+        <Setter Property="TextWrapping" Value="WrapWithOverflow"/>
+    </Style>
+
+    <Style x:Key="LabelStyle" TargetType="TextBlock">
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource SecondaryFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+    </Style>
+
+    <!-- TextBox styles -->
     <Style x:Key="InputTextBoxStyle" TargetType="TextBox">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -117,7 +131,7 @@
                     <Grid>
                         <ScrollViewer x:Name="PART_ContentHost"/>
                         <TextBlock x:Name="Watermark"
-                                   Text="Написать сообщение..."
+                                   Text="{x:Static l:Strings.BackgroundMessageBoxText}"
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    Margin="3,0,0,0"
                                    IsHitTestVisible="False"
@@ -148,8 +162,40 @@
         <Setter Property="BorderThickness" Value="0"/>
     </Style>
 
-    <!-- Слайдеры -->
-    
+    <Style x:Key="StartInputTextBoxStyle" TargetType="TextBox">
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Background" Value="{DynamicResource TextBoxBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="5,0"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border Background="{TemplateBinding Background}"
+                        CornerRadius="6">
+                        <Border.Effect>
+                            <DropShadowEffect Color="{DynamicResource BorderColor}"
+                                          Direction="270"
+                                          ShadowDepth="1"
+                                          BlurRadius="1"
+                                          Opacity="0.2"/>
+                        </Border.Effect>
+                        <Grid>
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Slider styles -->
     <cnv:SliderWidthConverter x:Key="SliderWidthConverter"/>
 
     <Style x:Key="InvisibleRepeatButton" TargetType="RepeatButton">
@@ -211,8 +257,7 @@
         </Setter>
     </Style>
 
-    <!-- Кнопки -->
-    
+    <!-- Button styles -->
     <Style x:Key="BaseButtonStyle" TargetType="Button">
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
@@ -381,8 +426,35 @@
         </Setter>
     </Style>
 
-    <!-- Я устал -->
+    <Style x:Key="StartConnectButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
+        <Setter Property="Height" Value="38"/>
+        <Setter Property="Padding" Value="24,8"/>
+        <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                        CornerRadius="6">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ButtonMouseOverBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ButtonPressedBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
 
+    <!-- TabControl styles -->
     <Style x:Key="StartTabControlStyle" TargetType="TabControl">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -429,39 +501,7 @@
         </Setter>
     </Style>
 
-    <Style x:Key="StartInputTextBoxStyle" TargetType="TextBox">
-        <Setter Property="Height" Value="32"/>
-        <Setter Property="Background" Value="{DynamicResource TextBoxBrush}"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="5,0"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
-        <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
-        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
-        <Setter Property="FontWeight" Value="Medium"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="TextBox">
-                    <Border Background="{TemplateBinding Background}"
-                        CornerRadius="6">
-                        <Border.Effect>
-                            <DropShadowEffect Color="{DynamicResource BorderColor}"
-                                          Direction="270"
-                                          ShadowDepth="1"
-                                          BlurRadius="1"
-                                          Opacity="0.2"/>
-                        </Border.Effect>
-                        <Grid>
-                            <ScrollViewer x:Name="PART_ContentHost"
-                                      Margin="{TemplateBinding Padding}"
-                                      VerticalAlignment="Center"/>
-                        </Grid>
-                    </Border>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
+    <!-- PasswordBox styles -->
     <Style x:Key="StartPasswordBoxStyle" TargetType="PasswordBox">
         <Setter Property="Height" Value="32"/>
         <Setter Property="Background" Value="{DynamicResource TextBoxBrush}"/>
@@ -472,6 +512,7 @@
         <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
         <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="MaxLength" Value="40"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="PasswordBox">
@@ -495,49 +536,7 @@
         </Setter>
     </Style>
 
-    <Style x:Key="StartConnectButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
-        <Setter Property="Height" Value="38"/>
-        <Setter Property="Padding" Value="24,8"/>
-        <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
-        <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border Background="{TemplateBinding Background}"
-                        CornerRadius="6">
-                        <ContentPresenter HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"
-                                      Margin="{TemplateBinding Padding}"/>
-                    </Border>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{DynamicResource ButtonMouseOverBrush}"/>
-            </Trigger>
-            <Trigger Property="IsPressed" Value="True">
-                <Setter Property="Background" Value="{DynamicResource ButtonPressedBrush}"/>
-            </Trigger>
-        </Style.Triggers>
-    </Style>
-
-    <Style x:Key="StartLabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
-        <Setter Property="Margin" Value="0,0,0,8"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-    </Style>
-
-    <Style x:Key="ErrorLabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
-        <Setter Property="Margin" Value="0,0,0,20"/>
-        <Setter Property="FontWeight" Value="Light"/>
-        <Setter Property="HorizontalAlignment" Value="Center"/>
-        <Setter Property="Foreground" Value="{DynamicResource ErrorMessageBrush}"/>
-        <Setter Property="TextWrapping" Value="WrapWithOverflow"/>
-    </Style>
-
-    <!-- Я устал x2 -->
-
+    <!-- CheckBox styles -->
     <Style x:Key="SettingsCheckBoxStyle" TargetType="CheckBox">
         <Setter Property="Margin" Value="0,12,0,0"/>
         <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
@@ -565,13 +564,7 @@
         </Setter>
     </Style>
 
-    <Style x:Key="LabelStyle" TargetType="TextBlock">
-        <Setter Property="Margin" Value="0,0,0,8"/>
-        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
-        <Setter Property="FontSize" Value="{StaticResource SecondaryFontSize}"/>
-        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
-    </Style>
-
+    <!-- ComboBox styles -->
     <Style x:Key="ComboStyle" TargetType="ComboBox">
         <Setter Property="Background" Value="{StaticResource UserItemBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
@@ -645,7 +638,6 @@
                             </Border>
                         </Popup>
                     </Canvas>
-
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Border" Property="Background" 
@@ -666,6 +658,7 @@
     <Style x:Key="ComboItemStyle" TargetType="ComboBoxItem">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+        <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
         <Setter Property="FontSize" Value="{StaticResource SecondaryFontSize}"/>
         <Setter Property="Padding" Value="8,6"/>
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
@@ -693,6 +686,5 @@
             </Setter.Value>
         </Setter>
     </Style>
-
 
 </ResourceDictionary>

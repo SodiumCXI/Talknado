@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using Talknado.Client.Properties.Localization;
 using Talknado.Client.ViewModels;
 
 namespace Talknado.Client.Views;
@@ -42,7 +43,7 @@ public partial class MainWindow : TalknadoWindow, IMainWindow, IDisposable
         var connectionKey = mwvm!.ConnectionInfo.ConnectionKey;
         var formattedConnectionKey = mwvm!.ConnectionInfo.FormattedConnectionKey;
 
-        CopyTextWithFeedback((TextBox)sender, connectionKey, formattedConnectionKey, "Скопировано!");
+        CopyTextWithFeedback((TextBox)sender, connectionKey, formattedConnectionKey, Strings.CopiedText);
     }
 
     private async void CopyTextWithFeedback(TextBox textBox, string textToCopy, string originalText, string copiedText)

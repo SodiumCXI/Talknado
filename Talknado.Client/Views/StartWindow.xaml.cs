@@ -21,6 +21,11 @@ public partial class StartWindow : TalknadoWindow, IDisposable
         };
     }
 
+    protected override void OnMaximizeButtonClick()
+    {
+        return;
+    }
+
     protected override void OnCloseButtonClick()
     {
         Application.Current.Shutdown();

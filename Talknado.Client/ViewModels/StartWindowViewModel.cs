@@ -1,6 +1,8 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Windows;
+using Talknado.Client.Properties;
+using Talknado.Client.Properties.Localization;
 using Talknado.Server;
 
 namespace Talknado.Client.ViewModels;
@@ -22,11 +24,42 @@ public partial class StartWindowViewModel : ObservableObject
     private string _passwordTextBoxValue = string.Empty;
     [ObservableProperty]
     private string _errorMessage = string.Empty;
+    [ObservableProperty]
+    private int _selectedLanguageIndex;
 
 
     public StartWindowViewModel()
     {
         _clientDisconnectedHandler = SoftRestart;
+
+        var lang = Settings.Default.Language;
+        SelectedLanguageIndex = lang switch
+        {
+            "en" => 0,
+            "ru" => 1,
+            "zh" => 2,
+            _ => 0
+        };
+    }
+
+    partial void OnSelectedLanguageIndexChanged(int value)
+    {
+        string langCode = value switch
+        {
+            0 => "en",
+            1 => "ru",
+            2 => "zh",
+            _ => "en"
+        };
+
+        if (langCode != Settings.Default.Language)
+        {
+            Settings.Default.Language = langCode;
+            Settings.Default.Save();
+
+            System.Diagnostics.Process.Start(Environment.ProcessPath!);
+            Application.Current.Shutdown();
+        }
     }
 
     [RelayCommand]
@@ -37,12 +70,14 @@ public partial class StartWindowViewModel : ObservableObject
         _serverHost?.Dispose();
         _clientHost?.Dispose();
 
-        var usernameError = CheckUsername(UsernameTextBoxValue);
+        var username = UsernameTextBoxValue.Trim();
+        var usernameError = CheckUsername(username);
         if (usernameError != null)
         {
             ErrorMessage = usernameError;
             return;
         }
+
         var passwordError = CheckPassword(PasswordTextBoxValue);
         if (passwordError != null)
         {
@@ -61,7 +96,7 @@ public partial class StartWindowViewModel : ObservableObject
 
         _clientHost = new ClientHost();
 
-        var clientResult = _clientHost.TryConnectToServer(serverResult, UsernameTextBoxValue);
+        var clientResult = _clientHost.TryConnectToServer(serverResult, username);
         if (clientResult != null)
         {
             ErrorMessage = clientResult;
@@ -80,7 +115,8 @@ public partial class StartWindowViewModel : ObservableObject
 
         _clientHost?.Dispose();
 
-        var usernameError = CheckUsername(UsernameTextBoxValue);
+        var username = UsernameTextBoxValue.Trim();
+        var usernameError = CheckUsername(username);
         if (usernameError != null)
         {
             ErrorMessage = usernameError;
@@ -89,7 +125,7 @@ public partial class StartWindowViewModel : ObservableObject
 
         _clientHost = new ClientHost();
 
-        var clientResult = _clientHost.TryConnectToServer(ConnectionKeyTextBoxValue, UsernameTextBoxValue);
+        var clientResult = _clientHost.TryConnectToServer(ConnectionKeyTextBoxValue, username);
         if (clientResult != null)
         {
             ErrorMessage = clientResult;
@@ -104,18 +140,16 @@ public partial class StartWindowViewModel : ObservableObject
     private static string? CheckUsername(string username)
     {
         if (username == string.Empty)
-            return "Никнейм не может быть пустым";
-        else if (username[0].Equals(' ') || username[^1].Equals(' '))
-            return "Никнейм не может содержать пробелы в начале и в конце";
-        else if (username.Length > 20)
-            return "Никнейм не может быть длиннее 20 символов";
+            return Strings.NicknameCannotBeEmptyText;
+        
         return null;
     }
 
     private static string? CheckPassword(string password)
     {
         if (password.Contains(' '))
-            return "Пароль не может содержать пробелы";
+            return Strings.PasswordCannotContainSpacesText;
+
         return null;
     }
 
