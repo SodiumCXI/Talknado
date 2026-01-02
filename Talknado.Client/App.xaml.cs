@@ -10,7 +10,6 @@ public partial class App : Application
     {
         var lang = Settings.Default.Language;
 
-        // Если язык не сохранен - определить по системе
         if (string.IsNullOrEmpty(lang))
         {
             var systemLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
@@ -22,7 +21,6 @@ public partial class App : Application
             else
                 lang = "en";
 
-            // Сохранить выбор
             Settings.Default.Language = lang;
             Settings.Default.Save();
         }
