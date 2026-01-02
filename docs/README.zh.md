@@ -1,4 +1,4 @@
-**语言：** [English](/README.md) | [Русский](/docs/README.ru.md) | [中文](/docs/README.zh.md)
+**[English](/README.md)** | **[Русский](/docs/README.ru.md)** | **[中文](/docs/README.zh.md)**
 
 ## 简介
 一款轻量级、低延迟的实时通信应用程序。在单个 exe 可执行文件中提供**语音聊天、文本消息和硬件加速屏幕共享**功能。

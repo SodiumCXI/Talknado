@@ -1,4 +1,4 @@
-**Language:** [English](/README.md) | [Русский](/docs/README.ru.md) | [中文](/docs/README.zh.md)
+**[English](/README.md)** | **[Русский](/docs/README.ru.md)** | **[中文](/docs/README.zh.md)**
 
 ## Description
 A lightweight low-latency real-time communication application. Provides **voice chat, text messaging, and hardware-accelerated screen sharing** in a single executable.
@@ -41,47 +41,3 @@ To use Talknado over a global network, all participants must join the same **Zer
 1. Install ZeroTier on each device.
 2. Join the same ZeroTier network using its Network ID.
 3. Start Talknado and choose host or join a session.
-
----
-
-## Описание
-Легковесное приложение для связи в реальном времени с низкой задержкой. Обеспечивает **голосовую связь, текстовые сообщения и аппаратно-ускоренную демонстрацию экрана** в одном exe-файле.
-
-## Основные возможности
-- **Голосовая связь и демонстрация экрана** с минимальной задержкой
-- **Видеопоток H.264** с аппаратным кодированием (NVENC/AMF) через FFmpeg
-- **Захват экрана** через Desktop Duplication API (только основной дисплей, SharpDX)
-- **Транспорт**: TCP для управления, UDP для медиа (LiteNetLib)
-- **Компактный протокол управления** с шифрованием
-- **Обмен сессионными ключами** для безопасной связи
-- **Архитектура MVVM** с внедрением зависимостей
-- **Встроенный сервер по желанию** — запускается только если пользователь выбирает быть сервером
-
-## Компоненты системы
-
-### Клиент (WPF .NET 8)
-- UI, захват аудио и экрана
-- Кодирование/декодирование H.264
-- Сетевой клиент TCP/UDP
-
-### Встроенный сервер (DLL .NET 8)
-- Управление сессиями и пользователями
-- Ретрансляция медиа между клиентами
-
-### Отдельный сервер для Linux
-- Не входит в этот репозиторий
-- Обеспечивает те же функции управления сессиями и ретрансляции медиа, что и встроенный сервер
-- Установить с помощью:
-```
-curl -fsSL https://raw.githubusercontent.com/SodiumCXI/talknado-server-linux/main/install.sh | bash
-```
-
-## Безопасность
-- Симметричное шифрование с сессионными ключами
-- Опциональный пароль для подключения к сессии
-
-## Как использовать через интернет
-Чтобы использовать Talknado через глобальную сеть, всем участникам необходимо подключиться к одной и той же виртуальной сети **ZeroTier**:
-1. Установите ZeroTier на каждом устройстве.
-2. Подключитесь к одной сети ZeroTier, используя её Network ID.
-3. Запустите Talknado и создайте или присоединитесь к сессии.
