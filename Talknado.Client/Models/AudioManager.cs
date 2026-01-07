@@ -260,6 +260,9 @@ namespace Talknado.Client.Models
             _audioReceiveThread.Join();
             _receiveCancellationTokenSource.Dispose();
 
+            NoiseSuppressor.Dispose();
+            OpusCodec.Dispose();
+
             GC.SuppressFinalize(this);
         }
     }

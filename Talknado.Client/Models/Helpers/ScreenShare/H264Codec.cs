@@ -125,11 +125,6 @@ public static unsafe class H264Encoder
         }
     }
 
-    /// <summary>
-    /// Кодирует BGRA кадр в H.264
-    /// </summary>
-    /// <param name="bgraData">Линейный массив BGRA пикселей (width * height * 4 байта)</param>
-    /// <returns>Закодированные H.264 данные или null если пакет не готов</returns>
     public static byte[] Encode(byte[] bgraData)
     {
         if (!_initialized)
@@ -219,33 +214,24 @@ public static unsafe class H264Decoder
         if (_initialized)
             Cleanup();
 
-        // Находим декодер
         _codec = ffmpeg.avcodec_find_decoder(AVCodecID.AV_CODEC_ID_H264);
         if (_codec == null)
             throw new Exception("H.264 декодер не найден");
 
-        // Создаём контекст
         _codecContext = ffmpeg.avcodec_alloc_context3(_codec);
         if (_codecContext == null)
             throw new Exception("Не удалось создать контекст декодера");
 
-        // Открываем декодер
         int ret = ffmpeg.avcodec_open2(_codecContext, _codec, null);
         if (ret < 0)
             throw new Exception($"Не удалось открыть декодер: {ret}");
 
-        // Создаём фрейм и пакет
         _frame = ffmpeg.av_frame_alloc();
         _packet = ffmpeg.av_packet_alloc();
 
         _initialized = true;
     }
 
-    /// <summary>
-    /// Декодирует H.264 данные в BGRA кадр
-    /// </summary>
-    /// <param name="h264Data">Закодированные H.264 данные</param>
-    /// <returns>BGRA пиксели или null если фрейм не готов</returns>
     public static byte[] Decode(byte[] h264Data)
     {
         if (!_initialized)

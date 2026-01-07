@@ -116,19 +116,9 @@ namespace Talknado.Client.Models
 
         private void SendFramePacket(byte[] frameData)
         {
-            var header = new PacketHeader
-            {
-                IsAudio = 0
-            };
+            var encryptedData = _cryptoSessionManager.EncryptMessage(frameData);
 
-            var headerBytes = header.ToBytes();
-            var packet = new byte[PacketHeader.SIZE + frameData.Length];
-            Buffer.BlockCopy(headerBytes, 0, packet, 0, headerBytes.Length);
-            Buffer.BlockCopy(frameData, 0, packet, headerBytes.Length, frameData.Length);
-
-            var encryptedPacket = _cryptoSessionManager.EncryptMessage(packet);
-
-            _networkUtils.SendScreenSharePacketAsync(encryptedPacket).GetAwaiter().GetResult();
+            _networkUtils.SendScreenSharePacketAsync(encryptedData).GetAwaiter().GetResult();
         }
 
         private void HandleReceiveScreenShare(CancellationToken token)
@@ -139,13 +129,14 @@ namespace Talknado.Client.Models
                 {
                     if (_screenSharePlayer.IsWindowVisible)
                     {
-                        var packet = _networkUtils.ReceiveScreenSharePacketAsync(token).GetAwaiter().GetResult();
+                        var encryptedData = _networkUtils.ReceiveScreenSharePacketAsync(token).GetAwaiter().GetResult();
+                        var data = _cryptoSessionManager.DecryptMessage(encryptedData);
 
-                        ProcessPacket(packet, token);
+                        ProcessFrame(data, token);
                     }
                     else
                     {
-                        Thread.Sleep(50);
+                        Thread.Sleep(100);
                     }
                 }
                 catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex))
@@ -153,23 +144,6 @@ namespace Talknado.Client.Models
                     return;
                 }
                 catch { /* ignore */ }
-            }
-        }
-
-        private void ProcessPacket(byte[] packet, CancellationToken token)
-        {
-            var decryptedPacket = _cryptoSessionManager.DecryptMessage(packet);
-
-            var header = PacketHeader.FromBytes(decryptedPacket.AsSpan()[..PacketHeader.SIZE]);
-            var data = decryptedPacket[PacketHeader.SIZE..];
-
-            if (header.IsAudio == 1)
-            {
-                _usersAudioPlayer.Play(0, data);
-            }
-            else
-            {
-                ProcessFrame(data, token);
             }
         }
 
@@ -190,26 +164,6 @@ namespace Talknado.Client.Models
             H264Encoder.Cleanup();
 
             GC.SuppressFinalize(this);
-        }
-
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        private struct PacketHeader
-        {
-            public byte IsAudio;
-
-            public const int SIZE = 1;
-
-            public readonly byte[] ToBytes()
-            {
-                var buffer = new byte[SIZE];
-                MemoryMarshal.Write(buffer.AsSpan(), this);
-                return buffer;
-            }
-
-            public static PacketHeader FromBytes(ReadOnlySpan<byte> data)
-            {
-                return MemoryMarshal.Read<PacketHeader>(data);
-            }
         }
     }
 }

@@ -111,7 +111,8 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
         try
         {
             var usersPublicInfo = _usersInfo.GetUsersPublicInfo();
-            _networkUtils.WritePacketAsync(stream, BitConverter.GetBytes(usersPublicInfo.Count), token).GetAwaiter().GetResult();
+            var encryptedUsersPublicInfoCountBytes = _cryptoSessionManager.EncryptMessage(BitConverter.GetBytes(usersPublicInfo.Count));
+            _networkUtils.WritePacketAsync(stream, encryptedUsersPublicInfoCountBytes, token).GetAwaiter().GetResult();
 
             foreach (var user in usersPublicInfo)
             {
@@ -125,6 +126,9 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
                 var encryptedData = _cryptoSessionManager.EncryptMessage(resultData);
                 _networkUtils.WritePacketAsync(stream, encryptedData, token).GetAwaiter().GetResult();
             }
+
+            var encryptedScreenSharerIdBytes = _cryptoSessionManager.EncryptMessage(BitConverter.GetBytes(_screenShareManager.ScreenSharerId));
+            _networkUtils.WritePacketAsync(stream, encryptedScreenSharerIdBytes, token).GetAwaiter().GetResult();
         }
         catch
         {

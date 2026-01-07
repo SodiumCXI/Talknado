@@ -8,9 +8,6 @@ using Resource = SharpDX.DXGI.Resource;
 
 namespace Talknado.Client.Models.Helpers.ScreenShare;
 
-/// <summary>
-/// Захват экрана через Desktop Duplication API (SharpDX).
-/// </summary>
 public static class ScreenGrabber
 {
     private static Device _device;
@@ -30,13 +27,6 @@ public static class ScreenGrabber
         _duplicator = output.DuplicateOutput(_device);
     }
 
-    /// <summary>
-    /// Захват следующего кадра.
-    /// </summary>
-    /// <param name="width">Ширина кадра в пикселях.</param>
-    /// <param name="height">Высота кадра в пикселях.</param>
-    /// <param name="stride">Шаг (RowPitch) в байтах.</param>
-    /// <returns>Указатель на начало буфера B8G8R8A8 (не густой Alpha), валиден до следующего вызова.</returns>
     public static byte[] CaptureFrame(out int width, out int height)
     {
         Resource dxgiResource = null!;

@@ -38,9 +38,9 @@ namespace Talknado.Client.Models
         private readonly IWindowsState _windowsState = windowsState;
         private readonly ISettingsManager _settingsManager = settingsManager;
 
-        private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
+        private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789&%";
 
-        private readonly string _clientVersion = "v1.3.1";
+        private readonly string _clientVersion = "v1.3.2";
         private TcpClient _tcpMainClient = null!;
 
         private readonly CancellationTokenSource _receiveCancellationTokenSource = new();
@@ -214,12 +214,12 @@ namespace Talknado.Client.Models
         {
             var userId = _connectionInfo.LocalUserId;
             var userIdBytes = BitConverter.GetBytes(userId);
-            var encryptedUserId = _cryptoSessionManager.EncryptMessage(userIdBytes);
+            var encryptedUserIdBytes = _cryptoSessionManager.EncryptMessage(userIdBytes);
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
             cts.CancelAfter(TimeSpan.FromSeconds(3));
 
-            _networkUtils.ConnectToUdp(encryptedUserId, cts.Token);
+            _networkUtils.ConnectToUdp(encryptedUserIdBytes, cts.Token);
         }
 
         private void ReceivePortsConfirmation(NetworkStream stream, CancellationToken token)
@@ -252,7 +252,8 @@ namespace Talknado.Client.Models
         {
             try
             {
-                var countBytes = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
+                var encryptedCountBytes = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
+                var countBytes = _cryptoSessionManager.DecryptMessage(encryptedCountBytes);
                 int count = BitConverter.ToInt32(countBytes, 0);
 
                 for (int i = 0; i < count; i++)
@@ -260,10 +261,17 @@ namespace Talknado.Client.Models
                     var encryptedData = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
                     var data = _cryptoSessionManager.DecryptMessage(encryptedData).AsSpan();
 
-                    ushort userId = BitConverter.ToUInt16(data);
-                    string username = Encoding.UTF8.GetString(data[2..]);
+                    var userId = BitConverter.ToUInt16(data);
+                    var username = Encoding.UTF8.GetString(data[2..]);
 
                     _usersInfo.AddUser(userId, username, false, false);
+                }
+
+                var encryptedScreenSharerIdBytes = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
+                var screenSharerIdBytes = _cryptoSessionManager.DecryptMessage(encryptedScreenSharerIdBytes);
+                if (BitConverter.ToUInt16(screenSharerIdBytes) != 0)
+                {
+                    ExecuteCommand("#SSS", screenSharerIdBytes.AsSpan());
                 }
             }
             catch
