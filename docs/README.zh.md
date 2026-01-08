@@ -3,7 +3,9 @@
 ## 简介
 一款轻量级、低延迟的实时通信应用程序。在单个 exe 可执行文件中提供**语音聊天、文本消息和硬件加速屏幕共享**功能。
 
-![主界面截图](/docs/MainWindow-zh.png)
+<p align="center">
+  <img src="/docs/MainWindow-zh.png" alt="主界面截图">
+</p>
 
 ## 主要功能
 - **语音聊天和屏幕共享**，延迟最小

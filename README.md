@@ -3,7 +3,9 @@
 ## Description
 A lightweight low-latency real-time communication application. Provides **voice chat, text messaging, and hardware-accelerated screen sharing** in a single executable.
 
-![Main window screenshot](/docs/MainWindow-en.png)
+<p align="center">
+  <img src="/docs/MainWindow-en.png" alt="Main window screenshot">
+</p>
 
 ## Key Features
 - **Voice chat and screen sharing** with minimal latency
