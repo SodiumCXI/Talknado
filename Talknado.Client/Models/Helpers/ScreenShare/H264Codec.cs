@@ -253,15 +253,17 @@ public static unsafe class H264Decoder
         if (ret < 0)
             throw new Exception($"Ошибка декодирования: {ret}");
 
-        if (_swsContext == null)
+        if (_width != _frame->width || _height != _frame->height)
         {
+            ffmpeg.avcodec_flush_buffers(_codecContext);
+
             _width = _frame->width;
             _height = _frame->height;
 
-            _swsContext = ffmpeg.sws_getContext(
-                _width, _height, (AVPixelFormat)_frame->format,
-                _width, _height, AVPixelFormat.AV_PIX_FMT_BGRA,
-                ffmpeg.SWS_FAST_BILINEAR, null, null, null);
+            _swsContext = ffmpeg.sws_getCachedContext(_swsContext,
+            _width, _height, (AVPixelFormat)_frame->format,
+            _width, _height, AVPixelFormat.AV_PIX_FMT_BGRA,
+            ffmpeg.SWS_FAST_BILINEAR, null, null, null);
         }
 
         byte[] bgraData = new byte[_width * _height * 4];

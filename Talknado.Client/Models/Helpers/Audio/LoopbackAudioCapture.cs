@@ -19,12 +19,13 @@ public partial class LoopbackAudioCapture
     [UnmanagedCallConv(CallConvs = new Type[] { typeof(System.Runtime.CompilerServices.CallConvStdcall) })]
     private static partial void StopCaptureAsync();
 
-    public static Action<byte[]> SendAudioPacket { get; set; } = null!;
+    public static Action<byte[]> SendOpusData { get; set; } = null!;
 
     private static Thread? _captureThread;
     private static bool _isInitialized;
     private static volatile bool _isEnabled;
 
+    private static readonly OpusCodecEncoder _encoder = new(true);
 
     public static void InitializeAudio()
     {
@@ -56,9 +57,10 @@ public partial class LoopbackAudioCapture
 
         try
         {
-            byte[] buffer = new byte[length];
+            var buffer = new byte[length];
             Marshal.Copy(data, buffer, 0, length);
-            SendAudioPacket?.Invoke(buffer);
+            var opusData = _encoder.Encode(buffer);
+            SendOpusData?.Invoke(opusData);
         }
         catch { }
     }

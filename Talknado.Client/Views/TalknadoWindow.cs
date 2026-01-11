@@ -131,8 +131,9 @@ namespace Talknado.Client.Views
             {
                 WindowState = WindowState.Minimized;
                 _previousWindowState = WindowState.Minimized;
+                UpdateLayout();
             }
-        }        
+        }
 
         protected void MaximizeButton_Click(object sender, RoutedEventArgs e)
         {
@@ -223,6 +224,12 @@ namespace Talknado.Client.Views
                 };
 
                 sb.Begin();
+            }
+            else if (WindowState == WindowState.Maximized && _previousWindowState == WindowState.Minimized)
+            {
+                WindowState = WindowState.Maximized;
+                _previousWindowState = WindowState.Maximized;
+                UpdateLayout();
             }
         }
 

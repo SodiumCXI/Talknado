@@ -1,169 +1,167 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using Talknado.Client.Models.Client.Helpers;
 using Talknado.Client.Models.Helpers;
 using Talknado.Client.Models.Helpers.Audio;
 using Talknado.Client.Models.Helpers.ScreenShare;
 
-namespace Talknado.Client.Models
+namespace Talknado.Client.Models;
+
+public interface IScreenShareManager
 {
-    public interface IScreenShareManager
+    void StartSharing(bool withAudio);
+    void StopSharing();
+    bool IsSharing { get; }
+}
+
+public partial class ScreenShareManager : ObservableObject, IScreenShareManager, IDisposable
+{
+    private const int TARGET_FPS = 30;
+
+    private readonly INetworkUtils _networkUtils;
+    private readonly ICryptoSessionManager _cryptoSessionManager;
+    private readonly IUsersAudioPlayer _usersAudioPlayer;
+    private readonly IScreenSharePlayer _screenSharePlayer;
+
+    private readonly CancellationTokenSource _receiveCancellationTokenSource;
+    private CancellationTokenSource? _sendCancellationTokenSource;
+
+    private readonly Thread _screenShareReceiveThread;
+    private Thread? _screenShareSendThread;
+
+    [ObservableProperty]
+    private bool _isSharing = false;
+
+    public ScreenShareManager(
+        INetworkUtils networkUtils,
+        ICryptoSessionManager cryptoSessionManager,
+        IUsersAudioPlayer usersAudioPlayer,
+        IScreenSharePlayer screenSharePlayer)
     {
-        void StartSharing(bool withAudio);
-        void StopSharing();
-        bool IsSharing { get; }
+        _networkUtils = networkUtils;
+        _cryptoSessionManager = cryptoSessionManager;
+        _usersAudioPlayer = usersAudioPlayer;
+        _screenSharePlayer = screenSharePlayer;
+
+        _receiveCancellationTokenSource = new CancellationTokenSource();
+        _screenShareReceiveThread = new(() => HandleReceiveScreenShare(_receiveCancellationTokenSource.Token))
+        {
+            IsBackground = true
+        };
+        _screenShareReceiveThread.Start();
     }
 
-    public partial class ScreenShareManager : ObservableObject, IScreenShareManager, IDisposable
+    public void StartSharing(bool withAudio)
     {
-        private const int TARGET_FPS = 30;
+        if (IsSharing) return;
 
-        private readonly INetworkUtils _networkUtils;
-        private readonly ICryptoSessionManager _cryptoSessionManager;
-        private readonly IUsersAudioPlayer _usersAudioPlayer;
-        private readonly IScreenSharePlayer _screenSharePlayer;
+        IsSharing = true;
 
-        private readonly CancellationTokenSource _receiveCancellationTokenSource;
-        private CancellationTokenSource? _sendCancellationTokenSource;
+        _sendCancellationTokenSource = new CancellationTokenSource();
 
-        private readonly Thread _screenShareReceiveThread;
-        private Thread? _screenShareSendThread;
-
-        [ObservableProperty]
-        private bool _isSharing = false;
-
-        public ScreenShareManager(
-            INetworkUtils networkUtils,
-            ICryptoSessionManager cryptoSessionManager,
-            IUsersAudioPlayer usersAudioPlayer,
-            IScreenSharePlayer screenSharePlayer)
+        if (withAudio)
         {
-            _networkUtils = networkUtils;
-            _cryptoSessionManager = cryptoSessionManager;
-            _usersAudioPlayer = usersAudioPlayer;
-            _screenSharePlayer = screenSharePlayer;
-
-            _receiveCancellationTokenSource = new CancellationTokenSource();
-            _screenShareReceiveThread = new(() => HandleReceiveScreenShare(_receiveCancellationTokenSource.Token))
-            {
-                IsBackground = true
-            };
-            _screenShareReceiveThread.Start();
+            LoopbackAudioCapture.InitializeAudio();
         }
 
-        public void StartSharing(bool withAudio)
+        _screenShareSendThread = new(() => ShareScreenLoop(_sendCancellationTokenSource.Token))
         {
-            if (IsSharing) return;
+            IsBackground = true
+        };
+        _screenShareSendThread.Start();
+    }
 
-            IsSharing = true;
+    public void StopSharing()
+    {
+        IsSharing = false;
+        _sendCancellationTokenSource?.Cancel();
+        _screenShareSendThread?.Join();
+        _sendCancellationTokenSource?.Dispose();
+        _sendCancellationTokenSource = null;
 
-            _sendCancellationTokenSource = new CancellationTokenSource();
+        LoopbackAudioCapture.Stop();
+    }
 
-            if (withAudio)
+    private void ShareScreenLoop(CancellationToken token)
+    {
+        const int INTERVAL = 1000 / TARGET_FPS;
+
+        _ = ScreenGrabber.CaptureFrame(out int w, out int h);
+        H264Encoder.Initialize(w, h);
+
+        while (!token.IsCancellationRequested)
+        {
+            var sw = Stopwatch.StartNew();
+
+            var screenFrame = ScreenGrabber.CaptureFrame(out _, out _);
+            CursorRenderer.OverlayCursorOnByteBuffer(screenFrame, w, h);
+            var encodedFrame = H264Encoder.Encode(screenFrame);
+
+            if (encodedFrame != null)
             {
-                LoopbackAudioCapture.InitializeAudio();
+                SendFramePacket(encodedFrame);
+
+                if (_screenSharePlayer.IsWindowVisible)
+                    ProcessFrame(encodedFrame, token);
             }
 
-            _screenShareSendThread = new(() => ShareScreenLoop(_sendCancellationTokenSource.Token))
+            int delay = INTERVAL - (int)sw.ElapsedMilliseconds;
+            if (delay > 0)
             {
-                IsBackground = true
-            };
-            _screenShareSendThread.Start();
-        }
-
-        public void StopSharing()
-        {
-            IsSharing = false;
-            _sendCancellationTokenSource?.Cancel();
-            _screenShareSendThread?.Join();
-            _sendCancellationTokenSource?.Dispose();
-            _sendCancellationTokenSource = null;
-
-            LoopbackAudioCapture.Stop();
-        }
-
-        private void ShareScreenLoop(CancellationToken token)
-        {
-            const int INTERVAL = 1000 / TARGET_FPS;
-
-            _ = ScreenGrabber.CaptureFrame(out int w, out int h);
-            H264Encoder.Initialize(w, h);
-
-            while (!token.IsCancellationRequested)
-            {
-                var sw = Stopwatch.StartNew();
-
-                var screenFrame = ScreenGrabber.CaptureFrame(out _, out _);
-                CursorRenderer.OverlayCursorOnByteBuffer(screenFrame, w, h);
-                var encodedFrame = H264Encoder.Encode(screenFrame);
-
-                if (encodedFrame != null)
-                {
-                    SendFramePacket(encodedFrame);
-
-                    if (_screenSharePlayer.IsWindowVisible)
-                        ProcessFrame(encodedFrame, token);
-                }
-
-                int delay = INTERVAL - (int)sw.ElapsedMilliseconds;
-                if (delay > 0)
-                {
-                    Thread.Sleep(delay);
-                }
+                Thread.Sleep(delay);
             }
         }
+    }
 
-        private void SendFramePacket(byte[] frameData)
+    private void SendFramePacket(byte[] frameData)
+    {
+        var encryptedData = _cryptoSessionManager.EncryptMessage(frameData);
+
+        _networkUtils.SendScreenSharePacketAsync(encryptedData).GetAwaiter().GetResult();
+    }
+
+    private void HandleReceiveScreenShare(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
         {
-            var encryptedData = _cryptoSessionManager.EncryptMessage(frameData);
-
-            _networkUtils.SendScreenSharePacketAsync(encryptedData).GetAwaiter().GetResult();
-        }
-
-        private void HandleReceiveScreenShare(CancellationToken token)
-        {
-            while (!token.IsCancellationRequested)
+            try
             {
-                try
+                if (_screenSharePlayer.IsWindowVisible)
                 {
-                    if (_screenSharePlayer.IsWindowVisible)
-                    {
-                        var encryptedData = _networkUtils.ReceiveScreenSharePacketAsync(token).GetAwaiter().GetResult();
-                        var data = _cryptoSessionManager.DecryptMessage(encryptedData);
+                    var encryptedData = _networkUtils.ReceiveScreenSharePacketAsync(token).GetAwaiter().GetResult();
+                    var data = _cryptoSessionManager.DecryptMessage(encryptedData);
 
-                        ProcessFrame(data, token);
-                    }
-                    else
-                    {
-                        Thread.Sleep(100);
-                    }
+                    ProcessFrame(data, token);
                 }
-                catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex))
+                else
                 {
-                    return;
+                    Thread.Sleep(100);
                 }
-                catch { /* ignore */ }
             }
+            catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex))
+            {
+                return;
+            }
+            catch { /* ignore */ }
         }
+    }
 
-        private void ProcessFrame(byte[] imageData, CancellationToken token)
-        {
-            _screenSharePlayer.UpdateFrame(imageData, token);
-        }
+    private void ProcessFrame(byte[] imageData, CancellationToken token)
+    {
+        _screenSharePlayer.UpdateFrame(imageData, token);
+    }
 
-        public void Dispose()
-        {
-            _receiveCancellationTokenSource.Cancel();
-            _screenShareReceiveThread.Join();
-            _receiveCancellationTokenSource.Dispose();
+    public void Dispose()
+    {
+        _receiveCancellationTokenSource.Cancel();
+        _screenShareReceiveThread.Join();
+        _receiveCancellationTokenSource.Dispose();
 
-            StopSharing();
+        StopSharing();
 
-            LoopbackAudioCapture.Dispose();
-            H264Encoder.Cleanup();
+        LoopbackAudioCapture.Dispose();
+        H264Encoder.Cleanup();
 
-            GC.SuppressFinalize(this);
-        }
+        GC.SuppressFinalize(this);
     }
 }

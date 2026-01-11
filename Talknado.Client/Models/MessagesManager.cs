@@ -2,59 +2,58 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 
-namespace Talknado.Client.Models
+namespace Talknado.Client.Models;
+
+public interface IMessagesManager
 {
-    public interface IMessagesManager
-    {
-        void AddMessage(ushort userId, string message);
-        ObservableCollection<MessagesManager.Message> Messages { get; }
-    }
-    public partial class MessagesManager(IUsersInfo usersInfo) : ObservableObject, IMessagesManager
-    {
-        private readonly IUsersInfo _usersInfo = usersInfo;
+    void AddMessage(ushort userId, string message);
+    ObservableCollection<MessagesManager.Message> Messages { get; }
+}
+public partial class MessagesManager(IUsersInfo usersInfo) : ObservableObject, IMessagesManager
+{
+    private readonly IUsersInfo _usersInfo = usersInfo;
 
-        [ObservableProperty]
-        private ObservableCollection<Message> _messages = [];
+    [ObservableProperty]
+    private ObservableCollection<Message> _messages = [];
 
-        public void AddMessage(ushort userId, string message)
+    public void AddMessage(ushort userId, string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
         {
-            if (string.IsNullOrWhiteSpace(message))
-            {
-                return;
-            }
-
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                string timestamp = DateTime.Now.ToString("HH:mm");
-
-                if (Messages.Count > 0 && Messages[^1].UserId == userId && Messages[^1].Timestamp == timestamp)
-                {
-                    Messages[^1].Text += "\n" + message;
-                }
-                else
-                {
-                    var username = _usersInfo.GetUsernameByUserId(userId);
-                    Messages.Add(new(userId, username, message, DateTime.Now.ToString("HH:mm")));
-                }
-            });
+            return;
         }
 
-        public partial class Message : ObservableObject
+        Application.Current.Dispatcher.Invoke(() =>
         {
-            public ushort UserId { get; }
-            public string Username { get; }
-            public string Timestamp { get; }
+            string timestamp = DateTime.Now.ToString("HH:mm");
 
-            [ObservableProperty]
-            private string _text;
-
-            public Message(ushort userId, string username, string text, string timestamp)
+            if (Messages.Count > 0 && Messages[^1].UserId == userId && Messages[^1].Timestamp == timestamp)
             {
-                UserId = userId;
-                Username = username;
-                Timestamp = timestamp;
-                Text = text;
+                Messages[^1].Text += "\n" + message;
             }
+            else
+            {
+                var username = _usersInfo.GetUsernameByUserId(userId);
+                Messages.Add(new(userId, username, message, DateTime.Now.ToString("HH:mm")));
+            }
+        });
+    }
+
+    public partial class Message : ObservableObject
+    {
+        public ushort UserId { get; }
+        public string Username { get; }
+        public string Timestamp { get; }
+
+        [ObservableProperty]
+        private string _text;
+
+        public Message(ushort userId, string username, string text, string timestamp)
+        {
+            UserId = userId;
+            Username = username;
+            Timestamp = timestamp;
+            Text = text;
         }
     }
 }

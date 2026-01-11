@@ -1,148 +1,180 @@
 ﻿using NAudio.Wave;
 using System.Collections.Concurrent;
+using Talknado.Client.Models.Helpers.Audio;
+using Talknado.Client.Properties.Localization;
 
-namespace Talknado.Client.Models
+namespace Talknado.Client.Models;
+
+public interface IUsersAudioPlayer
 {
-    public interface IUsersAudioPlayer
+    void Play(ushort userId, byte[] opusData);
+}
+
+public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
+{
+    private readonly IUsersInfo _usersInfo;
+
+    private readonly ConcurrentDictionary<ushort, UserAudioStream> _userAudioStreams = [];
+    private readonly TimeSpan _streamTimeout = TimeSpan.FromMilliseconds(500);
+    private readonly Timer _playbackTimer;
+
+    private event Action<ushort>? UserAdded;
+    private event Action<ushort>? UserRemoved;
+
+    private readonly ISettingsManager _settingsManager;
+
+    public UsersAudioPlayer(ISettingsManager settingsManager, IUsersInfo usersInfo)
     {
-        event Action<ushort>? UserAdded;
-        event Action<ushort>? UserRemoved;
-        void Play(ushort userId, byte[]? audioData);
+        _usersInfo = usersInfo;
+
+        _settingsManager = settingsManager;
+        _playbackTimer = new(PlaybackTick, null, 0, 10);
+        _settingsManager.OutputDeviceChanged += HandleOutputDeviceChanged;
+
+        UserAdded += userId => _usersInfo.UpdateMicrophoneState(userId, true);
+        UserRemoved += userId => _usersInfo.UpdateMicrophoneState(userId, false);
     }
 
-    public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
+    public void Play(ushort userId, byte[] opusData)
     {
-        private readonly ConcurrentDictionary<ushort, UserAudioStream> _userAudioStreams = [];
-        private readonly TimeSpan _streamTimeout = TimeSpan.FromMilliseconds(150);
-        private readonly Timer _cleanupTimer;
-
-        public event Action<ushort>? UserAdded;
-        public event Action<ushort>? UserRemoved;
-
-        private readonly ISettingsManager _settingsManager;
-
-        public UsersAudioPlayer(ISettingsManager settingsManager)
+        if (!_userAudioStreams.TryGetValue(userId, out UserAudioStream? value))
         {
-            _settingsManager = settingsManager;
-
-            _cleanupTimer = new(CheckInactiveStreams, null, 0, 200);
-            _cleanupTimer.ConfigureAwait(false);
-
-            _settingsManager.OutputDeviceChanged += HandleOutputDeviceChanged;
+            var deviceIndex = ResolveDeviceIndex(_settingsManager.SelectedInputDevice);
+            value = new UserAudioStream(_usersInfo, userId, deviceIndex);
+            _userAudioStreams[userId] = value;
+            UserAdded?.Invoke(userId);
         }
 
-        public void Play(ushort userId, byte[]? audioData)
-        {
-            if (!_userAudioStreams.TryGetValue(userId, out UserAudioStream? value))
-            {
-                var deviceIndex = ResolveDeviceIndex(_settingsManager.SelectedInputDevice);
-                value = new UserAudioStream(deviceIndex);
-                _userAudioStreams[userId] = value;
+        value.AddPacket(opusData);
+    }
 
-                UserAdded?.Invoke(userId);
-            }
-            if (audioData != null)
-                value.AddAudio(audioData);
-            else
-                value.UpdateLastActiveTime();
+    private void RemoveUserStream(ushort userId)
+    {
+        if (_userAudioStreams.TryRemove(userId, out var stream))
+        {
+            stream.Dispose();
+            UserRemoved?.Invoke(userId);
+        }
+    }
+
+    private void PlaybackTick(object? state)
+    {
+        foreach (var stream in _userAudioStreams.Values)
+        {
+            stream.Playback();
         }
 
-        private void RemoveUserStream(ushort userId)
-        {
-            if (_userAudioStreams.TryRemove(userId, out var stream))
-            {
-                stream.Dispose();
+        var inactive = _userAudioStreams
+            .Where(kvp => kvp.Value.ConsecutiveLosses >= 50)
+            .Select(kvp => kvp.Key)
+            .ToList();
 
-                UserRemoved?.Invoke(userId);
-            }
-        }
+        foreach (var userId in inactive)
+            RemoveUserStream(userId);
+    }
 
-        private void CheckInactiveStreams(object? state)
-        {
-            var now = DateTime.UtcNow;
-            var inactive = _userAudioStreams
-                .Where(kvp => now - kvp.Value.LastActiveTime > _streamTimeout)
-                .Select(kvp => kvp.Key)
-                .ToList();
-
-            foreach (var userId in inactive)
-                RemoveUserStream(userId);
-        }
-
-        private static int ResolveDeviceIndex(string? deviceName)
-        {
-            if (string.IsNullOrEmpty(deviceName) || deviceName == "Устройство по умолчанию")
-                return -1;
-
-            for (int i = 0; i < WaveOut.DeviceCount; i++)
-            {
-                var caps = WaveOut.GetCapabilities(i);
-                if (caps.ProductName == deviceName)
-                    return i;
-            }
-
+    private static int ResolveDeviceIndex(string? deviceName)
+    {
+        if (string.IsNullOrEmpty(deviceName) || deviceName == Strings.DefaultDeviceText)
             return -1;
+
+        for (int i = 0; i < WaveOut.DeviceCount; i++)
+        {
+            var caps = WaveOut.GetCapabilities(i);
+            if (caps.ProductName == deviceName)
+                return i;
         }
 
-        private void HandleOutputDeviceChanged()
+        return -1;
+    }
+
+    private void HandleOutputDeviceChanged()
+    {
+        foreach (var userId in _userAudioStreams.Keys.ToList())
+            RemoveUserStream(userId);
+    }
+
+    public void Dispose()
+    {
+        foreach (var stream in _userAudioStreams.Values)
+            stream.Dispose();
+
+        _userAudioStreams.Clear();
+        _playbackTimer.Dispose();
+        _settingsManager.OutputDeviceChanged -= HandleOutputDeviceChanged;
+
+        UserAdded = null;
+        UserRemoved = null;
+
+        GC.SuppressFinalize(this);
+    }
+
+    public class UserAudioStream : IDisposable
+    {
+        private WaveOutEvent WaveOut { get; }
+        private BufferedWaveProvider WaveProvider { get; }
+
+        private readonly IUsersInfo _usersInfo;
+        private readonly ushort _userId;
+
+        private readonly OpusCodecDecoder _decoder = new();
+        private readonly Queue<byte[]> _packetQueue = new();
+        public int ConsecutiveLosses { get; private set; }
+
+        public UserAudioStream(IUsersInfo usersInfo, ushort userId, int deviceIndex)
         {
-            foreach (var userId in _userAudioStreams.Keys.ToList())
+            _usersInfo = usersInfo;
+            _userId = userId;
+
+            WaveProvider = new BufferedWaveProvider(new WaveFormat(48000, 16, 1))
             {
-                RemoveUserStream(userId);
+                DiscardOnBufferOverflow = true
+            };
+
+            WaveOut = new WaveOutEvent
+            {
+                DeviceNumber = deviceIndex
+            };
+
+            WaveOut.Init(WaveProvider);
+            WaveOut.Play();
+        }
+
+        public void AddPacket(byte[] opusData)
+        {
+            _packetQueue.Enqueue(opusData);
+        }
+
+        public void Playback()
+        {
+            var userVolumeMultiplier = _usersInfo.GetVolumeByUserId(_userId) / 50f;
+
+            if (_packetQueue.TryDequeue(out byte[]? opusData))
+            {
+                byte[] pcmData = _decoder.Decode(opusData);
+                VolumeController.AdjustVolume(pcmData, userVolumeMultiplier);
+                WaveProvider.AddSamples(pcmData, 0, pcmData.Length);
+                ConsecutiveLosses = 0;
+            }
+            else
+            {
+                ConsecutiveLosses++;
+                if (ConsecutiveLosses <= 5)
+                {
+                    byte[] plcData = _decoder.DecodePLC();
+                    VolumeController.AdjustVolume(plcData, userVolumeMultiplier);
+                    WaveProvider.AddSamples(plcData, 0, plcData.Length);
+                }
             }
         }
 
         public void Dispose()
         {
-            _cleanupTimer.Dispose();
-
-            UserAdded = null;
-            UserRemoved = null;
+            WaveOut?.Stop();
+            WaveOut?.Dispose();
+            _decoder?.Dispose();
 
             GC.SuppressFinalize(this);
-        }
-
-        public class UserAudioStream : IDisposable
-        {
-            public WaveOutEvent WaveOut { get; }
-            public BufferedWaveProvider WaveProvider { get; }
-            public DateTime LastActiveTime { get; private set; }
-
-            public UserAudioStream(int deviceIndex)
-            {
-                WaveProvider = new BufferedWaveProvider(new WaveFormat(48000, 16, 1))
-                {
-                    DiscardOnBufferOverflow = true
-                };
-
-                WaveOut = new WaveOutEvent
-                {
-                    DeviceNumber = deviceIndex
-                };
-                WaveOut.Init(WaveProvider);
-                WaveOut.Play();
-
-                LastActiveTime = DateTime.UtcNow;
-            }
-
-            public void AddAudio(byte[] data)
-            {
-                WaveProvider.AddSamples(data, 0, data.Length);
-                LastActiveTime = DateTime.UtcNow;
-            }
-
-            public void UpdateLastActiveTime()
-            {
-                LastActiveTime = DateTime.UtcNow;
-            }
-
-            public void Dispose()
-            {
-                WaveOut.Stop();
-                WaveOut.Dispose();
-
-                GC.SuppressFinalize(this);
-            }
         }
     }
 }
