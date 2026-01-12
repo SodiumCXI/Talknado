@@ -255,8 +255,6 @@ public static unsafe class H264Decoder
 
         if (_width != _frame->width || _height != _frame->height)
         {
-            ffmpeg.avcodec_flush_buffers(_codecContext);
-
             _width = _frame->width;
             _height = _frame->height;
 
