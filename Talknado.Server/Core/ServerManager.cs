@@ -49,7 +49,7 @@ public class ServerManager(INetworkUtils networkUtils,
 
             _serverThread = new Thread(() => ServerHandle(password, token))
             {
-                IsBackground = true
+                IsBackground = false
             };
             _serverThread.Start();
 

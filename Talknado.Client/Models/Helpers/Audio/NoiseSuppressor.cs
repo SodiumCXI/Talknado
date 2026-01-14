@@ -37,9 +37,4 @@ public static class NoiseSuppressor
         }
         return buffer;
     }
-
-    public static void Dispose()
-    {
-        _denoiser?.Dispose();
-    }
 }

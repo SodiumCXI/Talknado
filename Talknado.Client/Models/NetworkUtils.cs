@@ -72,11 +72,10 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
         {
             if (_serverPeer?.ConnectionState == ConnectionState.Connected)
             {
-                Console.WriteLine("[Client] Successfully connected!");
                 return;
             }
 
-            Thread.Sleep(50);
+            Thread.Sleep(10);
         }
     }
 

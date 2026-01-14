@@ -40,7 +40,7 @@ public class ClientManager(IUsersInfo usersInfo,
 
     private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789&%";
 
-    private readonly string _clientVersion = "v1.3.3";
+    private readonly string _clientVersion = "v1.3.4";
     private TcpClient _tcpMainClient = null!;
 
     private readonly CancellationTokenSource _receiveCancellationTokenSource = new();

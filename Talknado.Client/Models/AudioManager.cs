@@ -225,7 +225,6 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         _audioReceiveThread.Join();
         _receiveCancellationTokenSource.Dispose();
 
-        NoiseSuppressor.Dispose();
         _encoder.Dispose();
 
         GC.SuppressFinalize(this);

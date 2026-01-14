@@ -5,6 +5,8 @@ namespace Talknado.Client.Models.Helpers.ScreenShare;
 
 public static unsafe class H264Encoder
 {
+    private const int MAX_PIXELS = 921600;
+
     private static AVCodec* _codec;
     private static AVCodecContext* _codecContext;
     private static AVFrame* _frame;
@@ -14,7 +16,6 @@ public static unsafe class H264Encoder
     private static int _height;
     private static int _frameCount = 0;
     private static bool _initialized = false;
-    private static int _ret;
 
     public static void Initialize(int inputWidth, int inputHeight)
     {
@@ -73,8 +74,8 @@ public static unsafe class H264Encoder
                 ffmpeg.av_opt_set(_codecContext->priv_data, "intra-refresh", "1", 0);
             }
 
-            _ret = ffmpeg.avcodec_open2(_codecContext, _codec, null);
-            if (_ret >= 0)
+            var ret = ffmpeg.avcodec_open2(_codecContext, _codec, null);
+            if (ret >= 0)
             {
                 codecOpened = true;
                 break;
@@ -109,8 +110,6 @@ public static unsafe class H264Encoder
 
     private static void CalculateScaledDimensions(int inputWidth, int inputHeight, out int width, out int height)
     {
-        const int MAX_PIXELS = 921600;
-
         width = inputWidth;
         height = inputHeight;
 
@@ -135,8 +134,8 @@ public static unsafe class H264Encoder
 
         fixed (byte* pBgra = bgraData)
         {
-            byte*[] srcData = { pBgra };
-            int[] srcLinesize = { _width * 4 };
+            byte*[] srcData = [pBgra];
+            int[] srcLinesize = [_width * 4];
             ffmpeg.sws_scale(_swsContext, srcData, srcLinesize, 0, _height, _frame->data, _frame->linesize);
         }
 
@@ -198,18 +197,23 @@ public static unsafe class H264Encoder
     }
 }
 
-public static unsafe class H264Decoder
+public unsafe class H264Decoder
 {
-    private static AVCodec* _codec;
-    private static AVCodecContext* _codecContext;
-    private static AVFrame* _frame;
-    private static AVPacket* _packet;
-    private static SwsContext* _swsContext;
-    private static int _width;
-    private static int _height;
-    private static bool _initialized = false;
+    private AVCodec* _codec;
+    private AVCodecContext* _codecContext;
+    private AVFrame* _frame;
+    private AVPacket* _packet;
+    private SwsContext* _swsContext;
+    private int _width;
+    private int _height;
+    private bool _initialized = false;
 
-    public static void Initialize()
+    public H264Decoder()
+    {
+        Initialize();
+    }
+
+    public void Initialize()
     {
         if (_initialized)
             Cleanup();
@@ -232,21 +236,36 @@ public static unsafe class H264Decoder
         _initialized = true;
     }
 
-    public static byte[] Decode(byte[] h264Data)
+    public byte[] Decode(byte[] h264Data)
     {
         if (!_initialized)
             throw new InvalidOperationException("Декодер не инициализирован. Вызовите Initialize()");
 
-        fixed (byte* pData = h264Data)
-        {
-            _packet->data = pData;
-            _packet->size = h264Data.Length;
+        AVPacket* pkt = ffmpeg.av_packet_alloc();
+        if (pkt == null)
+            throw new Exception("av_packet_alloc failed");
 
-            ffmpeg.avcodec_send_packet(_codecContext, _packet);
+        int ret = ffmpeg.av_new_packet(pkt, h264Data.Length);
+        if (ret < 0)
+            throw new Exception("av_new_packet failed");
+
+        fixed (byte* src = h264Data)
+        {
+            Buffer.MemoryCopy(
+                src,
+                pkt->data,
+                h264Data.Length,
+                h264Data.Length);
         }
 
+        ret = ffmpeg.avcodec_send_packet(_codecContext, pkt);
+        ffmpeg.av_packet_free(&pkt);
 
-        int ret = ffmpeg.avcodec_receive_frame(_codecContext, _frame);
+        if (ret < 0)
+            throw new Exception($"avcodec_send_packet error {ret}");
+
+
+        ret = ffmpeg.avcodec_receive_frame(_codecContext, _frame);
         if (ret == ffmpeg.AVERROR(ffmpeg.EAGAIN) || ret == ffmpeg.AVERROR_EOF)
             return null!;
 
@@ -267,19 +286,19 @@ public static unsafe class H264Decoder
         byte[] bgraData = new byte[_width * _height * 4];
         fixed (byte* pBgra = bgraData)
         {
-            byte*[] dstData = { pBgra };
-            int[] dstLinesize = { _width * 4 };
+            byte*[] dstData = [pBgra];
+            int[] dstLinesize = [_width * 4];
             ffmpeg.sws_scale(_swsContext, _frame->data, _frame->linesize, 0, _height, dstData, dstLinesize);
         }
 
         return bgraData;
     }
 
-    public static int Width => _width;
+    public int Width => _width;
 
-    public static int Height => _height;
+    public int Height => _height;
 
-    public static void Cleanup()
+    public void Cleanup()
     {
         if (!_initialized) return;
 

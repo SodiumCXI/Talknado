@@ -46,14 +46,14 @@
                 <StackPanel>
                     <TextBlock Text="{x:Static l:Strings.InputDevicesLabel}"
                                Style="{StaticResource LabelStyle}"/>
-                    <ComboBox ItemsSource="{Binding SettingManager.OutputDevices}"
+                    <ComboBox ItemsSource="{Binding SettingManager.InputDevices}"
                               SelectedItem="{Binding SettingManager.SelectedOutputDevice}"
                               Style="{StaticResource ComboStyle}"
                               ItemContainerStyle="{StaticResource ComboItemStyle}"/>
 
                     <TextBlock Text="{x:Static l:Strings.OutputDevicesLabel}"
                                Style="{StaticResource LabelStyle}"/>
-                    <ComboBox ItemsSource="{Binding SettingManager.InputDevices}" 
+                    <ComboBox ItemsSource="{Binding SettingManager.OutputDevices}" 
                               SelectedItem="{Binding SettingManager.SelectedInputDevice}"
                               Style="{StaticResource ComboStyle}"
                               ItemContainerStyle="{StaticResource ComboItemStyle}"/>

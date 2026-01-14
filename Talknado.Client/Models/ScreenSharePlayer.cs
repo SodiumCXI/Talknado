@@ -11,6 +11,7 @@ namespace Talknado.Client.Models;
 public interface IScreenSharePlayer
 {
     void UpdateFrame(byte[] h264Data, CancellationToken token);
+    void Clear();
     ImageSource DisplayImage { get; }
     int FramesPerSecond { get; }
     bool IsWindowVisible { get; set; }
@@ -29,6 +30,8 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     private int _currentHeight;
     private bool _isInitialized = false;
 
+    private readonly H264Decoder _decoder = new();
+
     [ObservableProperty]
     private bool _isWindowVisible = false;
     [ObservableProperty]
@@ -38,8 +41,6 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
 
     public ScreenSharePlayer()
     {
-        H264Decoder.Initialize();
-
         _statsTimer = new Timer(_ =>
         {
             FramesPerSecond = _frameCount;
@@ -51,13 +52,13 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     {
         try
         {
-            byte[] bgraPixels = H264Decoder.Decode(h264Data);
+            byte[] bgraPixels = _decoder.Decode(h264Data);
 
             if (bgraPixels == null)
                 return;
 
-            int width = H264Decoder.Width;
-            int height = H264Decoder.Height;
+            int width = _decoder.Width;
+            int height = _decoder.Height;
 
             if (!_isInitialized || _currentWidth != width || _currentHeight != height)
             {
@@ -154,7 +155,7 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     public void Dispose()
     {
         _statsTimer?.Dispose();
-        H264Decoder.Cleanup();
+        _decoder.Cleanup();
 
         GC.SuppressFinalize(this);
     }
