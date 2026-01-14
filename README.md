@@ -29,7 +29,7 @@ A lightweight low-latency real-time communication application. Provides **voice 
 - Media relaying between clients
 
 ### Dedicated Linux Server
-- Not part of this repository: [talknado-server-linux](https://github.com/SodiumCXI/talknado-server-linux)
+- Not part of this repository: **[talknado-server-linux](https://github.com/SodiumCXI/talknado-server-linux)**
 - Provides the same connection handling and media relaying functionality as the embedded server
 - Installation:
 ```bash

@@ -29,7 +29,7 @@
 - Ретрансляция медиа между клиентами
 
 ### Отдельный сервер для Linux
-- Не входит в этот репозиторий: [talknado-server-linux](https://github.com/SodiumCXI/talknado-server-linux)
+- Не входит в этот репозиторий: **[talknado-server-linux](https://github.com/SodiumCXI/talknado-server-linux)**
 - Обеспечивает те же функции обработки соединений и ретрансляции медиа, что и встроенный сервер
 - Установка:
 ```bash

@@ -29,7 +29,7 @@
 - 客户端之间的媒体中继
 
 ### 独立 Linux 服务器
-- 不包含在本仓库中： [talknado-server-linux](https://github.com/SodiumCXI/talknado-server-linux)
+- 不包含在本仓库中： **[talknado-server-linux](https://github.com/SodiumCXI/talknado-server-linux)**
 - 提供与内置服务器相同的连接处理和媒体中继功能
 - 安装：
 ```bash
