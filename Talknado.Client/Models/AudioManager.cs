@@ -1,5 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
+using System.Windows;
 using Talknado.Client.Models.Helpers;
 using Talknado.Client.Models.Helpers.Audio;
 using Talknado.Client.Properties.Localization;
@@ -140,32 +142,111 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
 
     private void HandleSendAudio(int deviceIndex, CancellationToken token)
     {
+        if (WaveInEvent.DeviceCount == 0)
+        {
+            IsMicrophoneActive = false;
+            MessageBox.Show(Strings.MicrophoneNotDetectedText, Strings.MicrophoneErrorText,
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        int targetSampleRate = 48000;
+        int microphoneSampleRate = targetSampleRate;
+
+        try
+        {
+            using var testWaveIn = new WaveInEvent
+            {
+                DeviceNumber = deviceIndex,
+                WaveFormat = new WaveFormat(targetSampleRate, 16, 1)
+            };
+        }
+        catch
+        {
+            using var tempWaveIn = new WaveInEvent { DeviceNumber = deviceIndex };
+            microphoneSampleRate = tempWaveIn.WaveFormat.SampleRate;
+        }
+
         using var waveIn = new WaveInEvent
         {
             DeviceNumber = deviceIndex,
-            WaveFormat = new WaveFormat(48000, 16, 1),
+            WaveFormat = new WaveFormat(microphoneSampleRate, 16, 1),
             BufferMilliseconds = 10
         };
+
+        BufferedWaveProvider? bufferProvider = null;
+        WdlResamplingSampleProvider? resampler = null;
+
+        if (microphoneSampleRate != targetSampleRate)
+        {
+            bufferProvider = new BufferedWaveProvider(waveIn.WaveFormat)
+            {
+                DiscardOnBufferOverflow = true,
+                BufferLength = waveIn.WaveFormat.AverageBytesPerSecond * 2
+            };
+
+            resampler = new WdlResamplingSampleProvider(
+                bufferProvider.ToSampleProvider(),
+                targetSampleRate
+            );
+        }
 
         void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
             if (token.IsCancellationRequested) return;
 
-            var microphoneData = new byte[e.BytesRecorded];
-            Array.Copy(e.Buffer, microphoneData, e.BytesRecorded);
+            try
+            {
+                byte[] audioData;
 
-            var audioData = NoiseSuppressor.Denoise(microphoneData);
-            var opusData = _encoder.Encode(audioData);
+                if (resampler != null && bufferProvider != null)
+                {
+                    bufferProvider.AddSamples(e.Buffer, 0, e.BytesRecorded);
 
-            SendOpusPacket(opusData, _connectionInfo.LocalUserId);
+                    int inputSamples = e.BytesRecorded / waveIn.WaveFormat.BlockAlign;
+                    int outputSamples = (int)(inputSamples * (long)targetSampleRate / microphoneSampleRate) + 100;
+                    float[] floatBuffer = new float[outputSamples];
+
+                    int samplesRead = resampler.Read(floatBuffer, 0, outputSamples);
+
+                    if (samplesRead == 0) return;
+
+                    audioData = new byte[samplesRead * 2];
+                    for (int i = 0; i < samplesRead; i++)
+                    {
+                        short pcmSample = (short)Math.Clamp(floatBuffer[i] * 32767f, -32768f, 32767f);
+                        audioData[i * 2] = (byte)(pcmSample & 0xFF);
+                        audioData[i * 2 + 1] = (byte)(pcmSample >> 8);
+                    }
+                }
+                else
+                {
+                    audioData = new byte[e.BytesRecorded];
+                    Array.Copy(e.Buffer, audioData, e.BytesRecorded);
+                }
+
+                var denoisedData = NoiseSuppressor.Denoise(audioData);
+                var opusData = _encoder.Encode(denoisedData);
+                SendOpusPacket(opusData, _connectionInfo.LocalUserId);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Audio processing error: {ex.Message}");
+            }
         }
 
         waveIn.DataAvailable += OnDataAvailable;
-        waveIn.StartRecording();
 
         try
         {
+            waveIn.StartRecording();
             token.WaitHandle.WaitOne();
+        }
+        catch
+        {
+            IsMicrophoneActive = false;
+            MessageBox.Show(Strings.MicrophoneUnableText, Strings.MicrophoneErrorText,
+                MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {

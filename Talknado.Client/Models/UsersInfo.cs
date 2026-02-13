@@ -7,17 +7,21 @@ namespace Talknado.Client.Models;
 
 public interface IUsersInfo
 {
+    ObservableCollection<UsersInfo.UserItem> Users { get; }
+    bool IsWaitingForScreenShareWindow { get; set; }
+    float GetVolumeByUserId(ushort userId);
+    string GetUsernameByUserId(ushort userId);
     void AddUser(ushort userId, string username, bool isMicrophoneActive, bool isScreenShareActive);
     void RemoveUser(ushort userId);
     void UpdateMicrophoneState(ushort userId, bool isActive);
     void UpdateScreenSharingState(ushort userId, bool isActive);
-    float GetVolumeByUserId(ushort userId);
-    string GetUsernameByUserId(ushort userId);
-    ObservableCollection<UsersInfo.UserItem> Users { get; }
 }
 
-public partial class UsersInfo : ObservableObject, IUsersInfo
+public partial class UsersInfo(IConnectionInfo connectionInfo, IWindowsState windowsState) : ObservableObject, IUsersInfo
 {
+    private readonly IConnectionInfo _connectionInfo = connectionInfo;
+    private readonly IWindowsState _windowsState = windowsState;
+
     [ObservableProperty]
     private ObservableCollection<UserItem> _users = [];
     private readonly ConcurrentDictionary<ushort, UserItem> _userLookup = [];
@@ -25,13 +29,18 @@ public partial class UsersInfo : ObservableObject, IUsersInfo
     [ObservableProperty]
     private float _screenShareVolume = 50f;
 
-    private readonly IConnectionInfo _connectionInfo;
-    private readonly IWindowsState _windowsState;
-
-    public UsersInfo(IConnectionInfo connectionInfo, IWindowsState windowsState)
+    public bool IsWaitingForScreenShareWindow
     {
-        _connectionInfo = connectionInfo;
-        _windowsState = windowsState;
+        get => _userLookup.Values.FirstOrDefault(u => u.IsScreenShareActive)
+               ?.IsWaitingForScreenShareWindow ?? true;
+        set
+        {
+            var user = _userLookup.Values.FirstOrDefault(u => u.IsScreenShareActive);
+            if (user != null)
+            {
+                user.IsWaitingForScreenShareWindow = value;
+            }
+        }
     }
 
     public float GetVolumeByUserId(ushort userId)
@@ -75,40 +84,39 @@ public partial class UsersInfo : ObservableObject, IUsersInfo
     {
         if (userId == _connectionInfo.LocalUserId)
         {
-            MessageBox.Show("Сервер закрыл соединение с вами", "Ошибка подключения", MessageBoxButton.OK, MessageBoxImage.Error);
             _windowsState.InvokeClientDisconnected();
         }
 
-        Application.Current.Dispatcher.Invoke(() =>
+        if (_userLookup.TryGetValue(userId, out var userToRemove))
         {
-            if (_userLookup.TryGetValue(userId, out var userToRemove))
+            Application.Current.Dispatcher.Invoke(() =>
             {
                 Users.Remove(userToRemove);
-                _userLookup.Remove(userId, out _);
-            }
-        });
+            });
+            _userLookup.Remove(userId, out _);
+        }
     }
 
     public void UpdateMicrophoneState(ushort userId, bool isActive)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        if (_userLookup.TryGetValue(userId, out var user))
         {
-            if (_userLookup.TryGetValue(userId, out var user))
+            Application.Current.Dispatcher.Invoke(() =>
             {
                 user.IsMicrophoneActive = isActive;
-            }
-        });
+            });
+        }
     }
 
     public void UpdateScreenSharingState(ushort userId, bool isActive)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        if (_userLookup.TryGetValue(userId, out var user))
         {
-            if (_userLookup.TryGetValue(userId, out var user))
+            Application.Current.Dispatcher.Invoke(() =>
             {
                 user.IsScreenShareActive = isActive;
-            }
-        });
+            });
+        }
     }
 
     public partial class UserItem : ObservableObject
@@ -124,6 +132,9 @@ public partial class UsersInfo : ObservableObject, IUsersInfo
 
         [ObservableProperty]
         private float _volume = 50f;
+
+        [ObservableProperty]
+        private bool _isWaitingForScreenShareWindow;
 
         public UserItem(string username, bool isMicrophoneActive, bool isScreenSharingActive)
         {

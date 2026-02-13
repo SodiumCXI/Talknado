@@ -13,15 +13,13 @@ public interface IUsersAudioPlayer
 public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
 {
     private readonly IUsersInfo _usersInfo;
+    private readonly ISettingsManager _settingsManager;
 
     private readonly ConcurrentDictionary<ushort, UserAudioStream> _userAudioStreams = [];
-    private readonly TimeSpan _streamTimeout = TimeSpan.FromMilliseconds(500);
     private readonly Timer _playbackTimer;
 
     private event Action<ushort>? UserAdded;
     private event Action<ushort>? UserRemoved;
-
-    private readonly ISettingsManager _settingsManager;
 
     public UsersAudioPlayer(ISettingsManager settingsManager, IUsersInfo usersInfo)
     {
@@ -39,7 +37,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
     {
         if (!_userAudioStreams.TryGetValue(userId, out UserAudioStream? value))
         {
-            var deviceIndex = ResolveDeviceIndex(_settingsManager.SelectedInputDevice);
+            var deviceIndex = ResolveDeviceIndex(_settingsManager.SelectedOutputDevice);
             value = new UserAudioStream(_usersInfo, userId, deviceIndex);
             _userAudioStreams[userId] = value;
             UserAdded?.Invoke(userId);

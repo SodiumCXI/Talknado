@@ -66,7 +66,7 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
         {
             _usersInfo.UpdateUserTcpClient(userId, tcpClient);
 
-            var data = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("CTU"));
+            var data = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("#CTU"));
             _networkUtils.WritePacketAsync(stream, data, token).GetAwaiter().GetResult();
         }
         catch
@@ -173,15 +173,21 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
                 while (!token.IsCancellationRequested)
                 {
                     var encryptedData = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
-                    var data = _cryptoSessionManager.DecryptMessage(encryptedData);
-                    var command = Encoding.UTF8.GetString(data[..4]);
+                    var headerBytes = _cryptoSessionManager.DecryptMessage(encryptedData[..32]);
+                    var header = Encoding.UTF8.GetString(headerBytes);
 
                     lock (_lockCommandExecution)
                     {
-                        if (command.StartsWith("#MSG"))
-                            _networkUtils.BroadcastMessage(userId, encryptedData, token).GetAwaiter().GetResult();
+                        if (header.StartsWith("MSG"))
+                        {
+                            _networkUtils.BroadcastMessage(userId, encryptedData[32..], token).GetAwaiter().GetResult();
+                        }
                         else
-                            ExecuteCommand(stream, userId, command, data.AsSpan()[4..], token);
+                        {
+                            var commandBytes = _cryptoSessionManager.DecryptMessage(encryptedData[32..]);
+                            var command = Encoding.UTF8.GetString(commandBytes);
+                            ExecuteCommand(stream, userId, command,  token);
+                        }
                     }
                 }
             }
@@ -270,7 +276,7 @@ internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
         return id;
     }
 
-    private void ExecuteCommand(NetworkStream stream, ushort userId, string command, ReadOnlySpan<byte> body, CancellationToken token)
+    private void ExecuteCommand(NetworkStream stream, ushort userId, string command, CancellationToken token)
     {
         switch (command)
         {

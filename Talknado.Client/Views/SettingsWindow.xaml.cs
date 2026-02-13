@@ -5,9 +5,6 @@ using Talknado.Client.ViewModels;
 
 namespace Talknado.Client.Views
 {
-    /// <summary>
-    /// Логика взаимодействия для SettingsWindow.xaml
-    /// </summary>
     public partial class SettingsWindow : TalknadoWindow, IDisposable
     {
         public SettingsWindow()
@@ -37,7 +34,7 @@ namespace Talknado.Client.Views
                 newVm.SettingManager is INotifyPropertyChanged newNotifier)
             {
                 PropertyChangedEventManager.AddHandler(newNotifier, OnPlayerPropertyChanged!, nameof(ISettingsManager.IsWindowVisible));
-                UpdateVisibility(newVm.SettingManager.IsWindowVisible);
+                UpdateVisibility(newVm.SettingManager.IsWindowVisible, newVm);
             }
         }
 
@@ -46,14 +43,17 @@ namespace Talknado.Client.Views
             if (e.PropertyName == nameof(ISettingsManager.IsWindowVisible) &&
                 DataContext is SettingsWindowViewModel vm)
             {
-                UpdateVisibility(vm.SettingManager.IsWindowVisible);
+                UpdateVisibility(vm.SettingManager.IsWindowVisible, vm);
             }
         }
 
-        private void UpdateVisibility(bool isVisible)
+        private void UpdateVisibility(bool isVisible, SettingsWindowViewModel vm)
         {
             if (isVisible)
+            {
+                vm.SettingManager.LoadAudioDevices();
                 Show();
+            }
             else
                 Hide();
         }

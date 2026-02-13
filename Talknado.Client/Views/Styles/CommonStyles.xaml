@@ -6,18 +6,21 @@
                     xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters">
 
     <!-- Fonts and sizes -->
+    
     <FontFamily x:Key="BaseFont">pack://application:,,,/Views/Fonts/#Moderustic, Microsoft YaHei UI</FontFamily>
     <FontFamily x:Key="TitleBarFont">Segoe UI</FontFamily>
     <sys:Double x:Key="PrimaryFontSize">15</sys:Double>
     <sys:Double x:Key="SecondaryFontSize">14</sys:Double>
 
     <!-- Icons -->
+    
     <sys:String x:Key="WindowMinimizeIcon">—</sys:String>
     <sys:String x:Key="WindowMaximizeIcon">▢</sys:String>
     <sys:String x:Key="WindowRestoreIcon">❐</sys:String>
     <sys:String x:Key="WindowCloseIcon">✕</sys:String>
 
     <!-- Window styles -->
+    
     <Style x:Key="WindowStyle" TargetType="Window">
         <Setter Property="AllowsTransparency" Value="True"/>
         <Setter Property="Background" Value="Transparent"/>
@@ -60,6 +63,7 @@
     </Style>
 
     <!-- Border styles -->
+    
     <Style x:Key="MessageBorderStyle" TargetType="Border">
         <Setter Property="Margin" Value="4,5,5,0"/>
         <Setter Property="Padding" Value="10,5,10,4"/>
@@ -74,7 +78,34 @@
         <Setter Property="VerticalAlignment" Value="Stretch"/>
     </Style>
 
+    <Style x:Key="LoadingSpinner" TargetType="Path">
+        <Setter Property="Width" Value="20"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="Stroke" Value="{DynamicResource PrimaryTextBrush}"/>
+        <Setter Property="StrokeThickness" Value="2.5"/>
+        <Setter Property="StrokeStartLineCap" Value="Round"/>
+        <Setter Property="StrokeEndLineCap" Value="Round"/>
+        <Setter Property="Data" Value="M 10,2 A 8,8 0 1,1 2,10"/>
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <RotateTransform/>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <EventTrigger RoutedEvent="Loaded">
+                <BeginStoryboard>
+                    <Storyboard RepeatBehavior="Forever">
+                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                   From="0" To="360" Duration="0:0:0.8"/>
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- TextBlock styles -->
+    
     <Style x:Key="PrimaryTextStyle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
         <Setter Property="FontSize" Value="{StaticResource PrimaryFontSize}"/>
@@ -112,6 +143,7 @@
     </Style>
 
     <!-- TextBox styles -->
+    
     <Style x:Key="InputTextBoxStyle" TargetType="TextBox">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -196,6 +228,7 @@
     </Style>
 
     <!-- Slider styles -->
+    
     <cnv:SliderWidthConverter x:Key="SliderWidthConverter"/>
 
     <Style x:Key="InvisibleRepeatButton" TargetType="RepeatButton">
@@ -258,6 +291,7 @@
     </Style>
 
     <!-- Button styles -->
+    
     <Style x:Key="BaseButtonStyle" TargetType="Button">
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
@@ -455,6 +489,7 @@
     </Style>
 
     <!-- TabControl styles -->
+    
     <Style x:Key="StartTabControlStyle" TargetType="TabControl">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -502,6 +537,7 @@
     </Style>
 
     <!-- PasswordBox styles -->
+    
     <Style x:Key="StartPasswordBoxStyle" TargetType="PasswordBox">
         <Setter Property="Height" Value="32"/>
         <Setter Property="Background" Value="{DynamicResource TextBoxBrush}"/>
@@ -537,6 +573,7 @@
     </Style>
 
     <!-- CheckBox styles -->
+    
     <Style x:Key="SettingsCheckBoxStyle" TargetType="CheckBox">
         <Setter Property="Margin" Value="0,12,0,0"/>
         <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
@@ -565,6 +602,7 @@
     </Style>
 
     <!-- ComboBox styles -->
+    
     <Style x:Key="ComboStyle" TargetType="ComboBox">
         <Setter Property="Background" Value="{StaticResource UserItemBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>

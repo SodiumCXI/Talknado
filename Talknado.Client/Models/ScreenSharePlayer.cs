@@ -10,11 +10,16 @@ namespace Talknado.Client.Models;
 
 public interface IScreenSharePlayer
 {
+    void SaveLastKeyFrame(byte[] h264Data);
+    void ClearLastKeyFrame();
+    void UpdateSavedKeyFrame();
     void UpdateFrame(byte[] h264Data, CancellationToken token);
     void Clear();
     ImageSource DisplayImage { get; }
     int FramesPerSecond { get; }
     bool IsWindowVisible { get; set; }
+    bool IsKeyFrameInitialized { get; set; }
+    byte[]? LastKeyFrame { get; }
     string ScreenShareUsername { get; set; }
 }
 
@@ -22,6 +27,8 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
 {
     private WriteableBitmap _displayBitmap = null!;
     public ImageSource DisplayImage => _displayBitmap;
+    public bool IsKeyFrameInitialized { get; set; } = false;
+    public byte[]? LastKeyFrame { get; private set; } = null;
 
     private readonly Timer _statsTimer = null!;
     private int _frameCount;
@@ -39,6 +46,8 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     [ObservableProperty]
     private string _screenShareUsername = string.Empty;
 
+    private readonly object _lock = new();
+
     public ScreenSharePlayer()
     {
         _statsTimer = new Timer(_ =>
@@ -48,39 +57,82 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
         }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
     }
 
+    public void SaveLastKeyFrame(byte[] h264Data)
+    {
+        var frame = new EncodedFrame(h264Data);
+
+        if (!frame.IsKeyFrame)
+            return;
+
+        lock (_lock)
+        {
+            LastKeyFrame = [.. h264Data];
+        }
+
+        return;
+    }
+
+    public void ClearLastKeyFrame()
+    {
+        LastKeyFrame = null;
+    }
+
+    public void UpdateSavedKeyFrame()
+    {
+        if (LastKeyFrame == null)
+            return;
+
+        UpdateFrame(LastKeyFrame, CancellationToken.None);
+    }
+
     public void UpdateFrame(byte[] h264Data, CancellationToken token)
     {
-        try
+        lock (_lock)
         {
-            byte[] bgraPixels = _decoder.Decode(h264Data);
-
-            if (bgraPixels == null)
-                return;
-
-            int width = _decoder.Width;
-            int height = _decoder.Height;
-
-            if (!_isInitialized || _currentWidth != width || _currentHeight != height)
+            try
             {
-                InitializeBitmap(width, height);
+                var frame = new EncodedFrame(h264Data);
+
+                if (!IsKeyFrameInitialized)
+                {
+                    if (!frame.IsKeyFrame)
+                        return;
+
+                    LastKeyFrame = [.. h264Data];
+                    _decoder.FlushBuffers();
+                    IsKeyFrameInitialized = true;
+                }
+
+                byte[] bgraPixels = _decoder.Decode(frame.Data);
+
+                if (bgraPixels == null)
+                    return;
+
+                int width = _decoder.Width;
+                int height = _decoder.Height;
+
+                if (!_isInitialized || _currentWidth != width || _currentHeight != height)
+                {
+                    InitializeBitmap(width, height);
+                }
+
+                _frameCount++;
+
+                if (token.IsCancellationRequested)
+                    return;
+
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher != null && !dispatcher.HasShutdownStarted)
+                {
+                    dispatcher.BeginInvoke(
+                        () => RenderFrame(bgraPixels, width, height),
+                        DispatcherPriority.Render);
+                }
             }
-
-            _frameCount++;
-
-            if (token.IsCancellationRequested)
-                return;
-
-            var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.HasShutdownStarted)
+            catch (Exception ex)
             {
-                dispatcher.BeginInvoke(
-                    () => RenderFrame(bgraPixels, width, height),
-                    DispatcherPriority.Render);
+                Debug.WriteLine($"Frame update failed: {ex.Message}");
             }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Frame update failed: {ex.Message}");
         }
     }
 
@@ -89,7 +141,7 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
         _currentWidth = width;
         _currentHeight = height;
 
-        Application.Current.Dispatcher.Invoke(() =>
+        Application.Current?.Dispatcher.Invoke(() =>
         {
             _displayBitmap = new WriteableBitmap(
                 width, height,
@@ -141,15 +193,13 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
         if (!_isInitialized || _displayBitmap == null)
             return;
 
-        Application.Current.Dispatcher.Invoke(() =>
-        {
-            var blackPixels = new byte[_displayBitmap.PixelWidth * _displayBitmap.PixelHeight * 4];
-            _displayBitmap.WritePixels(
-                new Int32Rect(0, 0, _displayBitmap.PixelWidth, _displayBitmap.PixelHeight),
-                blackPixels,
-                _displayBitmap.PixelWidth * 4,
-                0);
-        });
+        _displayBitmap = new WriteableBitmap(
+                _currentWidth, _currentHeight,
+                96, 96,
+                PixelFormats.Bgra32,
+                null);
+
+        OnPropertyChanged(nameof(DisplayImage));
     }
 
     public void Dispose()
@@ -158,5 +208,21 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
         _decoder.Cleanup();
 
         GC.SuppressFinalize(this);
+    }
+
+    public readonly struct EncodedFrame
+    {
+        public bool IsKeyFrame { get; }
+        public byte[] Data { get; }
+
+        public EncodedFrame(byte[] encodedData)
+        {
+            if (encodedData == null || encodedData.Length < 1)
+                throw new ArgumentException("Data must contain at least 1 byte (frame flag)");
+
+            IsKeyFrame = encodedData[0] == 1;
+            Data = new byte[encodedData.Length - 1];
+            Array.Copy(encodedData, 1, Data, 0, Data.Length);
+        }
     }
 }

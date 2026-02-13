@@ -18,6 +18,8 @@ public interface ISettingsManager
 
     event Action? InputDeviceChanged;
     event Action? OutputDeviceChanged;
+
+    void LoadAudioDevices();
 }
 
 public partial class SettingsManager : ObservableObject, ISettingsManager
@@ -55,8 +57,11 @@ public partial class SettingsManager : ObservableObject, ISettingsManager
         AutoOpenScreenShareWindow = Settings.Default.AutoOpenScreenShareWindow;
     }
 
-    private void LoadAudioDevices()
+    public void LoadAudioDevices()
     {
+        OutputDevices.Clear();
+        InputDevices.Clear();
+
         OutputDevices.Add(Strings.DefaultDeviceText);
         for (int i = 0; i < WaveOut.DeviceCount; i++)
         {

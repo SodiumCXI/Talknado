@@ -15,7 +15,7 @@ public class ServerManager(INetworkUtils networkUtils,
     IServerInfo serverInfo, IClientManager clientManager,
     ICryptoSessionManager cryptoSessionManager) : IServerManager, IDisposable
 {
-    private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789&%";
+    private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
 
     private readonly CancellationTokenSource _mainTokenSource = new();
     private Thread? _serverThread;

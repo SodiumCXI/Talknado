@@ -15,7 +15,7 @@
         UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
     <Border x:Name="BorderAround" Style="{StaticResource BorderAround}">
-        <Grid Background="{DynamicResource RightPanelBackgroundBrush}">
+        <Grid Background="{DynamicResource SettingsBackgroundBrush}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="25"/>
                 <RowDefinition Height="*"/>
@@ -47,14 +47,14 @@
                     <TextBlock Text="{x:Static l:Strings.InputDevicesLabel}"
                                Style="{StaticResource LabelStyle}"/>
                     <ComboBox ItemsSource="{Binding SettingManager.InputDevices}"
-                              SelectedItem="{Binding SettingManager.SelectedOutputDevice}"
+                              SelectedItem="{Binding SettingManager.SelectedInputDevice}"
                               Style="{StaticResource ComboStyle}"
                               ItemContainerStyle="{StaticResource ComboItemStyle}"/>
 
                     <TextBlock Text="{x:Static l:Strings.OutputDevicesLabel}"
                                Style="{StaticResource LabelStyle}"/>
                     <ComboBox ItemsSource="{Binding SettingManager.OutputDevices}" 
-                              SelectedItem="{Binding SettingManager.SelectedInputDevice}"
+                              SelectedItem="{Binding SettingManager.SelectedOutputDevice}"
                               Style="{StaticResource ComboStyle}"
                               ItemContainerStyle="{StaticResource ComboItemStyle}"/>
 

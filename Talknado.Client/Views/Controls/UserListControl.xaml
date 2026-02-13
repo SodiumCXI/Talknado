@@ -52,7 +52,24 @@
                                     Style="{DynamicResource UserItemButton}"
                                     Click="ViewScreenShareButton_Click"
                                     Visibility="{Binding IsScreenShareActive, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <svgc:SvgViewbox Source="/Resources/expand_white.svg" Width="24" VerticalAlignment="Center"/>
+                                <Grid>
+                                    <svgc:SvgViewbox Source="/Resources/expand_white.svg" 
+                                                     Width="24" 
+                                                     VerticalAlignment="Center">
+                                        <svgc:SvgViewbox.Style>
+                                            <Style TargetType="svgc:SvgViewbox">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsWaitingForScreenShareWindow}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </svgc:SvgViewbox.Style>
+                                    </svgc:SvgViewbox>
+                                    <Path Style="{StaticResource LoadingSpinner}"
+                                             Visibility="{Binding IsWaitingForScreenShareWindow, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </Grid>
                             </Button>
                             <StackPanel Grid.Column="4"
                                         Orientation="Horizontal"

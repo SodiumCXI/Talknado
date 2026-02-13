@@ -198,4 +198,22 @@
   <data name="CopiedText" xml:space="preserve">
     <value>Copied!</value>
   </data>
+  <data name="MicrophoneErrorText" xml:space="preserve">
+    <value>Microphone Error</value>
+  </data>
+  <data name="MicrophoneNotDetectedText" xml:space="preserve">
+    <value>No microphones detected</value>
+  </data>
+  <data name="MicrophoneUnableText" xml:space="preserve">
+    <value>Unable to capture the selected microphone </value>
+  </data>
+  <data name="ScreenDisplayErrorText" xml:space="preserve">
+    <value>Screen Sharing Display Error</value>
+  </data>
+  <data name="NoKeyframeReceivedText" xml:space="preserve">
+    <value>Failed to receive any keyframe for display within 3 seconds</value>
+  </data>
+  <data name="ScreenSharingErrorText" xml:space="preserve">
+    <value>Screen Sharing Error</value>
+  </data>
 </root>

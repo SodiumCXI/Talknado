@@ -198,4 +198,22 @@
   <data name="CopiedText" xml:space="preserve">
     <value>已复制！</value>
   </data>
+  <data name="MicrophoneErrorText" xml:space="preserve">
+    <value>麦克风错误</value>
+  </data>
+  <data name="MicrophoneNotDetectedText" xml:space="preserve">
+    <value>未检测到麦克风</value>
+  </data>
+  <data name="MicrophoneUnableText" xml:space="preserve">
+    <value>无法访问所选麦克风</value>
+  </data>
+  <data name="ScreenDisplayErrorText" xml:space="preserve">
+    <value>屏幕共享显示错误</value>
+  </data>
+  <data name="NoKeyframeReceivedText" xml:space="preserve">
+    <value>3秒内未能接收到任何关键帧用于显示</value>
+  </data>
+  <data name="ScreenSharingErrorText" xml:space="preserve">
+    <value>屏幕共享错误</value>
+  </data>
 </root>

@@ -1,4 +1,6 @@
-﻿using System.IO;
+﻿using SharpDX;
+using System.ComponentModel.Design;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Numerics;
@@ -38,9 +40,9 @@ public class ClientManager(IUsersInfo usersInfo,
     private readonly IWindowsState _windowsState = windowsState;
     private readonly ISettingsManager _settingsManager = settingsManager;
 
-    private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789&%";
+    private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
+    private readonly string _clientVersion = "v1.3.5";
 
-    private readonly string _clientVersion = "v1.3.4";
     private TcpClient _tcpMainClient = null!;
 
     private readonly CancellationTokenSource _receiveCancellationTokenSource = new();
@@ -282,22 +284,53 @@ public class ClientManager(IUsersInfo usersInfo,
 
     public void SendMessage(string message)
     {
+        var headerBytes = Encoding.UTF8.GetBytes("MSG");
+        var encryptedHeader = _cryptoSessionManager.EncryptMessage(headerBytes);
+
+        var commandBytes = Encoding.UTF8.GetBytes("#MSG");
+        var userIdBytes = BitConverter.GetBytes(_connectionInfo.LocalUserId);
+        var messageBytes = Encoding.UTF8.GetBytes(message);
+        var result = new byte[commandBytes.Length + userIdBytes.Length + messageBytes.Length];
+        Array.Copy(commandBytes, 0, result, 0, commandBytes.Length);
+        Array.Copy(userIdBytes, 0, result, commandBytes.Length, userIdBytes.Length);
+        Array.Copy(messageBytes, 0, result, commandBytes.Length + userIdBytes.Length, messageBytes.Length);
+        var encryptedMessage = _cryptoSessionManager.EncryptMessage(result);
+
+        var packet = new byte[encryptedHeader.Length + encryptedMessage.Length];
+        Array.Copy(encryptedHeader, 0, packet, 0, encryptedHeader.Length);
+        Array.Copy(encryptedMessage, 0, packet, encryptedHeader.Length, encryptedMessage.Length);
+
+        var stream = _tcpMainClient.GetStream();
+        var token = _receiveCancellationTokenSource.Token;
+
         try
         {
-            var commandBytes = Encoding.UTF8.GetBytes("#MSG");
-            var userIdBytes = BitConverter.GetBytes(_connectionInfo.LocalUserId);
-            var messageBytes = Encoding.UTF8.GetBytes(message);
-            var result = new byte[commandBytes.Length + userIdBytes.Length + messageBytes.Length];
+            _networkUtils.WritePacketAsync(stream, packet, token).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            throw new IOException("Failed to send message to server");
+        }
+    }
 
-            Array.Copy(commandBytes, 0, result, 0, commandBytes.Length);
-            Array.Copy(userIdBytes, 0, result, commandBytes.Length, userIdBytes.Length);
-            Array.Copy(messageBytes, 0, result, commandBytes.Length + userIdBytes.Length, messageBytes.Length);
+    public void SendCommand(string command)
+    {
+        var headerBytes = Encoding.UTF8.GetBytes("CMD");
+        var encryptedHeader = _cryptoSessionManager.EncryptMessage(headerBytes);
 
-            var encryptedMessage = _cryptoSessionManager.EncryptMessage(result);
-            var stream = _tcpMainClient.GetStream();
-            var token = _receiveCancellationTokenSource.Token;
+        var commandBytes = Encoding.UTF8.GetBytes(command);
+        var encryptedCommand = _cryptoSessionManager.EncryptMessage(commandBytes);
 
-            _networkUtils.WritePacketAsync(stream, encryptedMessage, token).GetAwaiter().GetResult();
+        var packet = new byte[encryptedHeader.Length + encryptedCommand.Length];
+        Array.Copy(encryptedHeader, 0, packet, 0, encryptedHeader.Length);
+        Array.Copy(encryptedCommand, 0, packet, encryptedHeader.Length, encryptedCommand.Length);
+
+        var stream = _tcpMainClient.GetStream();
+        var token = _receiveCancellationTokenSource.Token;
+
+        try
+        {
+            _networkUtils.WritePacketAsync(stream, packet, token).GetAwaiter().GetResult();
         }
         catch
         {
@@ -309,9 +342,7 @@ public class ClientManager(IUsersInfo usersInfo,
     {
         try
         {
-            var stream = _tcpMainClient.GetStream();
-            var encryptedCommand = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("#END"));
-            _networkUtils.WritePacketAsync(stream, encryptedCommand, CancellationToken.None);
+            SendCommand("#END");
         }
         catch { /* ignore */ }
         finally
@@ -367,20 +398,41 @@ public class ClientManager(IUsersInfo usersInfo,
 
     public void ToggleScreenShare()
     {
-        var stream = _tcpMainClient.GetStream();
-        var token = _receiveCancellationTokenSource.Token;
-
         if (!_screenShareManager.IsSharing)
         {
-            var encryptedMessage = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("#CIS"));
-            _networkUtils.WritePacketAsync(stream, encryptedMessage, token).GetAwaiter().GetResult();
+            SendCommand("#CIS");
         }
         else
         {
-            var encryptedMessage = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("#STO"));
-            _networkUtils.WritePacketAsync(stream, encryptedMessage, token).GetAwaiter().GetResult();
+            SendCommand("#STO");
             _screenShareManager.StopSharing();
         }
+    }
+
+    public async Task StartMonitoringScreenShareErrors()
+    {
+        var token = _receiveCancellationTokenSource.Token;
+
+        try
+        {
+            while (_screenShareManager.IsSharing && !token.IsCancellationRequested)
+            {
+                if (_screenShareManager.ThreadException != null)
+                {
+                    ToggleScreenShare();
+
+                    var exceptionMessage = _screenShareManager.ThreadException.Message;
+                    _screenShareManager.ThreadException = null;
+
+                    MessageBox.Show(exceptionMessage, Strings.ScreenSharingErrorText, MessageBoxButton.OK, MessageBoxImage.Error);
+
+                    break;
+                }
+
+                await Task.Delay(100, token);
+            }
+        }
+        catch { }
     }
 
     private void ExecuteCommand(string command, ReadOnlySpan<byte> body)
@@ -423,6 +475,7 @@ public class ClientManager(IUsersInfo usersInfo,
             case var _ when command.Equals("#YYC"):
 
                 _screenShareManager.StartSharing(_settingsManager.ShareScreenWithAudio);
+                _ = StartMonitoringScreenShareErrors();
 
                 break;
 
@@ -445,10 +498,10 @@ public class ClientManager(IUsersInfo usersInfo,
                 var userIdCSS = BitConverter.ToUInt16(body);
 
                 Application.Current.Dispatcher.Invoke(() =>
-                {
-                    _screenSharePlayer.IsWindowVisible = false;
-                });
+                    _screenSharePlayer.IsWindowVisible = false);
 
+                _screenSharePlayer.IsKeyFrameInitialized = false;
+                _screenSharePlayer.ClearLastKeyFrame();
                 _usersInfo.UpdateScreenSharingState(userIdCSS, false);
 
                 break;

@@ -1,4 +1,5 @@
 ﻿using FFmpeg.AutoGen;
+using System.Management;
 using System.Runtime.InteropServices;
 
 namespace Talknado.Client.Models.Helpers.ScreenShare;
@@ -16,6 +17,28 @@ public static unsafe class H264Encoder
     private static int _height;
     private static int _frameCount = 0;
     private static bool _initialized = false;
+    private static readonly bool _hasDiscreteGPU;
+
+    static H264Encoder()
+    {
+        _hasDiscreteGPU = new ManagementObjectSearcher("SELECT * FROM Win32_VideoController")
+            .Get()
+            .Cast<ManagementObject>()
+            .Any(obj =>
+            {
+                string name = obj["Name"]?.ToString()?.ToLower() ?? "";
+                if (name.Contains("microsoft basic") || name.Contains("vga compatible"))
+                    return false;
+
+                if (obj["AdapterRAM"] != null)
+                {
+                    ulong vramMB = Convert.ToUInt64(obj["AdapterRAM"]) / (1024 * 1024);
+                    return vramMB >= 2000;
+                }
+                return false;
+            });
+    }
+
 
     public static void Initialize(int inputWidth, int inputHeight)
     {
@@ -29,11 +52,14 @@ public static unsafe class H264Encoder
 
         _frameCount = 0;
 
-        string[] codecNames = { "h264_nvenc", "h264_amf", "libx264" };
+        string[] codecNames = ["h264_nvenc", "h264_amf", "libx264"];
         bool codecOpened = false;
 
         foreach (var codecName in codecNames)
         {
+            if (!_hasDiscreteGPU && (codecName == "h264_nvench" || codecName == "h264_amf"))
+                continue;
+
             _codec = ffmpeg.avcodec_find_encoder_by_name(codecName);
             if (_codec == null)
                 continue;
@@ -89,7 +115,7 @@ public static unsafe class H264Encoder
         }
 
         if (!codecOpened)
-            throw new Exception("Не удалось открыть ни один H.264 кодек");
+            throw new Exception("Failed to open any H.264 codec");
 
 
         _frame = ffmpeg.av_frame_alloc();
@@ -127,10 +153,10 @@ public static unsafe class H264Encoder
     public static byte[] Encode(byte[] bgraData)
     {
         if (!_initialized)
-            throw new InvalidOperationException("Энкодер не инициализирован. Вызовите Initialize()");
+            throw new InvalidOperationException("Encoder is not initialized. Call Initialize()");
 
         if (bgraData.Length != _width * _height * 4)
-            throw new ArgumentException($"Неверный размер данных. Ожидается {_width * _height * 4} байт");
+            throw new ArgumentException($"Invalid data size. Expected {_width * _height * 4} bytes");
 
         fixed (byte* pBgra = bgraData)
         {
@@ -148,10 +174,12 @@ public static unsafe class H264Encoder
             return null!;
 
         if (ret < 0)
-            throw new Exception($"Ошибка кодирования: {ret}");
+            throw new Exception($"Encoding error: {ret}");
 
-        byte[] encodedData = new byte[_packet->size];
-        Marshal.Copy((IntPtr)_packet->data, encodedData, 0, _packet->size);
+        bool isKeyFrame = (_packet->flags & ffmpeg.AV_PKT_FLAG_KEY) != 0;
+        byte[] encodedData = new byte[1 + _packet->size];
+        encodedData[0] = isKeyFrame ? (byte)1 : (byte)0;
+        Marshal.Copy((IntPtr)_packet->data, encodedData, 1, _packet->size);
         ffmpeg.av_packet_unref(_packet);
 
         return encodedData;
@@ -220,15 +248,15 @@ public unsafe class H264Decoder
 
         _codec = ffmpeg.avcodec_find_decoder(AVCodecID.AV_CODEC_ID_H264);
         if (_codec == null)
-            throw new Exception("H.264 декодер не найден");
+            throw new Exception("H.264 decoder not found");
 
         _codecContext = ffmpeg.avcodec_alloc_context3(_codec);
         if (_codecContext == null)
-            throw new Exception("Не удалось создать контекст декодера");
+            throw new Exception("Failed to create decoder context");
 
         int ret = ffmpeg.avcodec_open2(_codecContext, _codec, null);
         if (ret < 0)
-            throw new Exception($"Не удалось открыть декодер: {ret}");
+            throw new Exception($"Failed to open decoder: {ret}");
 
         _frame = ffmpeg.av_frame_alloc();
         _packet = ffmpeg.av_packet_alloc();
@@ -236,10 +264,18 @@ public unsafe class H264Decoder
         _initialized = true;
     }
 
+    public void FlushBuffers()
+    {
+        if (!_initialized)
+            throw new InvalidOperationException("Decoder is not initialized. Call Initialize()");
+
+        ffmpeg.avcodec_flush_buffers(_codecContext);
+    }
+
     public byte[] Decode(byte[] h264Data)
     {
         if (!_initialized)
-            throw new InvalidOperationException("Декодер не инициализирован. Вызовите Initialize()");
+            throw new InvalidOperationException("Decoder is not initialized. Call Initialize()");
 
         AVPacket* pkt = ffmpeg.av_packet_alloc();
         if (pkt == null)
@@ -270,7 +306,7 @@ public unsafe class H264Decoder
             return null!;
 
         if (ret < 0)
-            throw new Exception($"Ошибка декодирования: {ret}");
+            throw new Exception($"Decoding error: {ret}");
 
         if (_width != _frame->width || _height != _frame->height)
         {

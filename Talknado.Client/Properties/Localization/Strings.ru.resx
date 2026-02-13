@@ -198,4 +198,22 @@
   <data name="CopiedText" xml:space="preserve">
     <value>Скопировано!</value>
   </data>
+  <data name="MicrophoneErrorText" xml:space="preserve">
+    <value>Ошибка микрофона</value>
+  </data>
+  <data name="MicrophoneNotDetectedText" xml:space="preserve">
+    <value>Не обнаружено ни одного микрофона</value>
+  </data>
+  <data name="MicrophoneUnableText" xml:space="preserve">
+    <value>Невозможно захватить выбранный микрофон</value>
+  </data>
+  <data name="ScreenDisplayErrorText" xml:space="preserve">
+    <value>Ошибка просмотра демонстрации экрана</value>
+  </data>
+  <data name="NoKeyframeReceivedText" xml:space="preserve">
+    <value>Не удалось получить ни один ключевой кадр для отображения за 3 секунды</value>
+  </data>
+  <data name="ScreenSharingErrorText" xml:space="preserve">
+    <value>Ошибка демонстрации экрана</value>
+  </data>
 </root>

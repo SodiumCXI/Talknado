@@ -214,6 +214,33 @@ namespace Talknado.Client.Properties.Localization {
         }
         
         /// <summary>
+        ///   Ищет локализованную строку, похожую на Microphone Error.
+        /// </summary>
+        public static string MicrophoneErrorText {
+            get {
+                return ResourceManager.GetString("MicrophoneErrorText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на No microphones detected.
+        /// </summary>
+        public static string MicrophoneNotDetectedText {
+            get {
+                return ResourceManager.GetString("MicrophoneNotDetectedText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Unable to capture the selected microphone .
+        /// </summary>
+        public static string MicrophoneUnableText {
+            get {
+                return ResourceManager.GetString("MicrophoneUnableText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Ищет локализованную строку, похожую на Nickname cannot be empty.
         /// </summary>
         public static string NicknameCannotBeEmptyText {
@@ -228,6 +255,15 @@ namespace Talknado.Client.Properties.Localization {
         public static string NicknameLabel {
             get {
                 return ResourceManager.GetString("NicknameLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Failed to receive any keyframe for display within 3 seconds.
+        /// </summary>
+        public static string NoKeyframeReceivedText {
+            get {
+                return ResourceManager.GetString("NoKeyframeReceivedText", resourceCulture);
             }
         }
         
@@ -255,6 +291,24 @@ namespace Talknado.Client.Properties.Localization {
         public static string PasswordLabel {
             get {
                 return ResourceManager.GetString("PasswordLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Screen Sharing Display Error.
+        /// </summary>
+        public static string ScreenDisplayErrorText {
+            get {
+                return ResourceManager.GetString("ScreenDisplayErrorText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Screen Sharing Error.
+        /// </summary>
+        public static string ScreenSharingErrorText {
+            get {
+                return ResourceManager.GetString("ScreenSharingErrorText", resourceCulture);
             }
         }
         

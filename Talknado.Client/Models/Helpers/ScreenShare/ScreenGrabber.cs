@@ -16,8 +16,8 @@ public static class ScreenGrabber
     private static OutputDuplication _duplicator = null!;
     private static Texture2D? _stagingTex = null;
     private static Factory1 _factory = null!;
-    private static int _adapterIndex = 0;
-    private static int _outputIndex = 0;
+    private static readonly int _adapterIndex = 0;
+    private static readonly int _outputIndex = 0;
 
     static ScreenGrabber()
     {
