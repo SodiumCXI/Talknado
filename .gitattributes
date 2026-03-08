@@ -1,0 +1,7 @@
+*.cs text eol=crlf
+*.xaml text eol=crlf
+*.csproj text eol=crlf
+*.sln text eol=crlf
+*.config text eol=crlf
+*.settings text eol=crlf
+*.resx text eol=crlf
