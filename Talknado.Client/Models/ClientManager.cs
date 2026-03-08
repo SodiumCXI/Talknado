@@ -1,6 +1,4 @@
-﻿using SharpDX;
-using System.ComponentModel.Design;
-using System.IO;
+﻿using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Numerics;

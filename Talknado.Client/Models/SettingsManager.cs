@@ -1,5 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
-using NAudio.Wave;
+using NAudio.CoreAudioApi;
 using System.Collections.ObjectModel;
 using Talknado.Client.Properties;
 using Talknado.Client.Properties.Localization;
@@ -18,7 +18,6 @@ public interface ISettingsManager
 
     event Action? InputDeviceChanged;
     event Action? OutputDeviceChanged;
-
     void LoadAudioDevices();
 }
 
@@ -45,6 +44,8 @@ public partial class SettingsManager : ObservableObject, ISettingsManager
     public event Action? InputDeviceChanged;
     public event Action? OutputDeviceChanged;
 
+    private bool _isLoadingDevices = false;
+
     public SettingsManager()
     {
         LoadSettings();
@@ -59,32 +60,61 @@ public partial class SettingsManager : ObservableObject, ISettingsManager
 
     public void LoadAudioDevices()
     {
-        OutputDevices.Clear();
-        InputDevices.Clear();
+        _isLoadingDevices = true;
 
-        OutputDevices.Add(Strings.DefaultDeviceText);
-        for (int i = 0; i < WaveOut.DeviceCount; i++)
+        try
         {
-            var caps = WaveOut.GetCapabilities(i);
-            OutputDevices.Add(caps.ProductName);
+            using var enumerator = new MMDeviceEnumerator();
+
+            OutputDevices.Clear();
+            OutputDevices.Add(Strings.DefaultDeviceText);
+
+            var outputDevices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
+            for (int i = 0; i < outputDevices.Count; i++)
+            {
+                try
+                {
+                    OutputDevices.Add(outputDevices[i].FriendlyName);
+                }
+                catch { }
+            }
+
+            var savedOutput = Settings.Default.SelectedOutputDevice;
+            SelectedOutputDevice = !string.IsNullOrEmpty(savedOutput) && OutputDevices.Contains(savedOutput)
+                ? savedOutput
+                : Strings.DefaultDeviceText;
+
+            InputDevices.Clear();
+            InputDevices.Add(Strings.DefaultDeviceText);
+
+            var inputDevices = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+            for (int i = 0; i < inputDevices.Count; i++)
+            {
+                try
+                {
+                    InputDevices.Add(inputDevices[i].FriendlyName);
+                }
+                catch { }
+            }
+
+            var savedInput = Settings.Default.SelectedInputDevice;
+            SelectedInputDevice = !string.IsNullOrEmpty(savedInput) && InputDevices.Contains(savedInput)
+                ? savedInput
+                : Strings.DefaultDeviceText;
         }
-
-        var savedSpeaker = Settings.Default.SelectedOutputDevice;
-        SelectedOutputDevice = !string.IsNullOrEmpty(savedSpeaker) && OutputDevices.Contains(savedSpeaker)
-            ? savedSpeaker
-            : Strings.DefaultDeviceText;
-
-        InputDevices.Add(Strings.DefaultDeviceText);
-        for (int i = 0; i < WaveIn.DeviceCount; i++)
+        catch (Exception ex)
         {
-            var caps = WaveIn.GetCapabilities(i);
-            InputDevices.Add(caps.ProductName);
-        }
+            System.Diagnostics.Debug.WriteLine($"Error loading devices: {ex.Message}");
 
-        var savedMicrophone = Settings.Default.SelectedInputDevice;
-        SelectedInputDevice = !string.IsNullOrEmpty(savedMicrophone) && InputDevices.Contains(savedMicrophone)
-            ? savedMicrophone
-            : Strings.DefaultDeviceText;
+            if (OutputDevices.Count == 0) OutputDevices.Add(Strings.DefaultDeviceText);
+            if (InputDevices.Count == 0) InputDevices.Add(Strings.DefaultDeviceText);
+            if (string.IsNullOrEmpty(SelectedOutputDevice)) SelectedOutputDevice = Strings.DefaultDeviceText;
+            if (string.IsNullOrEmpty(SelectedInputDevice)) SelectedInputDevice = Strings.DefaultDeviceText;
+        }
+        finally
+        {
+            _isLoadingDevices = false;
+        }
     }
 
     partial void OnShareScreenWithAudioChanged(bool value)
@@ -101,22 +131,20 @@ public partial class SettingsManager : ObservableObject, ISettingsManager
 
     partial void OnSelectedInputDeviceChanged(string? value)
     {
-        if (!string.IsNullOrEmpty(value))
+        if (!string.IsNullOrEmpty(value) && !_isLoadingDevices)
         {
             Settings.Default.SelectedInputDevice = value;
             Settings.Default.Save();
-
             InputDeviceChanged?.Invoke();
         }
     }
 
     partial void OnSelectedOutputDeviceChanged(string? value)
     {
-        if (!string.IsNullOrEmpty(value))
+        if (!string.IsNullOrEmpty(value) && !_isLoadingDevices)
         {
             Settings.Default.SelectedOutputDevice = value;
             Settings.Default.Save();
-
             OutputDeviceChanged?.Invoke();
         }
     }

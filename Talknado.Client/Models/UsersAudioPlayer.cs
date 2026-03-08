@@ -1,4 +1,5 @@
 ﻿using NAudio.Wave;
+using NAudio.CoreAudioApi;
 using System.Collections.Concurrent;
 using Talknado.Client.Models.Helpers.Audio;
 using Talknado.Client.Properties.Localization;
@@ -37,8 +38,8 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
     {
         if (!_userAudioStreams.TryGetValue(userId, out UserAudioStream? value))
         {
-            var deviceIndex = ResolveDeviceIndex(_settingsManager.SelectedOutputDevice);
-            value = new UserAudioStream(_usersInfo, userId, deviceIndex);
+            var deviceId = ResolveOutputDeviceId(_settingsManager.SelectedOutputDevice);
+            value = new UserAudioStream(_usersInfo, userId, deviceId);
             _userAudioStreams[userId] = value;
             UserAdded?.Invoke(userId);
         }
@@ -71,19 +72,27 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             RemoveUserStream(userId);
     }
 
-    private static int ResolveDeviceIndex(string? deviceName)
+    private static string? ResolveOutputDeviceId(string? deviceName)
     {
         if (string.IsNullOrEmpty(deviceName) || deviceName == Strings.DefaultDeviceText)
-            return -1;
+            return null;
 
-        for (int i = 0; i < WaveOut.DeviceCount; i++)
+        try
         {
-            var caps = WaveOut.GetCapabilities(i);
-            if (caps.ProductName == deviceName)
-                return i;
-        }
+            using var enumerator = new MMDeviceEnumerator();
+            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
 
-        return -1;
+            foreach (var device in devices)
+            {
+                if (device.FriendlyName == deviceName)
+                {
+                    return device.ID;
+                }
+            }
+        }
+        catch { }
+
+        return null;
     }
 
     private void HandleOutputDeviceChanged()
@@ -109,8 +118,9 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
 
     public class UserAudioStream : IDisposable
     {
-        private WaveOutEvent WaveOut { get; }
+        private WasapiOut? WasapiOut { get; set; }
         private BufferedWaveProvider WaveProvider { get; }
+        private MMDevice? Device { get; set; }
 
         private readonly IUsersInfo _usersInfo;
         private readonly ushort _userId;
@@ -119,7 +129,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         private readonly Queue<byte[]> _packetQueue = new();
         public int ConsecutiveLosses { get; private set; }
 
-        public UserAudioStream(IUsersInfo usersInfo, ushort userId, int deviceIndex)
+        public UserAudioStream(IUsersInfo usersInfo, ushort userId, string? deviceId)
         {
             _usersInfo = usersInfo;
             _userId = userId;
@@ -129,13 +139,37 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                 DiscardOnBufferOverflow = true
             };
 
-            WaveOut = new WaveOutEvent
+            try
             {
-                DeviceNumber = deviceIndex
-            };
+                var enumerator = new MMDeviceEnumerator();
 
-            WaveOut.Init(WaveProvider);
-            WaveOut.Play();
+                if (string.IsNullOrEmpty(deviceId))
+                {
+                    Device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                }
+                else
+                {
+                    Device = enumerator.GetDevice(deviceId);
+                }
+
+                WasapiOut = new WasapiOut(Device, AudioClientShareMode.Shared, false, 100);
+                WasapiOut.Init(WaveProvider);
+                WasapiOut.Play();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error initializing audio output: {ex.Message}");
+
+                try
+                {
+                    var enumerator = new MMDeviceEnumerator();
+                    Device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                    WasapiOut = new WasapiOut(Device, AudioClientShareMode.Shared, false, 100);
+                    WasapiOut.Init(WaveProvider);
+                    WasapiOut.Play();
+                }
+                catch { /* ignore */ }
+            }
         }
 
         public void AddPacket(byte[] opusData)
@@ -168,8 +202,9 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
 
         public void Dispose()
         {
-            WaveOut?.Stop();
-            WaveOut?.Dispose();
+            WasapiOut?.Stop();
+            WasapiOut?.Dispose();
+            Device?.Dispose();
             _decoder?.Dispose();
 
             GC.SuppressFinalize(this);

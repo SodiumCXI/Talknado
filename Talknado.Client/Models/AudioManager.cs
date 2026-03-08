@@ -1,6 +1,8 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
+using System.IO;
 using System.Windows;
 using Talknado.Client.Models.Helpers;
 using Talknado.Client.Models.Helpers.Audio;
@@ -11,8 +13,8 @@ namespace Talknado.Client.Models;
 public interface IAudioManager
 {
     void ToggleMicrophoneStatus();
-
 }
+
 public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
 {
     private readonly INetworkUtils _networkUtils;
@@ -75,9 +77,9 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
 
     private void StartRecording()
     {
-        var deviceIndex = ResolveDeviceIndex(_settingsManager.SelectedInputDevice);
+        var deviceId = ResolveDeviceId(_settingsManager.SelectedInputDevice);
         _sendCancellationTokenSource = new CancellationTokenSource();
-        _audioSendThread = new(() => HandleSendAudio(deviceIndex, _sendCancellationTokenSource.Token))
+        _audioSendThread = new(() => HandleSendAudio(deviceId, _sendCancellationTokenSource.Token))
         {
             IsBackground = true
         };
@@ -92,19 +94,27 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         _sendCancellationTokenSource = null;
     }
 
-    private static int ResolveDeviceIndex(string? deviceName)
+    private static string? ResolveDeviceId(string? deviceName)
     {
         if (string.IsNullOrEmpty(deviceName) || deviceName == Strings.DefaultDeviceText)
-            return -1;
+            return null;
 
-        for (int i = 0; i < WaveIn.DeviceCount; i++)
+        try
         {
-            var caps = WaveIn.GetCapabilities(i);
-            if (caps.ProductName == deviceName)
-                return i;
-        }
+            using var enumerator = new MMDeviceEnumerator();
+            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
 
-        return -1;
+            foreach (var device in devices)
+            {
+                if (device.FriendlyName == deviceName)
+                {
+                    return device.ID;
+                }
+            }
+        }
+        catch { /* ignore */ }
+
+        return null;
     }
 
     private void HandleInputDeviceChanged()
@@ -140,118 +150,113 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         }
     }
 
-    private void HandleSendAudio(int deviceIndex, CancellationToken token)
+    private void HandleSendAudio(string? deviceId, CancellationToken token)
     {
-        if (WaveInEvent.DeviceCount == 0)
-        {
-            IsMicrophoneActive = false;
-            MessageBox.Show(Strings.MicrophoneNotDetectedText, Strings.MicrophoneErrorText,
-                MessageBoxButton.OK, MessageBoxImage.Error);
-            return;
-        }
-
-        int targetSampleRate = 48000;
-        int microphoneSampleRate = targetSampleRate;
+        MMDeviceEnumerator? enumerator = null;
+        MMDevice? device = null;
+        WasapiCapture? capture = null;
 
         try
         {
-            using var testWaveIn = new WaveInEvent
+            enumerator = new MMDeviceEnumerator();
+            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+
+            if (devices.Count == 0)
             {
-                DeviceNumber = deviceIndex,
-                WaveFormat = new WaveFormat(targetSampleRate, 16, 1)
-            };
-        }
-        catch
-        {
-            using var tempWaveIn = new WaveInEvent { DeviceNumber = deviceIndex };
-            microphoneSampleRate = tempWaveIn.WaveFormat.SampleRate;
-        }
+                IsMicrophoneActive = false;
+                MessageBox.Show(Strings.MicrophoneNotDetectedText, Strings.MicrophoneErrorText,
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
 
-        using var waveIn = new WaveInEvent
-        {
-            DeviceNumber = deviceIndex,
-            WaveFormat = new WaveFormat(microphoneSampleRate, 16, 1),
-            BufferMilliseconds = 10
-        };
-
-        BufferedWaveProvider? bufferProvider = null;
-        WdlResamplingSampleProvider? resampler = null;
-
-        if (microphoneSampleRate != targetSampleRate)
-        {
-            bufferProvider = new BufferedWaveProvider(waveIn.WaveFormat)
+            if (string.IsNullOrEmpty(deviceId))
             {
-                DiscardOnBufferOverflow = true,
-                BufferLength = waveIn.WaveFormat.AverageBytesPerSecond * 2
-            };
-
-            resampler = new WdlResamplingSampleProvider(
-                bufferProvider.ToSampleProvider(),
-                targetSampleRate
-            );
-        }
-
-        void OnDataAvailable(object? sender, WaveInEventArgs e)
-        {
-            if (token.IsCancellationRequested) return;
-
-            try
+                device = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+            }
+            else
             {
-                byte[] audioData;
+                device = enumerator.GetDevice(deviceId);
+            }
 
-                if (resampler != null && bufferProvider != null)
+            if (device == null)
+            {
+                IsMicrophoneActive = false;
+                MessageBox.Show(Strings.MicrophoneNotDetectedText, Strings.MicrophoneErrorText,
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            capture = new WasapiCapture(device);
+
+            int targetSampleRate = 48000;
+            int sourceSampleRate = capture.WaveFormat.SampleRate;
+            int sourceChannels = capture.WaveFormat.Channels;
+
+            const int frameBytes = 960;
+
+            var audioBuffer = new List<byte>();
+
+            capture.DataAvailable += (s, e) =>
+            {
+                if (token.IsCancellationRequested) return;
+
+                try
                 {
-                    bufferProvider.AddSamples(e.Buffer, 0, e.BytesRecorded);
+                    using var ms = new MemoryStream(e.Buffer, 0, e.BytesRecorded);
+                    using var rawSource = new RawSourceWaveStream(ms, capture.WaveFormat);
 
-                    int inputSamples = e.BytesRecorded / waveIn.WaveFormat.BlockAlign;
-                    int outputSamples = (int)(inputSamples * (long)targetSampleRate / microphoneSampleRate) + 100;
-                    float[] floatBuffer = new float[outputSamples];
+                    var provider = rawSource.ToSampleProvider();
 
-                    int samplesRead = resampler.Read(floatBuffer, 0, outputSamples);
+                    if (sourceChannels > 1)
+                        provider = provider.ToMono();
 
-                    if (samplesRead == 0) return;
+                    if (sourceSampleRate != targetSampleRate)
+                        provider = new WdlResamplingSampleProvider(provider, targetSampleRate);
 
-                    audioData = new byte[samplesRead * 2];
-                    for (int i = 0; i < samplesRead; i++)
+                    float[] chunk = new float[4096];
+                    int read;
+                    while ((read = provider.Read(chunk, 0, chunk.Length)) > 0)
                     {
-                        short pcmSample = (short)Math.Clamp(floatBuffer[i] * 32767f, -32768f, 32767f);
-                        audioData[i * 2] = (byte)(pcmSample & 0xFF);
-                        audioData[i * 2 + 1] = (byte)(pcmSample >> 8);
+                        for (int i = 0; i < read; i++)
+                        {
+                            short pcmSample = (short)Math.Clamp(chunk[i] * 32767f, -32768f, 32767f);
+                            audioBuffer.Add((byte)(pcmSample & 0xFF));
+                            audioBuffer.Add((byte)(pcmSample >> 8));
+                        }
+                    }
+
+                    while (audioBuffer.Count >= frameBytes)
+                    {
+                        byte[] frameData = [.. audioBuffer.Take(frameBytes)];
+                        audioBuffer.RemoveRange(0, frameBytes);
+
+                        var denoisedData = NoiseSuppressor.Denoise(frameData);
+                        var opusData = _encoder.Encode(denoisedData);
+                        SendOpusPacket(opusData, _connectionInfo.LocalUserId);
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    audioData = new byte[e.BytesRecorded];
-                    Array.Copy(e.Buffer, audioData, e.BytesRecorded);
+                    System.Diagnostics.Debug.WriteLine($"Audio error: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");
                 }
+            };
 
-                var denoisedData = NoiseSuppressor.Denoise(audioData);
-                var opusData = _encoder.Encode(denoisedData);
-                SendOpusPacket(opusData, _connectionInfo.LocalUserId);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Audio processing error: {ex.Message}");
-            }
-        }
-
-        waveIn.DataAvailable += OnDataAvailable;
-
-        try
-        {
-            waveIn.StartRecording();
+            capture.StartRecording();
             token.WaitHandle.WaitOne();
         }
-        catch
+        catch (Exception ex)
         {
             IsMicrophoneActive = false;
-            MessageBox.Show(Strings.MicrophoneUnableText, Strings.MicrophoneErrorText,
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"{Strings.MicrophoneUnableText}\n\n{ex.Message}",
+                Strings.MicrophoneErrorText, MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
-            waveIn.DataAvailable -= OnDataAvailable;
-            waveIn.StopRecording();
+            capture?.StopRecording();
+            capture?.Dispose();
+            device?.Dispose();
+            enumerator?.Dispose();
         }
     }
 

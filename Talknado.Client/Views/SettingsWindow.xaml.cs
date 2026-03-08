@@ -3,86 +3,85 @@ using System.Windows;
 using Talknado.Client.Models;
 using Talknado.Client.ViewModels;
 
-namespace Talknado.Client.Views
+namespace Talknado.Client.Views;
+
+public partial class SettingsWindow : TalknadoWindow, IDisposable
 {
-    public partial class SettingsWindow : TalknadoWindow, IDisposable
+    public SettingsWindow()
     {
-        public SettingsWindow()
-        {
-            InitializeComponent();
+        InitializeComponent();
 
-            DataContextChanged += OnDataContextChanged;
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    protected override void OnCloseButtonClick()
+    {
+        if (DataContext is SettingsWindowViewModel ssvm)
+        {
+            ssvm.SettingManager.IsWindowVisible = false;
+        }
+    }
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.OldValue is SettingsWindowViewModel oldVm &&
+            oldVm.SettingManager is INotifyPropertyChanged oldNotifier)
+        {
+            PropertyChangedEventManager.RemoveHandler(oldNotifier, OnPlayerPropertyChanged!, "");
         }
 
-        protected override void OnCloseButtonClick()
+        if (e.NewValue is SettingsWindowViewModel newVm &&
+            newVm.SettingManager is INotifyPropertyChanged newNotifier)
         {
-            if (DataContext is SettingsWindowViewModel ssvm)
-            {
-                ssvm.SettingManager.IsWindowVisible = false;
-            }
+            PropertyChangedEventManager.AddHandler(newNotifier, OnPlayerPropertyChanged!, nameof(ISettingsManager.IsWindowVisible));
+            UpdateVisibility(newVm.SettingManager.IsWindowVisible, newVm);
         }
+    }
 
-        private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    private void OnPlayerPropertyChanged(object sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ISettingsManager.IsWindowVisible) &&
+            DataContext is SettingsWindowViewModel vm)
         {
-            if (e.OldValue is SettingsWindowViewModel oldVm &&
-                oldVm.SettingManager is INotifyPropertyChanged oldNotifier)
-            {
-                PropertyChangedEventManager.RemoveHandler(oldNotifier, OnPlayerPropertyChanged!, "");
-            }
-
-            if (e.NewValue is SettingsWindowViewModel newVm &&
-                newVm.SettingManager is INotifyPropertyChanged newNotifier)
-            {
-                PropertyChangedEventManager.AddHandler(newNotifier, OnPlayerPropertyChanged!, nameof(ISettingsManager.IsWindowVisible));
-                UpdateVisibility(newVm.SettingManager.IsWindowVisible, newVm);
-            }
+            UpdateVisibility(vm.SettingManager.IsWindowVisible, vm);
         }
+    }
 
-        private void OnPlayerPropertyChanged(object sender, PropertyChangedEventArgs e)
+    private void UpdateVisibility(bool isVisible, SettingsWindowViewModel vm)
+    {
+        if (isVisible)
         {
-            if (e.PropertyName == nameof(ISettingsManager.IsWindowVisible) &&
-                DataContext is SettingsWindowViewModel vm)
-            {
-                UpdateVisibility(vm.SettingManager.IsWindowVisible, vm);
-            }
+            vm.SettingManager.LoadAudioDevices();
+            Show();
         }
+        else
+            Hide();
+    }
 
-        private void UpdateVisibility(bool isVisible, SettingsWindowViewModel vm)
+    protected override void OnMaximizeButtonClick()
+    {
+        return;
+    }
+
+    protected override void OnDeactivated(EventArgs e)
+    {
+        base.OnDeactivated(e);
+        if (DataContext is SettingsWindowViewModel ssvm)
         {
-            if (isVisible)
-            {
-                vm.SettingManager.LoadAudioDevices();
-                Show();
-            }
-            else
-                Hide();
+            ssvm.SettingManager.IsWindowVisible = false;
         }
+    }
 
-        protected override void OnMaximizeButtonClick()
+    public void Dispose()
+    {
+        UseCustomClose = false;
+
+        try
         {
-            return;
+            Application.Current?.Dispatcher.Invoke(Close);
         }
+        catch { /* ignore */ }
 
-        protected override void OnDeactivated(EventArgs e)
-        {
-            base.OnDeactivated(e);
-            if (DataContext is SettingsWindowViewModel ssvm)
-            {
-                ssvm.SettingManager.IsWindowVisible = false;
-            }
-        }
-
-        public void Dispose()
-        {
-            UseCustomClose = false;
-
-            try
-            {
-                Application.Current?.Dispatcher.Invoke(Close);
-            }
-            catch { /* ignore */ }
-
-            GC.SuppressFinalize(this);
-        }
+        GC.SuppressFinalize(this);
     }
 }

@@ -11,7 +11,7 @@ public interface IClientManager
     void ReconnectClient(TcpClient tcpClient, ushort userId, CancellationToken token);
 }
 
-internal class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
+public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
     ICryptoSessionManager cryptoSessionManager, IServerInfo serverInfo,
     IScreenShareManager screenShareManager) : IClientManager, IDisposable
 {
