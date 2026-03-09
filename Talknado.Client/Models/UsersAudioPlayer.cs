@@ -36,6 +36,9 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
 
     public void Play(ushort userId, byte[] opusData)
     {
+        if (_usersInfo.GetUsernameByUserId(userId) == string.Empty)
+            return;
+
         if (!_userAudioStreams.TryGetValue(userId, out UserAudioStream? value))
         {
             var deviceId = ResolveOutputDeviceId(_settingsManager.SelectedOutputDevice);
