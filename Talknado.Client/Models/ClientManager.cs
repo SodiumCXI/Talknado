@@ -26,7 +26,8 @@ public class ClientManager(IUsersInfo usersInfo,
     IMessagesManager messagesManager,
     IScreenSharePlayer screenSharePlayer,
     IWindowsState windowsState,
-    ISettingsManager settingsManager) : IClientManager, IDisposable
+    ISettingsManager settingsManager,
+    IAudioManager audioManager) : IClientManager, IDisposable
 {
     private readonly IUsersInfo _usersInfo = usersInfo;
     private readonly INetworkUtils _networkUtils = networkUtils;
@@ -37,9 +38,10 @@ public class ClientManager(IUsersInfo usersInfo,
     private readonly IScreenSharePlayer _screenSharePlayer = screenSharePlayer;
     private readonly IWindowsState _windowsState = windowsState;
     private readonly ISettingsManager _settingsManager = settingsManager;
+    private readonly IAudioManager _audioManager = audioManager;
 
     private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
-    private readonly string _clientVersion = "v1.3.5";
+    private readonly string _clientVersion = "v1.3.6";
 
     private TcpClient _tcpMainClient = null!;
 
@@ -108,6 +110,8 @@ public class ClientManager(IUsersInfo usersInfo,
                 IsBackground = true
             };
             _receiveThread.Start();
+
+            _audioManager.ToggleMicrophoneStatus();
 
             return null;
         }
@@ -484,7 +488,7 @@ public class ClientManager(IUsersInfo usersInfo,
 
                 _screenSharePlayer.ScreenShareUsername = _usersInfo.GetUsernameByUserId(userIdSSS);
                 _usersInfo.UpdateScreenSharingState(userIdSSS, true);
-                if (_settingsManager.AutoOpenScreenShareWindow)
+                if (_settingsManager.AutoOpenScreenShareWindow && (userIdSSS != _connectionInfo.LocalUserId))
                     Application.Current.Dispatcher.Invoke(() =>
                         _screenSharePlayer.IsWindowVisible = true);
 
