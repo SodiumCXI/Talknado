@@ -121,16 +121,23 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
 
     public class UserAudioStream : IDisposable
     {
+        private readonly IUsersInfo _usersInfo;
+
         private WasapiOut? WasapiOut { get; set; }
         private BufferedWaveProvider WaveProvider { get; }
         private MMDevice? Device { get; set; }
 
-        private readonly IUsersInfo _usersInfo;
         private readonly ushort _userId;
-
         private readonly OpusCodecDecoder _decoder = new();
         private readonly Queue<byte[]> _packetQueue = new();
+        private readonly object _queueLock = new();
         public int ConsecutiveLosses { get; private set; }
+
+        private const int MIN_BUFFER_SIZE = 3;
+        private const int MAX_BUFFER_SIZE = 15;
+        private int _targetBufferSize = 5;
+        private int _underflowCounter = 0;
+        private int _playbackCounter = 0;
 
         public UserAudioStream(IUsersInfo usersInfo, ushort userId, string? deviceId)
         {
@@ -177,14 +184,46 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
 
         public void AddPacket(byte[] opusData)
         {
-            _packetQueue.Enqueue(opusData);
+            lock (_queueLock)
+            {
+                _packetQueue.Enqueue(opusData);
+
+                int dropThreshold = Math.Max(_targetBufferSize * 3, 10);
+
+                while (_packetQueue.Count > dropThreshold)
+                {
+                    _packetQueue.Dequeue();
+                }
+            }
         }
 
         public void Playback()
         {
             var userVolumeMultiplier = _usersInfo.GetVolumeByUserId(_userId) / 50f;
 
-            if (_packetQueue.TryDequeue(out byte[]? opusData))
+            byte[]? opusData = null;
+            int currentQueueSize;
+
+            lock (_queueLock)
+            {
+                currentQueueSize = _packetQueue.Count;
+
+                if (currentQueueSize > 0)
+                {
+                    _packetQueue.TryDequeue(out opusData);
+                }
+            }
+
+            _playbackCounter++;
+
+            if (_playbackCounter >= 100)
+            {
+                AdaptBufferSize();
+                _playbackCounter = 0;
+                _underflowCounter = 0;
+            }
+
+            if (opusData != null)
             {
                 byte[] pcmData = _decoder.Decode(opusData);
                 VolumeController.AdjustVolume(pcmData, userVolumeMultiplier);
@@ -194,12 +233,28 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             else
             {
                 ConsecutiveLosses++;
-                if (ConsecutiveLosses <= 5)
+                _underflowCounter++;
+
+                if (ConsecutiveLosses <= 10)
                 {
                     byte[] plcData = _decoder.DecodePLC();
                     VolumeController.AdjustVolume(plcData, userVolumeMultiplier);
                     WaveProvider.AddSamples(plcData, 0, plcData.Length);
                 }
+            }
+        }
+
+        private void AdaptBufferSize()
+        {
+            double underflowRate = _underflowCounter / 100.0;
+
+            if (underflowRate > 0.10)
+            {
+                _targetBufferSize = Math.Min(_targetBufferSize + 1, MAX_BUFFER_SIZE);
+            }
+            else if (underflowRate == 0 && _targetBufferSize > MIN_BUFFER_SIZE)
+            {
+                _targetBufferSize = Math.Max(_targetBufferSize - 1, MIN_BUFFER_SIZE);
             }
         }
 

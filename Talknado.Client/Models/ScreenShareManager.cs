@@ -90,13 +90,18 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
             _ = ScreenGrabber.CaptureFrame(out int w, out int h);
             H264Encoder.Initialize(w, h);
 
+            long lastCaptureTimestamp = Stopwatch.GetTimestamp();
+
             while (!token.IsCancellationRequested)
             {
                 var sw = Stopwatch.StartNew();
+                long now = Stopwatch.GetTimestamp();
+                int deltaMs = (int)((now - lastCaptureTimestamp) * 1000 / Stopwatch.Frequency);
+                lastCaptureTimestamp = now;
 
                 var screenFrame = ScreenGrabber.CaptureFrame(out _, out _);
                 CursorRenderer.OverlayCursorOnByteBuffer(screenFrame, w, h);
-                var encodedFrame = H264Encoder.Encode(screenFrame);
+                var encodedFrame = H264Encoder.Encode(screenFrame, deltaMs);
 
                 if (encodedFrame != null)
                 {

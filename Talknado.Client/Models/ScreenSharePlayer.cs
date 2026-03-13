@@ -39,14 +39,27 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
 
     private readonly H264Decoder _decoder = new();
 
+    private readonly object _saveLock = new();
+    private readonly object _queueLock = new();
+    private readonly Queue<EncodedFrame> _frameQueue = new();
+    private readonly CancellationTokenSource _playbackCts = new();
+    private readonly Task _playbackTask;
+    private readonly SemaphoreSlim _frameSignal = new(0);
+
+    private const int MIN_BUFFER_FRAMES = 1;
+    private const int MAX_BUFFER_FRAMES = 30;
+    private readonly object _jitterLock = new();
+    private long _lastArrivalTimestamp = 0;
+    private double _jitterEma = 0;
+    private int _lastDeltaMs = 33;
+    private volatile int _targetBufferFrames = MIN_BUFFER_FRAMES;
+
     [ObservableProperty]
     private bool _isWindowVisible = false;
     [ObservableProperty]
     private int _framesPerSecond = 0;
     [ObservableProperty]
     private string _screenShareUsername = string.Empty;
-
-    private readonly object _lock = new();
 
     public ScreenSharePlayer()
     {
@@ -55,6 +68,8 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
             FramesPerSecond = _frameCount;
             _frameCount = 0;
         }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+
+        _playbackTask = Task.Run(() => PlaybackLoop(_playbackCts.Token));
     }
 
     public void SaveLastKeyFrame(byte[] h264Data)
@@ -64,12 +79,10 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
         if (!frame.IsKeyFrame)
             return;
 
-        lock (_lock)
+        lock (_saveLock)
         {
             LastKeyFrame = [.. h264Data];
         }
-
-        return;
     }
 
     public void ClearLastKeyFrame()
@@ -87,52 +100,117 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
 
     public void UpdateFrame(byte[] h264Data, CancellationToken token)
     {
-        lock (_lock)
+        var frame = new EncodedFrame(h264Data);
+
+        if (!IsKeyFrameInitialized)
         {
-            try
+            if (!frame.IsKeyFrame)
+                return;
+
+            lock (_saveLock)
             {
-                var frame = new EncodedFrame(h264Data);
+                LastKeyFrame = [.. h264Data];
+                _decoder.FlushBuffers();
+                IsKeyFrameInitialized = true;
+            }
+        }
 
-                if (!IsKeyFrameInitialized)
-                {
-                    if (!frame.IsKeyFrame)
-                        return;
+        lock (_queueLock)
+        {
+            _frameQueue.Enqueue(frame);
+        }
 
-                    LastKeyFrame = [.. h264Data];
-                    _decoder.FlushBuffers();
-                    IsKeyFrameInitialized = true;
-                }
+        lock (_jitterLock)
+        {
+            long now = Stopwatch.GetTimestamp();
 
-                byte[] bgraPixels = _decoder.Decode(frame.Data);
+            if (_lastArrivalTimestamp != 0)
+            {
+                double arrivalIntervalMs = (now - _lastArrivalTimestamp) * 1000.0 / Stopwatch.Frequency;
+                double jitter = Math.Abs(arrivalIntervalMs - frame.DeltaMs);
+                if (jitter > frame.DeltaMs * 5) jitter = _jitterEma;
 
+                double alpha = jitter > _jitterEma ? 0.5 : 0.005;
+                _jitterEma = alpha * jitter + (1 - alpha) * _jitterEma;
+                if (frame.DeltaMs > 0) _lastDeltaMs = frame.DeltaMs;
+                _targetBufferFrames = Math.Clamp((int)Math.Ceiling(_jitterEma / _lastDeltaMs), MIN_BUFFER_FRAMES, MAX_BUFFER_FRAMES);
+            }
+
+            _lastArrivalTimestamp = now;
+        }
+
+        _frameSignal.Release();
+    }
+
+    private async Task PlaybackLoop(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            EncodedFrame? item = null;
+            int queueSize;
+
+            lock (_queueLock)
+            {
+                queueSize = _frameQueue.Count;
+                if (queueSize > 0)
+                    item = _frameQueue.Dequeue();
+            }
+
+            if (item is null)
+            {
+                await _frameSignal.WaitAsync(token);
+                continue;
+            }
+
+            int targetFrames = _targetBufferFrames;
+
+            float catchUpFactor = queueSize <= targetFrames
+                ? 1.0f
+                : queueSize >= (MAX_BUFFER_FRAMES + targetFrames)
+                    ? 0.0f
+                    : 1.0f - ((float)(queueSize - targetFrames) / ((MAX_BUFFER_FRAMES + targetFrames) - targetFrames));
+
+            int delay = (int)(item.Value.DeltaMs * catchUpFactor);
+            if (delay > 0)
+                await Task.Delay(delay, token);
+
+            DecodeAndRender(item.Value, token);
+        }
+    }
+
+    private void DecodeAndRender(EncodedFrame frame, CancellationToken token)
+    {
+        try
+        {
+            byte[] bgraPixels;
+            int width, height;
+
+                bgraPixels = _decoder.Decode(frame.Data);
                 if (bgraPixels == null)
                     return;
 
-                int width = _decoder.Width;
-                int height = _decoder.Height;
+                width = _decoder.Width;
+                height = _decoder.Height;
 
                 if (!_isInitialized || _currentWidth != width || _currentHeight != height)
-                {
                     InitializeBitmap(width, height);
-                }
 
-                _frameCount++;
+            _frameCount++;
 
-                if (token.IsCancellationRequested)
-                    return;
+            if (token.IsCancellationRequested)
+                return;
 
-                var dispatcher = Application.Current?.Dispatcher;
-                if (dispatcher != null && !dispatcher.HasShutdownStarted)
-                {
-                    dispatcher.BeginInvoke(
-                        () => RenderFrame(bgraPixels, width, height),
-                        DispatcherPriority.Render);
-                }
-            }
-            catch (Exception ex)
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.HasShutdownStarted)
             {
-                Debug.WriteLine($"Frame update failed: {ex.Message}");
+                dispatcher.BeginInvoke(
+                    () => RenderFrame(bgraPixels, width, height),
+                    DispatcherPriority.Render);
             }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Frame update failed: {ex.Message}");
         }
     }
 
@@ -194,16 +272,18 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
             return;
 
         _displayBitmap = new WriteableBitmap(
-                _currentWidth, _currentHeight,
-                96, 96,
-                PixelFormats.Bgra32,
-                null);
+            _currentWidth, _currentHeight,
+            96, 96,
+            PixelFormats.Bgra32,
+            null);
 
         OnPropertyChanged(nameof(DisplayImage));
     }
 
     public void Dispose()
     {
+        _playbackCts.Cancel();
+        _playbackCts.Dispose();
         _statsTimer?.Dispose();
         _decoder.Cleanup();
 
@@ -213,16 +293,18 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     public readonly struct EncodedFrame
     {
         public bool IsKeyFrame { get; }
+        public int DeltaMs { get; }
         public byte[] Data { get; }
 
         public EncodedFrame(byte[] encodedData)
         {
-            if (encodedData == null || encodedData.Length < 1)
-                throw new ArgumentException("Data must contain at least 1 byte (frame flag)");
+            if (encodedData == null || encodedData.Length < 5)
+                throw new ArgumentException("Data must contain at least 5 bytes");
 
             IsKeyFrame = encodedData[0] == 1;
-            Data = new byte[encodedData.Length - 1];
-            Array.Copy(encodedData, 1, Data, 0, Data.Length);
+            DeltaMs = BitConverter.ToInt32(encodedData, 1);
+            Data = new byte[encodedData.Length - 5];
+            Array.Copy(encodedData, 5, Data, 0, Data.Length);
         }
     }
 }

@@ -150,7 +150,7 @@ public static unsafe class H264Encoder
         }
     }
 
-    public static byte[] Encode(byte[] bgraData)
+    public static byte[] Encode(byte[] bgraData, int deltaMs)
     {
         if (!_initialized)
             throw new InvalidOperationException("Encoder is not initialized. Call Initialize()");
@@ -177,11 +177,12 @@ public static unsafe class H264Encoder
             throw new Exception($"Encoding error: {ret}");
 
         bool isKeyFrame = (_packet->flags & ffmpeg.AV_PKT_FLAG_KEY) != 0;
-        byte[] encodedData = new byte[1 + _packet->size];
+        byte[] encodedData = new byte[5 + _packet->size];
         encodedData[0] = isKeyFrame ? (byte)1 : (byte)0;
-        Marshal.Copy((IntPtr)_packet->data, encodedData, 1, _packet->size);
-        ffmpeg.av_packet_unref(_packet);
+        BitConverter.TryWriteBytes(encodedData.AsSpan(1, 4), deltaMs);
+        Marshal.Copy((IntPtr)_packet->data, encodedData, 5, _packet->size);
 
+        ffmpeg.av_packet_unref(_packet);
         return encodedData;
     }
 

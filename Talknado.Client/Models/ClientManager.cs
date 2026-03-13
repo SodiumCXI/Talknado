@@ -41,7 +41,7 @@ public class ClientManager(IUsersInfo usersInfo,
     private readonly IAudioManager _audioManager = audioManager;
 
     private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
-    private readonly string _clientVersion = "v1.3.6";
+    private readonly string _clientVersion = "v1.3.7";
 
     private TcpClient _tcpMainClient = null!;
 
