@@ -18,6 +18,8 @@
     </shell:WindowChrome.WindowChrome>
     <local:TalknadoWindow.Resources>
         <cnv:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+        <cnv:InverseBoolConverter x:Key="InverseBoolConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
     </local:TalknadoWindow.Resources>
     <Border x:Name="BorderAround"
             Style="{StaticResource BorderAround}">
@@ -96,6 +98,7 @@
                     </TabItem>
                     <TabItem Header="{x:Static l:Strings.ServerChoice}" 
                              Style="{StaticResource StartTabItemStyle}"
+                             IsSelected="{Binding IsServerTabSelected}"
                              Margin="1,-1,-5,0">
                         <Border Padding="25,20">
                             <Border.Effect>
@@ -118,13 +121,37 @@
                                          Text="{Binding PasswordTextBoxValue, UpdateSourceTrigger=PropertyChanged}"
                                          Margin="0,0,0,20"
                                          MaxLength="40"/>
+                                <CheckBox Content="{x:Static l:Strings.EnableUpnpPortForwardingText}"
+                                          IsChecked="{Binding IsUpnpEnabled}"
+                                          Style="{StaticResource StartCheckBoxStyle}"
+                                          HorizontalAlignment="Center" 
+                                          Margin="0,0,0,20"/>
                                 <TextBlock Text="{Binding ErrorMessage}" 
                                            Style="{StaticResource ErrorLabelTextStyle}"
                                            Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
-                                <Button Content="{x:Static l:Strings.HostButton}" 
-                                        Style="{StaticResource StartConnectButtonStyle}"
+                                <Button Style="{StaticResource StartConnectButtonStyle}"
                                         HorizontalAlignment="Center"
-                                        Command="{Binding ConnectWithServerCommand}"/>
+                                        Command="{Binding ConnectWithServerCommand}"
+                                        IsEnabled="{Binding IsWaitingForConnection, Converter={StaticResource InverseBoolConverter}}">
+                                    <Grid>
+                                        <TextBlock Text="{x:Static l:Strings.HostButton}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsWaitingForConnection}" Value="True">
+                                                            <Setter Property="Visibility" Value="Hidden"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <Path Style="{StaticResource LoadingSpinner}"
+                                              Visibility="{Binding IsWaitingForConnection, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    </Grid>
+                                </Button>
                             </StackPanel>
                         </Border>
                     </TabItem>

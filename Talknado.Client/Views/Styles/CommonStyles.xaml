@@ -573,12 +573,10 @@
     </Style>
 
     <!-- CheckBox styles -->
-    
-    <Style x:Key="SettingsCheckBoxStyle" TargetType="CheckBox">
-        <Setter Property="Margin" Value="0,12,0,0"/>
+
+    <Style x:Key="BaseCheckBoxStyle" TargetType="CheckBox">
         <Setter Property="FontFamily" Value="{StaticResource BaseFont}"/>
         <Setter Property="FontSize" Value="{StaticResource SecondaryFontSize}"/>
-        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
@@ -587,18 +585,46 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <CheckBox Grid.Column="0" 
-                                  IsChecked="{Binding IsChecked, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
-                                  VerticalAlignment="Center"
-                                  Margin="0,0,8,0"/>
-                        <TextBlock Grid.Column="1" 
-                                   Text="{TemplateBinding Content}" 
-                                   TextWrapping="Wrap"
-                                   VerticalAlignment="Center"/>
+                        <Border Grid.Column="0"
+                            Width="13" Height="13"
+                            Background="{StaticResource PrimaryTextBrush}"
+                            BorderBrush="{StaticResource SecondaryTextBrush}"
+                            BorderThickness="1"
+                            VerticalAlignment="Center"
+                            Margin="0,0,8,0">
+                            <Path x:Name="CheckMark"
+                              Data="M 1 5 L 4 9 L 10 1"
+                              Stroke="Black"
+                              StrokeThickness="2"
+                              Visibility="Collapsed"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Grid.Column="1"
+                               Text="{TemplateBinding Content}"
+                               Foreground="{TemplateBinding Foreground}"
+                               TextWrapping="Wrap"
+                               VerticalAlignment="Center"/>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style x:Key="StartCheckBoxStyle" TargetType="CheckBox" BasedOn="{StaticResource BaseCheckBoxStyle}">
+        <Setter Property="Margin" Value="0,12,0,0"/>
+        <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+
+    <Style x:Key="SettingsCheckBoxStyle" TargetType="CheckBox" BasedOn="{StaticResource BaseCheckBoxStyle}">
+        <Setter Property="Margin" Value="0,12,0,0"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
     </Style>
 
     <!-- ComboBox styles -->

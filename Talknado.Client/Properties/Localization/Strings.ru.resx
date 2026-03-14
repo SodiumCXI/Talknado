@@ -216,4 +216,16 @@
   <data name="ScreenSharingErrorText" xml:space="preserve">
     <value>Ошибка демонстрации экрана</value>
   </data>
+  <data name="EnableUpnpPortForwardingText" xml:space="preserve">
+    <value>Проброс портов UPnP</value>
+  </data>
+  <data name="UpnpMappingRefusedText" xml:space="preserve">
+    <value>Роутер отклонил проброс порта</value>
+  </data>
+  <data name="UpnpRouterNotFoundText" xml:space="preserve">
+    <value>Роутер с UPnP не найден. Убедитесь, что UPnP включен</value>
+  </data>
+  <data name="UpnpPortAlreadyInUseText" xml:space="preserve">
+    <value>Порт уже используется на роутере</value>
+  </data>
 </root>

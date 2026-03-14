@@ -160,6 +160,15 @@ namespace Talknado.Client.Properties.Localization {
         }
         
         /// <summary>
+        ///   Ищет локализованную строку, похожую на UPnP Port Forwarding.
+        /// </summary>
+        public static string EnableUpnpPortForwardingText {
+            get {
+                return ResourceManager.GetString("EnableUpnpPortForwardingText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Ищет локализованную строку, похожую на Host.
         /// </summary>
         public static string HostButton {
@@ -354,6 +363,33 @@ namespace Talknado.Client.Properties.Localization {
         public static string ShareScreenWithAudioText {
             get {
                 return ResourceManager.GetString("ShareScreenWithAudioText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Router refused to create mapping.
+        /// </summary>
+        public static string UpnpMappingRefusedText {
+            get {
+                return ResourceManager.GetString("UpnpMappingRefusedText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Port is already in use on the router.
+        /// </summary>
+        public static string UpnpPortAlreadyInUseText {
+            get {
+                return ResourceManager.GetString("UpnpPortAlreadyInUseText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на UPnP router not found. Make sure UPnP is enabled.
+        /// </summary>
+        public static string UpnpRouterNotFoundText {
+            get {
+                return ResourceManager.GetString("UpnpRouterNotFoundText", resourceCulture);
             }
         }
     }

@@ -1,6 +1,8 @@
-﻿using System.Windows;
-using Talknado.Client.Views;
+﻿using System.Globalization;
+using System.Windows;
+using System.Windows.Threading;
 using Talknado.Client.Properties;
+using Talknado.Client.Views;
 
 namespace Talknado.Client;
 
@@ -9,28 +11,37 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         var lang = Settings.Default.Language;
-
         if (string.IsNullOrEmpty(lang))
         {
             var systemLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-
             if (systemLang == "ru")
                 lang = "ru";
             else if (systemLang == "zh")
                 lang = "zh";
             else
                 lang = "en";
-
             Settings.Default.Language = lang;
             Settings.Default.Save();
         }
 
-        Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo(lang);
-        Thread.CurrentThread.CurrentUICulture = new System.Globalization.CultureInfo(lang);
-
         base.OnStartup(e);
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        var window = new StartWindow();
-        window.Show();
+        var culture = new CultureInfo(lang);
+        Thread.CurrentThread.CurrentCulture = culture;
+        Thread.CurrentThread.CurrentUICulture = culture;
+
+        var thread = new Thread(() =>
+        {
+            Thread.CurrentThread.CurrentCulture = culture;
+            Thread.CurrentThread.CurrentUICulture = culture;
+
+            var window = new StartWindow();
+            window.Show();
+            Dispatcher.Run();
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
+        thread.Start();
     }
 }

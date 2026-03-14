@@ -12,6 +12,7 @@ namespace Talknado.Client.Views;
 public interface IMainWindow
 {
     void Show();
+    bool Activate();
 }
 
 public partial class MainWindow : TalknadoWindow, IMainWindow, IDisposable

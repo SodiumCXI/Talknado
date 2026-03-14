@@ -234,7 +234,7 @@ public class ServerManager(INetworkUtils networkUtils,
     public void Dispose()
     {
         _mainTokenSource.Cancel();
-        _listener.Stop();
+        _listener?.Stop();
         _serverThread?.Join();
         _mainTokenSource.Dispose();
 

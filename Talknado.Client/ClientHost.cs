@@ -25,7 +25,11 @@ public sealed class ClientHost : IDisposable
         var clientManager = _provider.GetRequiredService<IClientManager>();
         var result = clientManager.TryConnect(connectionKey, username);
         if (result == null)
-            _provider.GetRequiredService<IMainWindow>().Show();
+        {
+            var window = _provider.GetRequiredService<IMainWindow>();
+            window.Show();
+            window.Activate();
+        }
         return result;
     }
 

@@ -216,4 +216,16 @@
   <data name="ScreenSharingErrorText" xml:space="preserve">
     <value>Screen Sharing Error</value>
   </data>
+  <data name="EnableUpnpPortForwardingText" xml:space="preserve">
+    <value>UPnP Port Forwarding</value>
+  </data>
+  <data name="UpnpMappingRefusedText" xml:space="preserve">
+    <value>Router refused to create mapping</value>
+  </data>
+  <data name="UpnpRouterNotFoundText" xml:space="preserve">
+    <value>UPnP router not found. Make sure UPnP is enabled</value>
+  </data>
+  <data name="UpnpPortAlreadyInUseText" xml:space="preserve">
+    <value>Port is already in use on the router</value>
+  </data>
 </root>

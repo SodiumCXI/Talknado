@@ -31,7 +31,6 @@ public partial class MainWindowViewModel(IClientManager clientManager,
 
     [ObservableProperty]
     private string _inputTextBoxValue = string.Empty;
-
     public bool UseDisconnect { get; set; } = false;
 
     [RelayCommand]

@@ -216,4 +216,16 @@
   <data name="ScreenSharingErrorText" xml:space="preserve">
     <value>屏幕共享错误</value>
   </data>
+  <data name="EnableUpnpPortForwardingText" xml:space="preserve">
+    <value>UPnP 端口转发</value>
+  </data>
+  <data name="UpnpMappingRefusedText" xml:space="preserve">
+    <value>路由器拒绝端口转发</value>
+  </data>
+  <data name="UpnpRouterNotFoundText" xml:space="preserve">
+    <value>未找到 UPnP 路由器。请确保已启用 UPnP</value>
+  </data>
+  <data name="UpnpPortAlreadyInUseText" xml:space="preserve">
+    <value>路由器上的端口已被占用</value>
+  </data>
 </root>

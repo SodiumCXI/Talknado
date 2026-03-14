@@ -1,6 +1,7 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Talknado.Client.ViewModels;
 
 namespace Talknado.Client.Views;
@@ -15,6 +16,7 @@ public partial class StartWindow : TalknadoWindow, IDisposable
         InitializeComponent();
 
         var startWindowViewModel = new StartWindowViewModel();
+        startWindowViewModel.SetDispatcher(Dispatcher);
         DataContext = startWindowViewModel;
 
         Loaded += (s, e) =>
@@ -28,20 +30,34 @@ public partial class StartWindow : TalknadoWindow, IDisposable
 
         startWindowViewModel.PropertyChanged += (s, e) =>
         {
-            if (e.PropertyName == nameof(startWindowViewModel.IsVisible))
+            Dispatcher.Invoke(() =>
             {
-                Visibility = startWindowViewModel.IsVisible ? Visibility.Visible : Visibility.Collapsed;
-            }
-            else if (e.PropertyName == nameof(startWindowViewModel.ErrorMessage))
-            {
-                AdjustWindowHeight();
-            }
+                if (e.PropertyName == nameof(startWindowViewModel.IsVisible))
+                {
+                    if (startWindowViewModel.IsVisible)
+                    {
+                        Show();
+                        Activate();
+                    }
+                    else
+                        Hide();
+                }
+                else if (e.PropertyName == nameof(startWindowViewModel.ErrorMessage))
+                {
+                    AdjustWindowHeight(startWindowViewModel);
+                }
+                else if (e.PropertyName == nameof(startWindowViewModel.IsServerTabSelected))
+                {
+                    startWindowViewModel.ErrorMessage = string.Empty;
+                    AdjustWindowHeight(startWindowViewModel);
+                }
+            });
         };
     }
 
-    private void AdjustWindowHeight()
+    private void AdjustWindowHeight(StartWindowViewModel viewModel)
     {
-        if (!_isHeightInitialized || DataContext is not StartWindowViewModel viewModel)
+        if (!_isHeightInitialized)
             return;
 
         Dispatcher.BeginInvoke(new Action(() =>
@@ -49,30 +65,34 @@ public partial class StartWindow : TalknadoWindow, IDisposable
             UpdateLayout();
 
             double errorHeight = 0;
+            double checkboxHeight = 0;
 
             if (!string.IsNullOrEmpty(viewModel.ErrorMessage))
             {
                 var errorTextBlocks = FindVisualChildren<TextBlock>(this)
                     .Where(tb => tb.Visibility == Visibility.Visible &&
-                                !string.IsNullOrEmpty(tb.Text) &&
-                                tb.Text == viewModel.ErrorMessage);
+                                 !string.IsNullOrEmpty(tb.Text) &&
+                                 tb.Text == viewModel.ErrorMessage);
 
                 foreach (var textBlock in errorTextBlocks)
-                {
-                    double textBlockHeight = textBlock.ActualHeight;
-
-                    var margin = textBlock.Margin;
-                    textBlockHeight += margin.Top + margin.Bottom;
-
-                    errorHeight = Math.Max(errorHeight, textBlockHeight);
-                }
+                    errorHeight = Math.Max(errorHeight, textBlock.ActualHeight + textBlock.Margin.Top + textBlock.Margin.Bottom);
             }
 
-            double newHeight = _originalHeight + errorHeight;
+            if (viewModel.IsServerTabSelected)
+            {
+                var checkboxes = FindVisualChildren<CheckBox>(this)
+                    .Where(cb => cb.Visibility == Visibility.Visible);
+
+                foreach (var checkbox in checkboxes)
+                    checkboxHeight = Math.Max(checkboxHeight, checkbox.ActualHeight + checkbox.Margin.Top + checkbox.Margin.Bottom);
+            }
+
+            double newHeight = _originalHeight + errorHeight + checkboxHeight;
             Height = newHeight;
             MinHeight = newHeight;
             MaxHeight = newHeight;
-        }), System.Windows.Threading.DispatcherPriority.Loaded);
+
+        }), DispatcherPriority.Loaded);
     }
 
     private IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
@@ -98,7 +118,7 @@ public partial class StartWindow : TalknadoWindow, IDisposable
 
     protected override void OnCloseButtonClick()
     {
-        Application.Current.Shutdown();
+        Application.Current.Dispatcher.Invoke(Application.Current.Shutdown);
     }
 
     public void Dispose()

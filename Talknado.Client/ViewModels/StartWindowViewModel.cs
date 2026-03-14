@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Windows;
+using System.Windows.Threading;
 using Talknado.Client.Properties;
 using Talknado.Client.Properties.Localization;
 using Talknado.Server;
@@ -13,6 +14,7 @@ public partial class StartWindowViewModel : ObservableObject
     private ClientHost? _clientHost;
 
     private readonly Action _clientDisconnectedHandler;
+    private Dispatcher? _dispatcher;
 
     [ObservableProperty]
     private bool _isVisible = true;
@@ -26,7 +28,12 @@ public partial class StartWindowViewModel : ObservableObject
     private string _errorMessage = string.Empty;
     [ObservableProperty]
     private int _selectedLanguageIndex;
-
+    [ObservableProperty]
+    private bool _isServerTabSelected;
+    [ObservableProperty]
+    private bool _isUpnpEnabled;
+    [ObservableProperty]
+    private bool _isWaitingForConnection;
 
     public StartWindowViewModel()
     {
@@ -40,6 +47,11 @@ public partial class StartWindowViewModel : ObservableObject
             "zh" => 2,
             _ => 0
         };
+    }
+
+    public void SetDispatcher(Dispatcher dispatcher)
+    {
+        _dispatcher = dispatcher;
     }
 
     partial void OnSelectedLanguageIndexChanged(int value)
@@ -58,83 +70,88 @@ public partial class StartWindowViewModel : ObservableObject
             Settings.Default.Save();
 
             System.Diagnostics.Process.Start(Environment.ProcessPath!);
-            Application.Current.Shutdown();
+            Application.Current.Dispatcher.Invoke(Application.Current.Shutdown);
         }
     }
 
     [RelayCommand]
-    private void ConnectWithServer()
-    {
-        ErrorMessage = string.Empty;
-
-        _serverHost?.Dispose();
-        _clientHost?.Dispose();
-
-        var username = UsernameTextBoxValue.Trim();
-        var usernameError = CheckUsername(username);
-        if (usernameError != null)
-        {
-            ErrorMessage = usernameError;
-            return;
-        }
-
-        var passwordError = CheckPassword(PasswordTextBoxValue);
-        if (passwordError != null)
-        {
-            ErrorMessage = passwordError;
-            return;
-        }
-
-        _serverHost = new ServerHost();
-
-        var (isException, serverResult) = _serverHost.StartServer(PasswordTextBoxValue);
-        if (isException)
-        {
-            ErrorMessage = serverResult;
-            return;
-        }
-
-        _clientHost = new ClientHost();
-
-        var clientResult = _clientHost.TryConnectToServer(serverResult, username);
-        if (clientResult != null)
-        {
-            ErrorMessage = clientResult;
-            return;
-        }
-        _clientHost.SetConnectionKey(serverResult);
-        _clientHost.SubscribeToClientDisconnected(_clientDisconnectedHandler);
-
-        IsVisible = false;
-    }
+    private void ConnectWithServer() => Connect(true);
 
     [RelayCommand]
-    private void ConnectWithoutServer()
+    private void ConnectWithoutServer() => Connect(false);
+
+    private void Connect(bool withServer)
     {
+        IsWaitingForConnection = true;
         ErrorMessage = string.Empty;
 
-        _clientHost?.Dispose();
-
-        var username = UsernameTextBoxValue.Trim();
-        var usernameError = CheckUsername(username);
-        if (usernameError != null)
+        Task.Run(() =>
         {
-            ErrorMessage = usernameError;
-            return;
-        }
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                try
+                {
+                    var username = UsernameTextBoxValue.Trim();
+                    var usernameError = CheckUsername(username);
+                    if (usernameError != null) { SetError(usernameError); return; }
 
-        _clientHost = new ClientHost();
+                    string connectionKey;
+                    if (withServer)
+                    {
+                        var passwordError = CheckPassword(PasswordTextBoxValue);
+                        if (passwordError != null) { SetError(passwordError); return; }
 
-        var clientResult = _clientHost.TryConnectToServer(ConnectionKeyTextBoxValue, username);
-        if (clientResult != null)
+                        _serverHost = new ServerHost();
+                        var (isException, serverResult) = _serverHost.StartServer(PasswordTextBoxValue, IsUpnpEnabled);
+                        if (isException)
+                        {
+                            SetError(serverResult);
+                            _serverHost?.Dispose();
+                            return;
+                        }
+
+                        connectionKey = serverResult;
+                    }
+                    else
+                    {
+                        connectionKey = ConnectionKeyTextBoxValue;
+                    }
+
+                    _clientHost = new ClientHost();
+                    var clientResult = _clientHost.TryConnectToServer(connectionKey, username);
+                    if (clientResult != null)
+                    {
+                        SetError(clientResult);
+                        _serverHost?.Dispose();
+                        _clientHost?.Dispose();
+                        return;
+                    }
+
+                    _clientHost.SetConnectionKey(connectionKey);
+                    _clientHost.SubscribeToClientDisconnected(_clientDisconnectedHandler);
+                    IsVisible = false;
+                }
+                finally
+                {
+                    _dispatcher?.Invoke(() => IsWaitingForConnection = false);
+                }
+            });
+        });
+    }
+
+    private void SetError(string message)
+    {
+        if (message.StartsWith('#'))
         {
-            ErrorMessage = clientResult;
-            return;
+            message = message switch
+            {
+                "#0" => Strings.UpnpRouterNotFoundText,
+                "#1" => Strings.UpnpPortAlreadyInUseText,
+                "#2" => Strings.UpnpMappingRefusedText,
+                _ => message
+            };
         }
-        _clientHost.SetConnectionKey(ConnectionKeyTextBoxValue);
-        _clientHost.SubscribeToClientDisconnected(_clientDisconnectedHandler);
-
-        IsVisible = false;
+        _dispatcher?.Invoke(() => ErrorMessage = message);
     }
 
     private static string? CheckUsername(string username)
@@ -156,15 +173,11 @@ public partial class StartWindowViewModel : ObservableObject
     private void SoftRestart()
     {
         _clientHost?.UnsubscribeFromClientDisconnected(_clientDisconnectedHandler);
-
         _clientHost?.CloseConnection();
 
         _clientHost?.Dispose();
         _serverHost?.Dispose();
 
-        Application.Current.Dispatcher.Invoke(() =>
-        {
-            IsVisible = true;
-        });
+        IsVisible = true;
     }
 }
