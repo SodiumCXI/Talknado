@@ -18,23 +18,23 @@ public partial class SettingsWindow : TalknadoWindow, IDisposable
     {
         if (DataContext is SettingsWindowViewModel ssvm)
         {
-            ssvm.SettingManager.IsWindowVisible = false;
+            ssvm.SettingsManager.IsWindowVisible = false;
         }
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         if (e.OldValue is SettingsWindowViewModel oldVm &&
-            oldVm.SettingManager is INotifyPropertyChanged oldNotifier)
+            oldVm.SettingsManager is INotifyPropertyChanged oldNotifier)
         {
             PropertyChangedEventManager.RemoveHandler(oldNotifier, OnPlayerPropertyChanged!, "");
         }
 
         if (e.NewValue is SettingsWindowViewModel newVm &&
-            newVm.SettingManager is INotifyPropertyChanged newNotifier)
+            newVm.SettingsManager is INotifyPropertyChanged newNotifier)
         {
             PropertyChangedEventManager.AddHandler(newNotifier, OnPlayerPropertyChanged!, nameof(ISettingsManager.IsWindowVisible));
-            UpdateVisibility(newVm.SettingManager.IsWindowVisible, newVm);
+            UpdateVisibility(newVm.SettingsManager.IsWindowVisible, newVm);
         }
     }
 
@@ -43,7 +43,7 @@ public partial class SettingsWindow : TalknadoWindow, IDisposable
         if (e.PropertyName == nameof(ISettingsManager.IsWindowVisible) &&
             DataContext is SettingsWindowViewModel vm)
         {
-            UpdateVisibility(vm.SettingManager.IsWindowVisible, vm);
+            UpdateVisibility(vm.SettingsManager.IsWindowVisible, vm);
         }
     }
 
@@ -51,7 +51,7 @@ public partial class SettingsWindow : TalknadoWindow, IDisposable
     {
         if (isVisible)
         {
-            vm.SettingManager.LoadAudioDevices();
+            vm.SettingsManager.LoadAudioDevices();
             Show();
         }
         else
@@ -68,7 +68,7 @@ public partial class SettingsWindow : TalknadoWindow, IDisposable
         base.OnDeactivated(e);
         if (DataContext is SettingsWindowViewModel ssvm)
         {
-            ssvm.SettingManager.IsWindowVisible = false;
+            ssvm.SettingsManager.IsWindowVisible = false;
         }
     }
 

@@ -17,10 +17,9 @@ public interface IUsersInfo
     void UpdateScreenSharingState(ushort userId, bool isActive);
 }
 
-public partial class UsersInfo(IConnectionInfo connectionInfo, IWindowsState windowsState) : ObservableObject, IUsersInfo
+public partial class UsersInfo(IConnectionInfo connectionInfo) : ObservableObject, IUsersInfo
 {
     private readonly IConnectionInfo _connectionInfo = connectionInfo;
-    private readonly IWindowsState _windowsState = windowsState;
 
     [ObservableProperty]
     private ObservableCollection<UserItem> _users = [];
@@ -53,6 +52,9 @@ public partial class UsersInfo(IConnectionInfo connectionInfo, IWindowsState win
 
     public string GetUsernameByUserId(ushort userId)
     {
+        if (userId == 0)
+            return "System";
+
         return _userLookup.TryGetValue(userId, out var user) ? user.Username : string.Empty;
     }
 
@@ -84,7 +86,7 @@ public partial class UsersInfo(IConnectionInfo connectionInfo, IWindowsState win
     {
         if (userId == _connectionInfo.LocalUserId)
         {
-            _windowsState.InvokeClientDisconnected();
+            _connectionInfo.InvokeClientDisconnected();
         }
 
         if (_userLookup.TryGetValue(userId, out var userToRemove))

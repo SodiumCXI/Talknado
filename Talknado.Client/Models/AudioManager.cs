@@ -159,11 +159,24 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         try
         {
             enumerator = new MMDeviceEnumerator();
+            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+
+            if (devices.Count == 0)
+            {
+                IsMicrophoneActive = false;
+                MessageBox.Show(Strings.MicrophoneNotDetectedText, Strings.MicrophoneErrorText,
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
 
             if (string.IsNullOrEmpty(deviceId))
+            {
                 device = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+            }
             else
+            {
                 device = enumerator.GetDevice(deviceId);
+            }
 
             if (device == null)
             {
@@ -175,37 +188,13 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
 
             capture = new WasapiCapture(device);
 
-            const int targetSampleRate = 48000;
-            const int targetChannels = 1;
+            int targetSampleRate = 48000;
+            int sourceSampleRate = capture.WaveFormat.SampleRate;
+            int sourceChannels = capture.WaveFormat.Channels;
+
             const int frameBytes = 960;
 
-            bool needsConversion = capture.WaveFormat.SampleRate != targetSampleRate ||
-                                  capture.WaveFormat.Channels != targetChannels;
-
-            BufferedWaveProvider? bufferProvider = null;
-            IWaveProvider? outputProvider = null;
-
-            if (needsConversion)
-            {
-                bufferProvider = new BufferedWaveProvider(capture.WaveFormat)
-                {
-                    DiscardOnBufferOverflow = true,
-                    BufferLength = capture.WaveFormat.AverageBytesPerSecond
-                };
-
-                ISampleProvider sampleProvider = bufferProvider.ToSampleProvider();
-
-                if (capture.WaveFormat.Channels > 1)
-                    sampleProvider = sampleProvider.ToMono();
-
-                if (capture.WaveFormat.SampleRate != targetSampleRate)
-                    sampleProvider = new WdlResamplingSampleProvider(sampleProvider, targetSampleRate);
-
-                outputProvider = sampleProvider.ToWaveProvider16();
-            }
-
             var audioBuffer = new List<byte>();
-            var lockObj = new object();
 
             capture.DataAvailable += (s, e) =>
             {
@@ -213,68 +202,48 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
 
                 try
                 {
-                    byte[] convertedData;
+                    using var ms = new MemoryStream(e.Buffer, 0, e.BytesRecorded);
+                    using var rawSource = new RawSourceWaveStream(ms, capture.WaveFormat);
 
-                    if (needsConversion && bufferProvider != null && outputProvider != null)
+                    var provider = rawSource.ToSampleProvider();
+
+                    if (sourceChannels > 1)
+                        provider = provider.ToMono();
+
+                    if (sourceSampleRate != targetSampleRate)
+                        provider = new WdlResamplingSampleProvider(provider, targetSampleRate);
+
+                    float[] chunk = new float[4096];
+                    int read;
+                    while ((read = provider.Read(chunk, 0, chunk.Length)) > 0)
                     {
-                        // Используем pipeline для конвертации
-                        bufferProvider.AddSamples(e.Buffer, 0, e.BytesRecorded);
-
-                        byte[] tempBuffer = new byte[frameBytes * 10];
-                        int bytesRead = outputProvider.Read(tempBuffer, 0, tempBuffer.Length);
-
-                        convertedData = new byte[bytesRead];
-                        Buffer.BlockCopy(tempBuffer, 0, convertedData, 0, bytesRead);
-                    }
-                    else if (capture.WaveFormat.Encoding == WaveFormatEncoding.IeeeFloat)
-                    {
-                        // Просто конвертируем float -> PCM16
-                        int sampleCount = e.BytesRecorded / 4;
-                        convertedData = new byte[sampleCount * 2];
-
-                        for (int i = 0; i < sampleCount; i++)
+                        for (int i = 0; i < read; i++)
                         {
-                            float sample = BitConverter.ToSingle(e.Buffer, i * 4);
-                            short pcm = (short)Math.Clamp(sample * 32767f, -32768f, 32767f);
-                            convertedData[i * 2] = (byte)(pcm & 0xFF);
-                            convertedData[i * 2 + 1] = (byte)(pcm >> 8);
+                            short pcmSample = (short)Math.Clamp(chunk[i] * 32767f, -32768f, 32767f);
+                            audioBuffer.Add((byte)(pcmSample & 0xFF));
+                            audioBuffer.Add((byte)(pcmSample >> 8));
                         }
                     }
-                    else
+
+                    while (audioBuffer.Count >= frameBytes)
                     {
-                        convertedData = new byte[e.BytesRecorded];
-                        Buffer.BlockCopy(e.Buffer, 0, convertedData, 0, e.BytesRecorded);
-                    }
+                        byte[] frameData = [.. audioBuffer.Take(frameBytes)];
+                        audioBuffer.RemoveRange(0, frameBytes);
 
-                    lock (lockObj)
-                    {
-                        audioBuffer.AddRange(convertedData);
-
-                        while (audioBuffer.Count >= frameBytes)
-                        {
-                            byte[] frame = [.. audioBuffer.GetRange(0, frameBytes)];
-                            audioBuffer.RemoveRange(0, frameBytes);
-
-                            var denoisedData = NoiseSuppressor.Denoise(frame);
-                            var opusData = _encoder.Encode(denoisedData);
-                            SendOpusPacket(opusData, _connectionInfo.LocalUserId);
-                        }
-
-                        if (audioBuffer.Count > frameBytes * 10)
-                        {
-                            audioBuffer.RemoveRange(0, audioBuffer.Count - frameBytes * 5);
-                        }
+                        var denoisedData = NoiseSuppressor.Denoise(frameData);
+                        var opusData = _encoder.Encode(denoisedData);
+                        SendOpusPacket(opusData, _connectionInfo.LocalUserId);
                     }
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"Audio error: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");
                 }
             };
 
             capture.StartRecording();
             token.WaitHandle.WaitOne();
-            capture.StopRecording();
         }
         catch (Exception ex)
         {
@@ -284,6 +253,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         }
         finally
         {
+            capture?.StopRecording();
             capture?.Dispose();
             device?.Dispose();
             enumerator?.Dispose();

@@ -46,24 +46,21 @@
                 <StackPanel>
                     <TextBlock Text="{x:Static l:Strings.InputDevicesLabel}"
                                Style="{StaticResource LabelStyle}"/>
-                    <ComboBox ItemsSource="{Binding SettingManager.InputDevices}"
-                              SelectedItem="{Binding SettingManager.SelectedInputDevice}"
+                    <ComboBox ItemsSource="{Binding SettingsManager.InputDevices}"
+                              SelectedItem="{Binding SettingsManager.SelectedInputDevice}"
                               Style="{StaticResource ComboStyle}"
                               ItemContainerStyle="{StaticResource ComboItemStyle}"/>
-
                     <TextBlock Text="{x:Static l:Strings.OutputDevicesLabel}"
                                Style="{StaticResource LabelStyle}"/>
-                    <ComboBox ItemsSource="{Binding SettingManager.OutputDevices}" 
-                              SelectedItem="{Binding SettingManager.SelectedOutputDevice}"
+                    <ComboBox ItemsSource="{Binding SettingsManager.OutputDevices}" 
+                              SelectedItem="{Binding SettingsManager.SelectedOutputDevice}"
                               Style="{StaticResource ComboStyle}"
                               ItemContainerStyle="{StaticResource ComboItemStyle}"/>
-
                     <CheckBox Content="{x:Static l:Strings.ShareScreenWithAudioText}"
-                              IsChecked="{Binding SettingManager.ScreenShareWithAudio}"
+                              IsChecked="{Binding SettingsManager.ShareScreenWithAudio}"
                               Style="{StaticResource SettingsCheckBoxStyle}"/>
-
                     <CheckBox Content="{x:Static l:Strings.AutoOpenScreenShareWindowText}"
-                              IsChecked="{Binding SettingManager.AutoOpenScreenShareWindow}"
+                              IsChecked="{Binding SettingsManager.AutoOpenScreenShareWindow}"
                               Style="{StaticResource SettingsCheckBoxStyle}"/>
                 </StackPanel>
             </Grid>

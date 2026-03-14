@@ -41,13 +41,13 @@ public sealed class ClientHost : IDisposable
 
     public void SubscribeToClientDisconnected(Action action)
     {
-        var windowsState = _provider.GetRequiredService<IWindowsState>();
+        var windowsState = _provider.GetRequiredService<IConnectionInfo>();
         windowsState.ClientDisconnected += action;
     }
 
     public void UnsubscribeFromClientDisconnected(Action action)
     {
-        var windowsState = _provider.GetRequiredService<IWindowsState>();
+        var windowsState = _provider.GetRequiredService<IConnectionInfo>();
         windowsState.ClientDisconnected -= action;
     }
 

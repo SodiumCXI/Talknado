@@ -10,7 +10,6 @@ public static class ModelServicesRegistration
     public static IServiceCollection RegisterModelServices(this IServiceCollection services)
     {
         services.AddSingleton<ISettingsManager, SettingsManager>();
-        services.AddSingleton<IWindowsState, WindowsState>();
         services.AddSingleton<IConnectionInfo, ConnectionInfo>();
         services.AddSingleton<IUsersInfo, UsersInfo>();
         services.AddSingleton<IMessagesManager, MessagesManager>();

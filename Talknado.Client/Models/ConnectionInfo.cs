@@ -11,6 +11,8 @@ public interface IConnectionInfo
     ushort LocalUserId { get; set; }
     string ConnectionKey { get; set; }
     string FormattedConnectionKey { get; set; }
+    event Action? ClientDisconnected;
+    void InvokeClientDisconnected();
 }
 public partial class ConnectionInfo : ObservableObject, IConnectionInfo
 {
@@ -24,6 +26,13 @@ public partial class ConnectionInfo : ObservableObject, IConnectionInfo
     private string _connectionKey = string.Empty;
     [ObservableProperty]
     private string _formattedConnectionKey = string.Empty;
+
+    public event Action? ClientDisconnected;
+
+    public void InvokeClientDisconnected()
+    {
+        ClientDisconnected?.Invoke();
+    }
 
     partial void OnConnectionKeyChanged(string value)
     {

@@ -25,7 +25,6 @@ public class ClientManager(IUsersInfo usersInfo,
     IScreenShareManager screenShareManager,
     IMessagesManager messagesManager,
     IScreenSharePlayer screenSharePlayer,
-    IWindowsState windowsState,
     ISettingsManager settingsManager,
     IAudioManager audioManager) : IClientManager, IDisposable
 {
@@ -36,7 +35,6 @@ public class ClientManager(IUsersInfo usersInfo,
     private readonly IScreenShareManager _screenShareManager = screenShareManager;
     private readonly IMessagesManager _messagesManager = messagesManager;
     private readonly IScreenSharePlayer _screenSharePlayer = screenSharePlayer;
-    private readonly IWindowsState _windowsState = windowsState;
     private readonly ISettingsManager _settingsManager = settingsManager;
     private readonly IAudioManager _audioManager = audioManager;
 
@@ -395,7 +393,7 @@ public class ClientManager(IUsersInfo usersInfo,
             }
         }
 
-        _windowsState.InvokeClientDisconnected();
+        _connectionInfo.InvokeClientDisconnected();
     }
 
     public void ToggleScreenShare()
