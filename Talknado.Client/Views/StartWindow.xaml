@@ -89,10 +89,29 @@
                                 <TextBlock Text="{Binding ErrorMessage}" 
                                            Style="{StaticResource ErrorLabelTextStyle}"
                                            Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
-                                <Button Content="{x:Static l:Strings.ConnectButton}" 
-                                            Style="{StaticResource StartConnectButtonStyle}"
-                                            HorizontalAlignment="Center"
-                                            Command="{Binding ConnectWithoutServerCommand}"/>
+                                <Button Style="{StaticResource StartConnectButtonStyle}"
+                                        HorizontalAlignment="Center"
+                                        Command="{Binding ConnectWithoutServerCommand}"
+                                        IsEnabled="{Binding IsWaitingForConnection, Converter={StaticResource InverseBoolConverter}}">
+                                    <Grid>
+                                        <TextBlock Text="{x:Static l:Strings.HostButton}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsWaitingForConnection}" Value="True">
+                                                            <Setter Property="Visibility" Value="Hidden"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <Path Style="{StaticResource LoadingSpinner}"
+                                              Visibility="{Binding IsWaitingForConnection, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    </Grid>
+                                </Button>
                             </StackPanel>
                         </Border>
                     </TabItem>
