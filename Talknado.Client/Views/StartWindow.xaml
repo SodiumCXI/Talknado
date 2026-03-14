@@ -94,7 +94,7 @@
                                         Command="{Binding ConnectWithoutServerCommand}"
                                         IsEnabled="{Binding IsWaitingForConnection, Converter={StaticResource InverseBoolConverter}}">
                                     <Grid>
-                                        <TextBlock Text="{x:Static l:Strings.HostButton}"
+                                        <TextBlock Text="{x:Static l:Strings.ConnectButton}"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center">
                                             <TextBlock.Style>
