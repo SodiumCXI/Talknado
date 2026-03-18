@@ -250,6 +250,15 @@ namespace Talknado.Client.Properties.Localization {
         }
         
         /// <summary>
+        ///   Ищет локализованную строку, похожую на Monitor Selection.
+        /// </summary>
+        public static string MonitorSelectionTitle {
+            get {
+                return ResourceManager.GetString("MonitorSelectionTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Ищет локализованную строку, похожую на Nickname cannot be empty.
         /// </summary>
         public static string NicknameCannotBeEmptyText {
@@ -273,6 +282,15 @@ namespace Talknado.Client.Properties.Localization {
         public static string NoKeyframeReceivedText {
             get {
                 return ResourceManager.GetString("NoKeyframeReceivedText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Only one user can share their screen at a time.
+        /// </summary>
+        public static string OnlyOneScreenShareText {
+            get {
+                return ResourceManager.GetString("OnlyOneScreenShareText", resourceCulture);
             }
         }
         

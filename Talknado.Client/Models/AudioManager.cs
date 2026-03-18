@@ -164,8 +164,8 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
             if (devices.Count == 0)
             {
                 IsMicrophoneActive = false;
-                MessageBox.Show(Strings.MicrophoneNotDetectedText, Strings.MicrophoneErrorText,
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                Application.Current.Dispatcher.Invoke(() =>
+                    MessageBox.Show(Strings.MicrophoneNotDetectedText, Strings.MicrophoneErrorText, MessageBoxButton.OK, MessageBoxImage.Error));
                 return;
             }
 
@@ -181,8 +181,8 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
             if (device == null)
             {
                 IsMicrophoneActive = false;
-                MessageBox.Show(Strings.MicrophoneNotDetectedText, Strings.MicrophoneErrorText,
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                Application.Current.Dispatcher.Invoke(() =>
+                    MessageBox.Show(Strings.MicrophoneNotDetectedText, Strings.MicrophoneErrorText, MessageBoxButton.OK, MessageBoxImage.Error));
                 return;
             }
 
@@ -248,8 +248,8 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         catch (Exception ex)
         {
             IsMicrophoneActive = false;
-            MessageBox.Show($"{Strings.MicrophoneUnableText}\n\n{ex.Message}",
-                Strings.MicrophoneErrorText, MessageBoxButton.OK, MessageBoxImage.Error);
+            Application.Current.Dispatcher.Invoke(() =>
+                MessageBox.Show($"{Strings.MicrophoneUnableText}\n\n{ex.Message}", Strings.MicrophoneErrorText, MessageBoxButton.OK, MessageBoxImage.Error));
         }
         finally
         {

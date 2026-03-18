@@ -10,7 +10,7 @@ namespace Talknado.Client.ViewModels;
 public partial class MainWindowViewModel(IClientManager clientManager,
     IUsersInfo usersInfo, IMessagesManager messagesManager, IScreenShareManager screenShareManager,
     IConnectionInfo connectionInfo, IScreenSharePlayer screenSharePlayer, IAudioManager audioManager,
-    ISettingsManager settingsManager) : ObservableObject
+    ISettingsManager settingsManager, IScreenMonitorManager screenMonitorManager) : ObservableObject
 {
     private readonly IClientManager _clientManager = clientManager;
     private readonly IUsersInfo _usersInfo = usersInfo;
@@ -20,6 +20,7 @@ public partial class MainWindowViewModel(IClientManager clientManager,
     private readonly IScreenSharePlayer _screenSharePlayer = screenSharePlayer;
     private readonly IAudioManager _audioManager = audioManager;
     private readonly ISettingsManager _settingsManager = settingsManager;
+    private readonly IScreenMonitorManager _screenMonitorManager = screenMonitorManager;
 
     public IScreenShareManager ScreenShareManager => _screenShareManager;
     public IConnectionInfo ConnectionInfo => _connectionInfo;
@@ -57,9 +58,23 @@ public partial class MainWindowViewModel(IClientManager clientManager,
     }
 
     [RelayCommand]
-    private void ToggleScreenShare()
+    private void ViewMonitorSelection()
     {
-        _clientManager.ToggleScreenShare();
+        if (!_screenShareManager.IsSharing)
+        {
+            _screenMonitorManager.CaptureAll();
+
+            if (_screenMonitorManager.Monitors.Count == 1)
+            {
+                _clientManager.ToggleScreenShare();
+            }
+            else
+            {
+                _screenMonitorManager.IsWindowVisible = true;
+            }
+        }
+        else
+            _clientManager.ToggleScreenShare();
     }
 
     [RelayCommand]

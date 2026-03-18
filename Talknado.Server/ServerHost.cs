@@ -9,8 +9,8 @@ public sealed class ServerHost : IDisposable
 {
     private readonly ServiceProvider _provider;
     private readonly PortForwardingHelper _forwardingHelper = new();
-    private bool _isPortForwarded;
     private int _port;
+    private bool _isPortForwarded;
 
     public ServerHost()
     {
@@ -25,26 +25,22 @@ public sealed class ServerHost : IDisposable
 
     public (bool, string) StartServer(string password, bool withPortForwarding)
     {
+        var serverManager = _provider.GetRequiredService<IServerManager>();
+        var serverResult = password != string.Empty ? serverManager.Start(password) : serverManager.Start(null);
+
+        if (serverResult.Item1)
+            return serverResult;
+
         if (withPortForwarding)
         {
             _port = _provider.GetRequiredService<IServerInfo>().Port;
-
-            var result = Task.Run(() => _forwardingHelper.EnsurePortForwardedAsync(_port)).GetAwaiter().GetResult();
-            if (result != null)
-                return (true, result);
-
+            var forwardingResult = Task.Run(() => _forwardingHelper.EnsurePortForwardedAsync(_port)).GetAwaiter().GetResult();
+            if (forwardingResult != null)
+                return (true, forwardingResult);
             _isPortForwarded = true;
         }
 
-        var serverManager = _provider.GetRequiredService<IServerManager>();
-        if (password != string.Empty)
-        {
-            return serverManager.Start(password);
-        }
-        else
-        {
-            return serverManager.Start(null);
-        }
+        return serverResult;
     }
 
     public void Dispose()

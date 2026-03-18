@@ -30,7 +30,6 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <DockPanel Grid.Column="0"
                             LastChildFill="False">
@@ -63,14 +62,10 @@
                             DockPanel.Dock="Right"/>
                 </DockPanel>
                 <Button Grid.Column="1"
-                    x:Name="MinimizeButton"
-                    Style="{DynamicResource MinimizeButtonStyle}"
-                    Click="MinimizeButton_Click"/>
-                <Button Grid.Column="2"
                     x:Name="MaximizeButton"
                     Style="{DynamicResource MaximizeButtonStyle}"
                     Click="MaximizeButton_Click"/>
-                <Button Grid.Column="3"
+                <Button Grid.Column="2"
                     x:Name="CloseButton"
                     Style="{DynamicResource CloseButtonStyle}"
                     Click="CloseButton_Click"/>

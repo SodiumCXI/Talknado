@@ -1,6 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using System.Diagnostics;
-using Talknado.Client.Models.Client.Helpers;
 using Talknado.Client.Models.Helpers;
 using Talknado.Client.Models.Helpers.Audio;
 using Talknado.Client.Models.Helpers.ScreenShare;
@@ -9,7 +8,7 @@ namespace Talknado.Client.Models;
 
 public interface IScreenShareManager
 {
-    void StartSharing(bool withAudio);
+    void StartSharing(int adapterIndex, int outputIndex, bool withAudio);
     void StopSharing();
     bool IsSharing { get; }
     Exception? ThreadException { get; set; }
@@ -50,7 +49,7 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
         _screenShareReceiveThread.Start();
     }
 
-    public void StartSharing(bool withAudio)
+    public void StartSharing(int adapterIndex, int outputIndex, bool withAudio)
     {
         if (IsSharing) return;
 
@@ -58,12 +57,14 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
 
         _sendCancellationTokenSource = new CancellationTokenSource();
 
+        ScreenGrabber.SelectMonitor(adapterIndex, outputIndex);
+
         if (withAudio)
         {
             LoopbackAudioCapture.InitializeAudio();
         }
 
-        _screenShareSendThread = new(() => ShareScreenLoop(_sendCancellationTokenSource.Token))
+        _screenShareSendThread = new(() => ShareScreenLoop(outputIndex, _sendCancellationTokenSource.Token))
         {
             IsBackground = true
         };
@@ -81,7 +82,7 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
         LoopbackAudioCapture.Stop();
     }
 
-    private void ShareScreenLoop(CancellationToken token)
+    private void ShareScreenLoop(int outputIndex, CancellationToken token)
     {
         const int INTERVAL = 1000 / TARGET_FPS;
         try
@@ -100,7 +101,6 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
                 lastCaptureTimestamp = now;
 
                 var screenFrame = ScreenGrabber.CaptureFrame(out _, out _);
-                CursorRenderer.OverlayCursorOnByteBuffer(screenFrame, w, h);
                 var encodedFrame = H264Encoder.Encode(screenFrame, deltaMs);
 
                 if (encodedFrame != null)

@@ -10,6 +10,7 @@ public static class ModelServicesRegistration
     public static IServiceCollection RegisterModelServices(this IServiceCollection services)
     {
         services.AddSingleton<ISettingsManager, SettingsManager>();
+        services.AddSingleton<IScreenMonitorManager, ScreenMonitorManager>();
         services.AddSingleton<IConnectionInfo, ConnectionInfo>();
         services.AddSingleton<IUsersInfo, UsersInfo>();
         services.AddSingleton<IMessagesManager, MessagesManager>();
@@ -20,6 +21,12 @@ public static class ModelServicesRegistration
         services.AddSingleton<IClientManager, ClientManager>();
         services.AddSingleton<IScreenShareManager, ScreenShareManager>();
         services.AddSingleton<IScreenSharePlayer, ScreenSharePlayer>();
+
+        services.AddSingleton<MonitorSelectionViewModel>();
+        services.AddSingleton(sp => new MonitorSelectionWindow
+        {
+            DataContext = sp.GetRequiredService<MonitorSelectionViewModel>()
+        });
 
         services.AddSingleton<SettingsWindowViewModel>();
         services.AddSingleton(sp => new SettingsWindow

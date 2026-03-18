@@ -3,6 +3,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Talknado.Server.Core;
 
@@ -30,17 +31,17 @@ public class ServerManager(INetworkUtils networkUtils,
     {
         try
         {
-            var port = _serverInfo.Port;
-
-            _listener = new(IPAddress.Any, port);
+            _listener = new(IPAddress.Any, 0);
             _listener.Start(5);
+
+            _serverInfo.Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
 
             var token = _mainTokenSource.Token;
 
             var localIP = GetLocalNetworkIP();
             var globalIP = GetGlobalNetworkIP(token);
 
-            var connectionKey = GetServerConnectionKey(localIP, globalIP, port);
+            var connectionKey = GetServerConnectionKey(localIP, globalIP, _serverInfo.Port);
 
             if (password != null)
                 connectionKey += $"?{password}";
@@ -81,10 +82,14 @@ public class ServerManager(INetworkUtils networkUtils,
 
                     if (!ValidateClientConnection(stream, token, out var userId))
                     {
-                        var data = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("#PNO"));
+                        var data = Encoding.UTF8.GetBytes("#PNO");
+                        _networkUtils.WritePacketAsync(stream, data, token).GetAwaiter().GetResult();
                         tcpClient.Close();
                         continue;
                     }
+
+                    var acceptData = Encoding.UTF8.GetBytes("#ZBS");
+                    _networkUtils.WritePacketAsync(stream, acceptData, token).GetAwaiter().GetResult();
 
                     if (userId != 0)
                         _clientManager.ReconnectClient(tcpClient, userId, token);

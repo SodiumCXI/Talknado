@@ -48,7 +48,7 @@ public partial class ScreenShareWindow : TalknadoWindow, IDisposable
         }
     }
 
-    private void UpdateVisibility(bool isVisible, ScreenShareViewModel vm)
+    private async void UpdateVisibility(bool isVisible, ScreenShareViewModel vm)
     {
         if (isVisible)
         {
@@ -61,7 +61,7 @@ public partial class ScreenShareWindow : TalknadoWindow, IDisposable
         {
             vm.ScreenSharePlayer.IsKeyFrameInitialized = false;
             vm.ScreenSharePlayer.Clear();
-            Task.Delay(50).ContinueWith(_ => Application.Current?.Dispatcher.Invoke(Hide));
+            await Task.Delay(50).ContinueWith(_ => Application.Current.Dispatcher.Invoke(Hide));
         }
     }
 
@@ -101,6 +101,8 @@ public partial class ScreenShareWindow : TalknadoWindow, IDisposable
             cts.Dispose();
         }
     }
+
+    protected override void OnMinimizeButtonClick() { }
 
     public void Dispose()
     {

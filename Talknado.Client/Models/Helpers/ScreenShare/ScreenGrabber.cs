@@ -1,5 +1,4 @@
 ﻿using SharpDX;
-using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using Buffer = System.Buffer;
@@ -16,11 +15,24 @@ public static class ScreenGrabber
     private static OutputDuplication _duplicator = null!;
     private static Texture2D? _stagingTex = null;
     private static Factory1 _factory = null!;
-    private static readonly int _adapterIndex = 0;
-    private static readonly int _outputIndex = 0;
+    private static int _adapterIndex = 0;
+    private static int _outputIndex = 0;
+
+    private static byte[]? _cursorShapeBuffer = null;
+    private static OutputDuplicatePointerShapeInformation _cursorShapeInfo;
+    private static System.Drawing.Point _cursorPosition;
+    private static bool _cursorVisible = false;
 
     static ScreenGrabber()
     {
+        _factory = new Factory1();
+        InitializeCapture();
+    }
+
+    public static void SelectMonitor(int adapterIndex, int outputIndex)
+    {
+        _adapterIndex = adapterIndex;
+        _outputIndex = outputIndex;
         InitializeCapture();
     }
 
@@ -30,21 +42,15 @@ public static class ScreenGrabber
         _stagingTex?.Dispose();
         _context?.Dispose();
         _device?.Dispose();
-        _factory?.Dispose();
 
         _stagingTex = null;
 
-        _device = new Device(DriverType.Hardware, DeviceCreationFlags.BgraSupport);
+        using var adapter = _factory.GetAdapter1(_adapterIndex);
+        using var output = adapter.GetOutput(_outputIndex).QueryInterface<Output1>();
+
+        _device = new Device(adapter, DeviceCreationFlags.BgraSupport);
         _context = _device.ImmediateContext;
-        _factory = new Factory1();
-
-        var adapter = _factory.GetAdapter1(_adapterIndex);
-        var output = adapter.GetOutput(_outputIndex).QueryInterface<Output1>();
-
         _duplicator = output.DuplicateOutput(_device);
-
-        adapter.Dispose();
-        output.Dispose();
     }
 
     private static void ReinitializeIfNeeded()
@@ -71,20 +77,48 @@ public static class ScreenGrabber
             {
                 while (true)
                 {
-                    var result = _duplicator.TryAcquireNextFrame(100, out _, out dxgiResource);
+                    var result = _duplicator.TryAcquireNextFrame(100, out var frameInfo, out dxgiResource);
 
                     if (result.Success)
+                    {
+                        if (frameInfo.PointerShapeBufferSize > 0)
+                        {
+                            _cursorShapeBuffer = new byte[frameInfo.PointerShapeBufferSize];
+                            unsafe
+                            {
+                                fixed (byte* bufPtr = _cursorShapeBuffer)
+                                {
+                                    _duplicator.GetFramePointerShape(
+                                        frameInfo.PointerShapeBufferSize,
+                                        (nint)bufPtr,
+                                        out _,
+                                        out _cursorShapeInfo);
+                                }
+                            }
+                        }
+
+                        if (frameInfo.LastMouseUpdateTime != 0)
+                        {
+                            _cursorVisible = frameInfo.PointerPosition.Visible;
+                            _cursorPosition = new System.Drawing.Point(
+                                frameInfo.PointerPosition.Position.X,
+                                frameInfo.PointerPosition.Position.Y);
+                        }
+
+                        if (frameInfo.LastPresentTime == 0)
+                        {
+                            _duplicator.ReleaseFrame();
+                            dxgiResource?.Dispose();
+                            continue;
+                        }
                         break;
+                    }
 
                     if (result.Code == SharpDX.DXGI.ResultCode.AccessLost.Code)
-                    {
                         throw new SharpDXException(result);
-                    }
 
                     if (result.Code != SharpDX.DXGI.ResultCode.WaitTimeout.Code)
-                    {
                         result.CheckError();
-                    }
                 }
 
                 try
@@ -100,7 +134,6 @@ public static class ScreenGrabber
                         _stagingTex.Description.Height != screenTex.Description.Height)
                     {
                         _stagingTex?.Dispose();
-
                         var desc = screenTex.Description;
                         desc.Usage = ResourceUsage.Staging;
                         desc.CpuAccessFlags = CpuAccessFlags.Read;
@@ -128,12 +161,16 @@ public static class ScreenGrabber
                             {
                                 for (int y = 0; y < height; y++)
                                 {
-                                    byte* srcRow = srcPtr + y * srcStride;
-                                    byte* dstRow = dstBase + y * dstStride;
-                                    Buffer.MemoryCopy(srcRow, dstRow, dstStride, dstStride);
+                                    Buffer.MemoryCopy(
+                                        srcPtr + y * srcStride,
+                                        dstBase + y * dstStride,
+                                        dstStride, dstStride);
                                 }
                             }
                         }
+
+                        if (_cursorVisible && _cursorShapeBuffer != null)
+                            DrawCursor(linear, width, height, dstStride);
 
                         return linear;
                     }
@@ -154,12 +191,10 @@ public static class ScreenGrabber
                 ex.ResultCode.Code == SharpDX.DXGI.ResultCode.DeviceReset.Code)
             {
                 retryCount++;
-
                 if (retryCount >= maxRetries)
                     throw new InvalidOperationException($"Failed to capture after {maxRetries} retries", ex);
 
                 Thread.Sleep(100);
-
                 ReinitializeIfNeeded();
                 dxgiResource?.Dispose();
                 dxgiResource = null!;
@@ -172,6 +207,154 @@ public static class ScreenGrabber
         }
 
         throw new InvalidOperationException("Failed to capture frame");
+    }
+
+    private static void DrawCursor(byte[] frame, int frameW, int frameH, int stride)
+    {
+        int left = _cursorPosition.X - _cursorShapeInfo.HotSpot.X;
+        int top = _cursorPosition.Y - _cursorShapeInfo.HotSpot.Y;
+
+        int shapeW = _cursorShapeInfo.Width;
+        int shapeH = _cursorShapeInfo.Height;
+        int shapePitch = _cursorShapeInfo.Pitch;
+
+        switch ((OutputDuplicatePointerShapeType)_cursorShapeInfo.Type)
+        {
+            case OutputDuplicatePointerShapeType.Color:
+                DrawColorCursor(frame, frameW, frameH, stride,
+                    left, top, shapeW, shapeH, shapePitch);
+                break;
+
+            case OutputDuplicatePointerShapeType.Monochrome:
+                DrawMonochromeCursor(frame, frameW, frameH, stride,
+                    left, top, shapeW, shapeH / 2, shapePitch);
+                break;
+
+            case OutputDuplicatePointerShapeType.MaskedColor:
+                DrawMaskedColorCursor(frame, frameW, frameH, stride,
+                    left, top, shapeW, shapeH, shapePitch);
+                break;
+        }
+    }
+
+    private static void DrawColorCursor(
+        byte[] frame, int frameW, int frameH, int stride,
+        int left, int top, int shapeW, int shapeH, int shapePitch)
+    {
+        for (int cy = 0; cy < shapeH; cy++)
+        {
+            int fy = top + cy;
+            if (fy < 0 || fy >= frameH) continue;
+
+            for (int cx = 0; cx < shapeW; cx++)
+            {
+                int fx = left + cx;
+                if (fx < 0 || fx >= frameW) continue;
+
+                int srcOff = cy * shapePitch + cx * 4;
+                byte srcB = _cursorShapeBuffer![srcOff];
+                byte srcG = _cursorShapeBuffer[srcOff + 1];
+                byte srcR = _cursorShapeBuffer[srcOff + 2];
+                byte srcA = _cursorShapeBuffer[srcOff + 3];
+
+                if (srcA == 0) continue;
+
+                int dstOff = fy * stride + fx * 4;
+                if (srcA == 255)
+                {
+                    frame[dstOff] = srcB;
+                    frame[dstOff + 1] = srcG;
+                    frame[dstOff + 2] = srcR;
+                }
+                else
+                {
+                    float a = srcA / 255f;
+                    frame[dstOff] = (byte)(srcB * a + frame[dstOff] * (1f - a));
+                    frame[dstOff + 1] = (byte)(srcG * a + frame[dstOff + 1] * (1f - a));
+                    frame[dstOff + 2] = (byte)(srcR * a + frame[dstOff + 2] * (1f - a));
+                }
+            }
+        }
+    }
+
+    private static void DrawMonochromeCursor(
+        byte[] frame, int frameW, int frameH, int stride,
+        int left, int top, int shapeW, int shapeH, int shapePitch)
+    {
+        for (int cy = 0; cy < shapeH; cy++)
+        {
+            int fy = top + cy;
+            if (fy < 0 || fy >= frameH) continue;
+
+            for (int cx = 0; cx < shapeW; cx++)
+            {
+                int fx = left + cx;
+                if (fx < 0 || fx >= frameW) continue;
+
+                int byteIdx = cy * shapePitch + cx / 8;
+                int bitMask = 0x80 >> (cx % 8);
+
+                bool andBit = (_cursorShapeBuffer![byteIdx] & bitMask) != 0;
+                int xorByteIdx = (cy + shapeH) * shapePitch + cx / 8;
+                bool xorBit = (_cursorShapeBuffer[xorByteIdx] & bitMask) != 0;
+
+                int dstOff = fy * stride + fx * 4;
+
+                if (!andBit && !xorBit)
+                {
+                    frame[dstOff] = frame[dstOff + 1] = frame[dstOff + 2] = 0;
+                }
+                else if (!andBit && xorBit)
+                {
+                    frame[dstOff] = frame[dstOff + 1] = frame[dstOff + 2] = 255;
+                }
+                else if (andBit && xorBit)
+                {
+                    frame[dstOff] ^= 0xFF;
+                    frame[dstOff + 1] ^= 0xFF;
+                    frame[dstOff + 2] ^= 0xFF;
+                }
+            }
+        }
+    }
+
+    private static void DrawMaskedColorCursor(
+        byte[] frame, int frameW, int frameH, int stride,
+        int left, int top, int shapeW, int shapeH, int shapePitch)
+    {
+        for (int cy = 0; cy < shapeH; cy++)
+        {
+            int fy = top + cy;
+            if (fy < 0 || fy >= frameH) continue;
+
+            for (int cx = 0; cx < shapeW; cx++)
+            {
+                int fx = left + cx;
+                if (fx < 0 || fx >= frameW) continue;
+
+                int srcOff = cy * shapePitch + cx * 4;
+                byte srcB = _cursorShapeBuffer![srcOff];
+                byte srcG = _cursorShapeBuffer[srcOff + 1];
+                byte srcR = _cursorShapeBuffer[srcOff + 2];
+                byte srcA = _cursorShapeBuffer[srcOff + 3];
+
+                int dstOff = fy * stride + fx * 4;
+
+                if (srcA == 0)
+                {
+                    frame[dstOff] ^= srcB;
+                    frame[dstOff + 1] ^= srcG;
+                    frame[dstOff + 2] ^= srcR;
+                }
+                else
+                {
+                    float a = srcA / 255f;
+                    frame[dstOff] = (byte)(srcB * a + frame[dstOff] * (1f - a));
+                    frame[dstOff + 1] = (byte)(srcG * a + frame[dstOff + 1] * (1f - a));
+                    frame[dstOff + 2] = (byte)(srcR * a + frame[dstOff + 2] * (1f - a));
+                }
+            }
+        }
     }
 
     public static void Dispose()

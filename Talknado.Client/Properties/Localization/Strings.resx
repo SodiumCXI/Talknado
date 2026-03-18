@@ -228,4 +228,10 @@
   <data name="UpnpPortAlreadyInUseText" xml:space="preserve">
     <value>Port is already in use on the router</value>
   </data>
+  <data name="MonitorSelectionTitle" xml:space="preserve">
+    <value>Monitor Selection</value>
+  </data>
+  <data name="OnlyOneScreenShareText" xml:space="preserve">
+    <value>Only one user can share their screen at a time</value>
+  </data>
 </root>

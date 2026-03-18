@@ -58,10 +58,9 @@ public partial class SettingsWindow : TalknadoWindow, IDisposable
             Hide();
     }
 
-    protected override void OnMaximizeButtonClick()
-    {
-        return;
-    }
+    protected override void OnMinimizeButtonClick() { }
+
+    protected override void OnMaximizeButtonClick() { }
 
     protected override void OnDeactivated(EventArgs e)
     {

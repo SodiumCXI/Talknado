@@ -180,6 +180,9 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
 
     private void DecodeAndRender(EncodedFrame frame, CancellationToken token)
     {
+        if (!IsWindowVisible)
+            return;
+
         try
         {
             byte[] bgraPixels;

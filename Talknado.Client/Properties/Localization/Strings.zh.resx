@@ -228,4 +228,10 @@
   <data name="UpnpPortAlreadyInUseText" xml:space="preserve">
     <value>路由器上的端口已被占用</value>
   </data>
+  <data name="MonitorSelectionTitle" xml:space="preserve">
+    <value>显示器选择</value>
+  </data>
+  <data name="OnlyOneScreenShareText" xml:space="preserve">
+    <value>同一时间只能有一个用户共享屏幕</value>
+  </data>
 </root>

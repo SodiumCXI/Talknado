@@ -62,6 +62,14 @@
         <Setter Property="MinWidth" Value="320"/>
     </Style>
 
+    <Style x:Key="MonitorSelectionWindowStyle" TargetType="Window" BasedOn="{StaticResource WindowStyle}">
+        <Setter Property="Title" Value="{x:Static l:Strings.MonitorSelectionTitle}"/>
+        <Setter Property="Height" Value="238"/>
+        <Setter Property="Width" Value="352"/>
+        <Setter Property="MinHeight" Value="238"/>
+        <Setter Property="MinWidth" Value="352"/>
+    </Style>
+
     <!-- Border styles -->
     
     <Style x:Key="MessageBorderStyle" TargetType="Border">

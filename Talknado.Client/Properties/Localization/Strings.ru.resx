@@ -228,4 +228,10 @@
   <data name="UpnpPortAlreadyInUseText" xml:space="preserve">
     <value>Порт уже используется на роутере</value>
   </data>
+  <data name="MonitorSelectionTitle" xml:space="preserve">
+    <value>Выбор монитора</value>
+  </data>
+  <data name="OnlyOneScreenShareText" xml:space="preserve">
+    <value>Экран может показывать только один пользователь одновременно</value>
+  </data>
 </root>

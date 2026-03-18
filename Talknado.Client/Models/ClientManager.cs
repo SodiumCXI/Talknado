@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Windows;
 using Talknado.Client.Models.Helpers;
 using Talknado.Client.Properties.Localization;
@@ -26,7 +27,8 @@ public class ClientManager(IUsersInfo usersInfo,
     IMessagesManager messagesManager,
     IScreenSharePlayer screenSharePlayer,
     ISettingsManager settingsManager,
-    IAudioManager audioManager) : IClientManager, IDisposable
+    IAudioManager audioManager,
+    IScreenMonitorManager screenMonitorManager) : IClientManager, IDisposable
 {
     private readonly IUsersInfo _usersInfo = usersInfo;
     private readonly INetworkUtils _networkUtils = networkUtils;
@@ -37,9 +39,10 @@ public class ClientManager(IUsersInfo usersInfo,
     private readonly IScreenSharePlayer _screenSharePlayer = screenSharePlayer;
     private readonly ISettingsManager _settingsManager = settingsManager;
     private readonly IAudioManager _audioManager = audioManager;
+    private readonly IScreenMonitorManager _screenMonitorManager = screenMonitorManager;
 
     private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
-    private readonly string _clientVersion = "v1.4.1";
+    private readonly string _clientVersion = "v1.5.0";
 
     private TcpClient _tcpMainClient = null!;
 
@@ -68,15 +71,11 @@ public class ClientManager(IUsersInfo usersInfo,
 
             var (ipAddresses, port) = DecodeServerConnectionKey(connectionKey);
 
-            foreach (var ipAddress in ipAddresses)
+            var endpoint = FindOpenEndpoint(ipAddresses, port, token);
+            if (endpoint is var (ip, p))
             {
-                if (IsIPEndPointOpen(ipAddress, port))
-                {
-                    _connectionInfo.ServerIP = ipAddress;
-                    _connectionInfo.ServerPort = port;
-
-                    break;
-                }
+                _connectionInfo.ServerIP = ip;
+                _connectionInfo.ServerPort = p;
             }
 
             if (_connectionInfo.ServerIP == string.Empty || _connectionInfo.ServerPort == 0)
@@ -153,20 +152,54 @@ public class ClientManager(IUsersInfo usersInfo,
         }
     }
 
-    private static bool IsIPEndPointOpen(string ip, int port, int timeout = 1000)
+    private (string ip, int port)? FindOpenEndpoint(IEnumerable<string> ipAddresses, int port, CancellationToken token)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+
+        var tasks = ipAddresses.Select(ip => Task.Run(() =>
+        {
+            if (IsIPEndPointOpen(ip, port, cts.Token))
+                return (string?)ip;
+            return null;
+        }, cts.Token)).ToList();
+
+        while (tasks.Count > 0)
+        {
+            var completed = Task.WhenAny(tasks).GetAwaiter().GetResult();
+            tasks.Remove(completed);
+
+            var ip = completed.GetAwaiter().GetResult();
+            if (ip is not null)
+            {
+                cts.Cancel();
+                return (ip, port);
+            }
+        }
+
+        return null;
+    }
+
+    private bool IsIPEndPointOpen(string ip, int port, CancellationToken token, int timeout = 1000)
     {
         try
         {
-            using var client = new TcpClient();
-            var result = client.BeginConnect(ip, port, null, null);
-            var success = result.AsyncWaitHandle.WaitOne(timeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            cts.CancelAfter(timeout);
 
-            if (success)
-            {
-                client.EndConnect(result);
-                return true;
-            }
-            return false;
+            using var client = new TcpClient();
+            client.ConnectAsync(ip, port, cts.Token).AsTask().GetAwaiter().GetResult();
+            client.ReceiveTimeout = timeout;
+            client.SendTimeout = timeout;
+
+            var stream = client.GetStream();
+
+            SendClientVersion(stream, cts.Token);
+
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            throw;
         }
         catch
         {
@@ -177,7 +210,11 @@ public class ClientManager(IUsersInfo usersInfo,
     private void SendClientVersion(NetworkStream stream, CancellationToken token)
     {
         var data = Encoding.UTF8.GetBytes(_clientVersion);
-        _networkUtils.WritePacketAsync(stream, data, token);
+        _networkUtils.WritePacketAsync(stream, data, token).GetAwaiter().GetResult();
+
+        var answer = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
+        if (Encoding.UTF8.GetString(answer).Equals("#PNO"))
+            throw new ArgumentException("Server does not support your client version");
     }
 
     private bool SendLocalUserId(NetworkStream stream, CancellationToken token)
@@ -383,7 +420,8 @@ public class ClientManager(IUsersInfo usersInfo,
 
                 if (TryReconnect() != null)
                 {
-                    MessageBox.Show(Strings.ConnectionLostText, Strings.ConnectionErrorText, MessageBoxButton.OK, MessageBoxImage.Error);
+                    Application.Current.Dispatcher.Invoke(() => 
+                        MessageBox.Show(Strings.ConnectionLostText, Strings.ConnectionErrorText, MessageBoxButton.OK, MessageBoxImage.Error));
                     break;
                 }
             }
@@ -424,7 +462,8 @@ public class ClientManager(IUsersInfo usersInfo,
                     var exceptionMessage = _screenShareManager.ThreadException.Message;
                     _screenShareManager.ThreadException = null;
 
-                    MessageBox.Show(exceptionMessage, Strings.ScreenSharingErrorText, MessageBoxButton.OK, MessageBoxImage.Error);
+                    Application.Current.Dispatcher.Invoke(() =>
+                        MessageBox.Show(exceptionMessage, Strings.ScreenSharingErrorText, MessageBoxButton.OK, MessageBoxImage.Error));
 
                     break;
                 }
@@ -471,11 +510,25 @@ public class ClientManager(IUsersInfo usersInfo,
 
                 break;
 
-            // Start Screen Sharing
+            // Yes You Can
             case var _ when command.Equals("#YYC"):
 
-                _screenShareManager.StartSharing(_settingsManager.ShareScreenWithAudio);
+                if (_screenMonitorManager.SelectedMonitor == null)
+                    return;
+
+                var adapterIndex = _screenMonitorManager.SelectedMonitor.AdapterIndex;
+                var outputIndex = _screenMonitorManager.SelectedMonitor.OutputIndex;
+
+                _screenShareManager.StartSharing(adapterIndex, outputIndex, _settingsManager.ShareScreenWithAudio);
                 _ = StartMonitoringScreenShareErrors();
+
+                break;
+
+            // No You Can't
+            case var _ when command.Equals("#NYC"):
+
+                Application.Current.Dispatcher.Invoke(() =>
+                    MessageBox.Show(Strings.OnlyOneScreenShareText, Strings.ScreenSharingErrorText, MessageBoxButton.OK, MessageBoxImage.Information));
 
                 break;
 
