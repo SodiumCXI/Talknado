@@ -181,7 +181,12 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     private void DecodeAndRender(EncodedFrame frame, CancellationToken token)
     {
         if (!IsWindowVisible)
+        {
+            if (_frameQueue.Count > 0)
+                _frameQueue.Clear();
+
             return;
+        }
 
         try
         {

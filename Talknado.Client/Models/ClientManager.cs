@@ -539,7 +539,7 @@ public class ClientManager(IUsersInfo usersInfo,
 
                 _screenSharePlayer.ScreenShareUsername = _usersInfo.GetUsernameByUserId(userIdSSS);
                 _usersInfo.UpdateScreenSharingState(userIdSSS, true);
-                if (_settingsManager.AutoOpenScreenShareWindow && (userIdSSS != _connectionInfo.LocalUserId))
+                if (_settingsManager.AutoOpenScreenShareWindow)
                     Application.Current.Dispatcher.Invoke(() =>
                         _screenSharePlayer.IsWindowVisible = true);
 
