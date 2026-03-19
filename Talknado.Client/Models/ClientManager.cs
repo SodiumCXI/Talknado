@@ -4,7 +4,6 @@ using System.Net.Sockets;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
 using System.Windows;
 using Talknado.Client.Models.Helpers;
 using Talknado.Client.Properties.Localization;
