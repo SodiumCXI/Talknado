@@ -29,7 +29,7 @@ A lightweight, low-latency real-time communication application. Provides **voice
 - WASAPI audio capture (microphone + system loopback) with RNNoise noise suppression
 - Opus codec (VOIP mode, 480-sample / 10 ms frames, PLC on packet loss)
 - H.264 encode/decode via FFmpeg (avcodec, swscale)
-- Desktop Duplication API capture (primary display, SharpDX) with cursor overlay
+- Desktop Duplication API capture (SharpDX) with cursor overlay
 - TCP/UDP network client with transparent reconnect
 
 ### Embedded Server (DLL .NET 8)

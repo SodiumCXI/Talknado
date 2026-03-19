@@ -29,7 +29,7 @@
 - WASAPI 音频捕获（麦克风 + 系统回环），带 RNNoise 降噪
 - Opus 编解码器（VOIP 模式，480 采样 / 10 毫秒帧，丢包时使用 PLC）
 - 通过 FFmpeg 进行 H.264 编码/解码（avcodec、swscale）
-- 桌面复制 API 捕获（仅主显示器，SharpDX），带光标叠加
+- 桌面复制 API 捕获（SharpDX），带光标叠加
 - TCP/UDP 网络客户端，支持透明重连
 
 ### 内置服务器（DLL .NET 8）
