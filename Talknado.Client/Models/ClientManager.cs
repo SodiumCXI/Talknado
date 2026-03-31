@@ -5,7 +5,7 @@ using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows;
-using Talknado.Client.Models.Helpers;
+using Talknado.Client.Models.Helpers.Network;
 using Talknado.Client.Properties.Localization;
 
 namespace Talknado.Client.Models;
@@ -41,7 +41,7 @@ public class ClientManager(IUsersInfo usersInfo,
     private readonly IScreenMonitorManager _screenMonitorManager = screenMonitorManager;
 
     private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
-    private readonly string _clientVersion = "v1.5.0";
+    private readonly string _clientVersion = "v1.5.1";
 
     private TcpClient _tcpMainClient = null!;
 
@@ -575,27 +575,22 @@ public class ClientManager(IUsersInfo usersInfo,
             value = value * 64 + digit;
         }
 
-        int port = (int)(value & 0xFFFF);
-        value >>= 16;
+        byte[] bytes = value.ToByteArray(isUnsigned: true, isBigEndian: true);
+        var r = new LocalIPsUnpacker.BitReader(bytes);
 
-        byte[] globalIpBytes = new byte[4];
-        for (int i = 3; i >= 0; i--)
+        var ipAddresses = new List<string>();
+
+        bool hasGlobal = r.Read(1) == 1;
+        if (hasGlobal)
         {
-            globalIpBytes[i] = (byte)(value & 0xFF);
-            value >>= 8;
+            byte[] gb = [(byte)r.Read(8), (byte)r.Read(8), (byte)r.Read(8), (byte)r.Read(8)];
+            ipAddresses.Add(new IPAddress(gb).ToString());
         }
 
-        byte[] localIpBytes = new byte[4];
-        for (int i = 3; i >= 0; i--)
-        {
-            localIpBytes[i] = (byte)(value & 0xFF);
-            value >>= 8;
-        }
+        int port = r.Read(16);
 
-        string localIp = new IPAddress(localIpBytes).ToString();
-        string globalIp = new IPAddress(globalIpBytes).ToString();
-
-        var ipAddresses = new List<string> { "127.0.0.1", localIp, globalIp };
+        ipAddresses.AddRange(LocalIPsUnpacker.Unpack(r));
+        ipAddresses.Add("127.0.0.1");
 
         return (ipAddresses, port);
     }

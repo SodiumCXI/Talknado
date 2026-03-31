@@ -43,7 +43,12 @@ public partial class ConnectionInfo : ObservableObject, IConnectionInfo
         }
 
         int questionMarkIndex = value.IndexOf('?');
-        if (questionMarkIndex >= 0)
+
+        if (questionMarkIndex > 20)
+        {
+            FormattedConnectionKey = value.Substring(0, 20) + "...";
+        }
+        else if (questionMarkIndex >= 0)
         {
             FormattedConnectionKey = value.Substring(0, questionMarkIndex + 1) + "...";
         }

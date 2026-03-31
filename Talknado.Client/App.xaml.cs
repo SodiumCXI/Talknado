@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Windows;
 using System.Windows.Threading;
+using Talknado.Client.Models.Helpers.Audio;
 using Talknado.Client.Properties;
 using Talknado.Client.Views;
 
@@ -13,7 +14,7 @@ public partial class App : Application
         var lang = Settings.Default.Language;
         if (string.IsNullOrEmpty(lang))
         {
-            var systemLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+            var systemLang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
             if (systemLang == "ru")
                 lang = "ru";
             else if (systemLang == "zh")
@@ -43,5 +44,12 @@ public partial class App : Application
         thread.SetApartmentState(ApartmentState.STA);
         thread.IsBackground = true;
         thread.Start();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        LoopbackAudioCapture.Dispose();
+
+        base.OnExit(e);
     }
 }

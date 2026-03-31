@@ -4,8 +4,8 @@ using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using System.IO;
 using System.Windows;
-using Talknado.Client.Models.Helpers;
 using Talknado.Client.Models.Helpers.Audio;
+using Talknado.Client.Models.Helpers.Network;
 using Talknado.Client.Properties.Localization;
 
 namespace Talknado.Client.Models;

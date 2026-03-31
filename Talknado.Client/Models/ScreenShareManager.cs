@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using System.Diagnostics;
-using Talknado.Client.Models.Helpers;
 using Talknado.Client.Models.Helpers.Audio;
+using Talknado.Client.Models.Helpers.Network;
 using Talknado.Client.Models.Helpers.ScreenShare;
 
 namespace Talknado.Client.Models;
@@ -170,8 +170,6 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
         _receiveCancellationTokenSource.Dispose();
 
         StopSharing();
-
-        LoopbackAudioCapture.Dispose();
         H264Encoder.Cleanup();
 
         GC.SuppressFinalize(this);

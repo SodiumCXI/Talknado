@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Net.Sockets;
 
-namespace Talknado.Client.Models.Helpers;
+namespace Talknado.Client.Models.Helpers.Network;
 
 public static class NetworkExceptionHelper
 {

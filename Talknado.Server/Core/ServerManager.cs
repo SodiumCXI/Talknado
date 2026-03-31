@@ -3,6 +3,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Text;
+using Talknado.Server.Core.Helpers;
 
 namespace Talknado.Server.Core;
 
@@ -37,10 +38,7 @@ public class ServerManager(INetworkUtils networkUtils,
 
             var token = _mainTokenSource.Token;
 
-            var localIP = GetLocalNetworkIP();
-            var globalIP = GetGlobalNetworkIP(token);
-
-            var connectionKey = GetServerConnectionKey(localIP, globalIP, _serverInfo.Port);
+            var connectionKey = GetServerConnectionKey(_serverInfo.Port, token);
 
             if (password != null)
                 connectionKey += $"?{password}";
@@ -110,52 +108,6 @@ public class ServerManager(INetworkUtils networkUtils,
         }
     }
 
-    private static string GetLocalNetworkIP()
-    {
-        var ni = NetworkInterface.GetAllNetworkInterfaces()
-            .Where(n =>
-                n.OperationalStatus == OperationalStatus.Up &&
-                n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-            .Select(n => new
-            {
-                Interface = n,
-                IPProps = n.GetIPProperties(),
-                Priority = GetInterfacePriority(n)
-            })
-            .Where(x => x.IPProps.UnicastAddresses.Any(a =>
-                a.Address.AddressFamily == AddressFamily.InterNetwork))
-            .OrderByDescending(x => x.Priority)
-            .ThenByDescending(x => x.Interface.Speed)
-            .FirstOrDefault()
-            ?? throw new IOException("No internet connection detected");
-
-        var ipProps = ni.IPProps;
-        var outwardIp = ipProps.UnicastAddresses
-            .FirstOrDefault(a => a.Address.AddressFamily == AddressFamily.InterNetwork)?.Address.ToString()
-            ?? throw new IOException("No internet connection detected");
-
-        return outwardIp;
-    }
-
-    private static int GetInterfacePriority(NetworkInterface networkInterface)
-    {
-        if (networkInterface.Name.Contains("ZeroTier", StringComparison.OrdinalIgnoreCase))
-            return 10;
-
-        var hasGateway = networkInterface.GetIPProperties().GatewayAddresses
-            .Any(g => !g.Address.ToString().StartsWith("0.0.0.0") &&
-                      g.Address.AddressFamily == AddressFamily.InterNetwork);
-
-        return networkInterface.NetworkInterfaceType switch
-        {
-            NetworkInterfaceType.Ethernet when hasGateway => 5,
-            NetworkInterfaceType.Wireless80211 when hasGateway => 4,
-            NetworkInterfaceType.Ethernet => 3,
-            NetworkInterfaceType.Wireless80211 => 2,
-            _ => 1
-        };
-    }
-
     private static string GetGlobalNetworkIP(CancellationToken token)
     {
         using var client = new HttpClient();
@@ -207,31 +159,31 @@ public class ServerManager(INetworkUtils networkUtils,
         }
     }
 
-    private static string GetServerConnectionKey(string localIp, string globalIp, int port)
+    private static string GetServerConnectionKey(int port, CancellationToken token)
     {
-        byte[] localIpBytes = IPAddress.Parse(localIp).GetAddressBytes();
-        byte[] globalIpBytes = IPAddress.Parse(globalIp).GetAddressBytes();
+        var globalIP = GetGlobalNetworkIP(token);
+        bool hasGlobal = globalIP != "0.0.0.0";
 
-        BigInteger value = 0;
+        var w = new LocalIPsPacker.BitWriter();
+        w.Write(hasGlobal ? 1 : 0, 1);
+        if (hasGlobal)
+        {
+            byte[] gb = IPAddress.Parse(globalIP).GetAddressBytes();
+            foreach (var b in gb) w.Write(b, 8);
+        }
+        w.Write(port, 16);
+        LocalIPsPacker.Pack(w);
 
-        for (int i = 0; i < 4; i++)
-            value = (value << 8) | localIpBytes[i];
-
-        for (int i = 0; i < 4; i++)
-            value = (value << 8) | globalIpBytes[i];
-
-        value = (value << 16) | (ushort)port;
-
+        byte[] bytes = w.ToArray();
+        BigInteger value = new(bytes, isUnsigned: true, isBigEndian: true);
         if (value == 0) return "A";
 
         var result = "";
         while (value > 0)
         {
-            int digit = (int)(value % 64);
-            result = ALPHABET[digit] + result;
+            result = ALPHABET[(int)(value % 64)] + result;
             value /= 64;
         }
-
         return result;
     }
 

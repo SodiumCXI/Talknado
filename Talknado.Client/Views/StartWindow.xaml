@@ -38,7 +38,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" 
-                           Text="Talknado v1.5.0"
+                           Text="Talknado v1.5.1"
                            FontFamily="{StaticResource TitleBarFont}"
                            FontSize="{StaticResource SecondaryFontSize}"
                            FontWeight="DemiBold"
@@ -85,7 +85,7 @@
                                 <TextBox Style="{StaticResource StartInputTextBoxStyle}"
                                          Text="{Binding ConnectionKeyTextBoxValue, UpdateSourceTrigger=PropertyChanged}"
                                          Margin="0,0,0,20"
-                                         MaxLength="60"/>
+                                         MaxLength="100"/>
                                 <TextBlock Text="{Binding ErrorMessage}" 
                                            Style="{StaticResource ErrorLabelTextStyle}"
                                            Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
