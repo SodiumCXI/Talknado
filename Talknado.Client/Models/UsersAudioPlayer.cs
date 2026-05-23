@@ -226,6 +226,12 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             if (opusData != null)
             {
                 byte[] pcmData = _decoder.Decode(opusData);
+
+                if (EnergyVad.IsSpeech(pcmData))
+                    _usersInfo.UpdateSpeakingState(_userId, true);
+                else
+                    _usersInfo.UpdateSpeakingState(_userId, false);
+
                 VolumeController.AdjustVolume(pcmData, userVolumeMultiplier);
                 WaveProvider.AddSamples(pcmData, 0, pcmData.Length);
                 ConsecutiveLosses = 0;
@@ -240,6 +246,8 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                     byte[] plcData = _decoder.DecodePLC();
                     VolumeController.AdjustVolume(plcData, userVolumeMultiplier);
                     WaveProvider.AddSamples(plcData, 0, plcData.Length);
+
+                    _usersInfo.UpdateSpeakingState(_userId, false);
                 }
             }
         }

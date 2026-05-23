@@ -41,7 +41,7 @@ public class ClientManager(IUsersInfo usersInfo,
     private readonly IScreenMonitorManager _screenMonitorManager = screenMonitorManager;
 
     private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
-    private readonly string _clientVersion = "v1.5.1";
+    private readonly string _clientVersion = "v1.5.2";
 
     private TcpClient _tcpMainClient = null!;
 
@@ -236,7 +236,7 @@ public class ClientManager(IUsersInfo usersInfo,
         var passwordHash = GetSha256Bytes(password);
         var encryptedPassword = _cryptoSessionManager.EncryptPassword(passwordHash);
         _networkUtils.WritePacketAsync(stream, encryptedPassword, token).GetAwaiter().GetResult();
-
+        
         var answer = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
         if (!answer.AsSpan().SequenceEqual(Encoding.UTF8.GetBytes("#PIC")))
             throw new ArgumentException(Strings.IncorrectPassword);
@@ -589,8 +589,8 @@ public class ClientManager(IUsersInfo usersInfo,
 
         int port = r.Read(16);
 
-        ipAddresses.AddRange(LocalIPsUnpacker.Unpack(r));
         ipAddresses.Add("127.0.0.1");
+        ipAddresses.AddRange(LocalIPsUnpacker.Unpack(r));
 
         return (ipAddresses, port);
     }

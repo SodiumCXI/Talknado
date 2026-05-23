@@ -14,6 +14,7 @@ public interface IUsersInfo
     void AddUser(ushort userId, string username, bool isMicrophoneActive, bool isScreenShareActive);
     void RemoveUser(ushort userId);
     void UpdateMicrophoneState(ushort userId, bool isActive);
+    void UpdateSpeakingState(ushort userId, bool isSpeaking);
     void UpdateScreenSharingState(ushort userId, bool isActive);
 }
 
@@ -60,7 +61,7 @@ public partial class UsersInfo(IConnectionInfo connectionInfo) : ObservableObjec
 
     public void AddUser(ushort userId, string username, bool isMicrophoneActive, bool isScreenShareActive)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        Application.Current?.Dispatcher.Invoke(() =>
         {
             if (_userLookup.TryGetValue(userId, out var existingUser))
             {
@@ -91,7 +92,7 @@ public partial class UsersInfo(IConnectionInfo connectionInfo) : ObservableObjec
 
         if (_userLookup.TryGetValue(userId, out var userToRemove))
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current?.Dispatcher.Invoke(() =>
             {
                 Users.Remove(userToRemove);
             });
@@ -103,9 +104,23 @@ public partial class UsersInfo(IConnectionInfo connectionInfo) : ObservableObjec
     {
         if (_userLookup.TryGetValue(userId, out var user))
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current?.Dispatcher.Invoke(() =>
             {
                 user.IsMicrophoneActive = isActive;
+            });
+        }
+    }
+
+    public void UpdateSpeakingState(ushort userId, bool isSpeaking)
+    {
+        if (_userLookup.TryGetValue(userId, out var user))
+        {
+            if (user.IsSpeaking == isSpeaking)
+                return;
+
+            Application.Current?.Dispatcher.Invoke(() =>
+            {
+                user.IsSpeaking = isSpeaking;
             });
         }
     }
@@ -114,7 +129,7 @@ public partial class UsersInfo(IConnectionInfo connectionInfo) : ObservableObjec
     {
         if (_userLookup.TryGetValue(userId, out var user))
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current?.Dispatcher.Invoke(() =>
             {
                 user.IsScreenShareActive = isActive;
             });
@@ -128,6 +143,9 @@ public partial class UsersInfo(IConnectionInfo connectionInfo) : ObservableObjec
 
         [ObservableProperty]
         private bool _isMicrophoneActive;
+
+        [ObservableProperty]
+        private bool _isSpeaking;
 
         [ObservableProperty]
         private bool _isScreenShareActive;

@@ -1,9 +1,11 @@
 ﻿<UserControl x:Class="Talknado.Client.Views.Controls.UserListControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
              xmlns:svgc="http://sharpvectors.codeplex.com/svgc/">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <cnv:MicIconConverter x:Key="MicIconConverter"/>
     </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <ItemsControl ItemsSource="{Binding Users}"
@@ -36,16 +38,12 @@
                                    VerticalAlignment="Center"
                                    Margin="11,0,9,0"/>
                             <svgc:SvgViewbox Grid.Column="1" Width="24" VerticalAlignment="Center">
-                                <svgc:SvgViewbox.Style>
-                                    <Style TargetType="svgc:SvgViewbox">
-                                        <Setter Property="Source" Value="/Resources/mic_off_white.svg"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsMicrophoneActive}" Value="True">
-                                                <Setter Property="Source" Value="/Resources/mic_on_white.svg"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </svgc:SvgViewbox.Style>
+                                <svgc:SvgViewbox.Source>
+                                    <MultiBinding Converter="{StaticResource MicIconConverter}">
+                                        <Binding Path="IsMicrophoneActive"/>
+                                        <Binding Path="IsSpeaking"/>
+                                    </MultiBinding>
+                                </svgc:SvgViewbox.Source>
                             </svgc:SvgViewbox>
                             <StackPanel Grid.Column="2"/>
                             <Button Grid.Column="3"

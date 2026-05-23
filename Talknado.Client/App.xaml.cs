@@ -26,6 +26,7 @@ public partial class App : Application
         }
 
         base.OnStartup(e);
+
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var culture = new CultureInfo(lang);
@@ -39,7 +40,11 @@ public partial class App : Application
 
             var window = new StartWindow();
             window.Show();
-            Dispatcher.Run();
+            try
+            {
+                Dispatcher.Run();
+            }
+            catch { /* ignore */ }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.IsBackground = true;

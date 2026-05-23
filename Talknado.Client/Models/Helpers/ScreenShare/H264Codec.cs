@@ -57,7 +57,7 @@ public static unsafe class H264Encoder
 
         foreach (var codecName in codecNames)
         {
-            if (!_hasDiscreteGPU && (codecName == "h264_nvench" || codecName == "h264_amf"))
+            if (!_hasDiscreteGPU && (codecName == "h264_nvenс" || codecName == "h264_amf"))
                 continue;
 
             _codec = ffmpeg.avcodec_find_encoder_by_name(codecName);

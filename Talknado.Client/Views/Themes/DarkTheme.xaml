@@ -9,7 +9,7 @@
     <Color x:Key="ButtonTextColor">#ced2e6</Color>
     <Color x:Key="TitleBarColor">#3B4A57</Color>
     <Color x:Key="TitleBarTextColor">#E8EAF0</Color>
-    <Color x:Key="ScreenShareOnColor">#123d20</Color>
+    <Color x:Key="ScreenShareOnColor">#123d28</Color>
     <Color x:Key="TitleBarButtonMouseOverColor">#5a7185</Color>
     <Color x:Key="TitleBarCloseButtonMouseOverColor">#D64550</Color>
 
