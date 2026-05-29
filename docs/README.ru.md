@@ -67,6 +67,6 @@ curl -fsSL https://raw.githubusercontent.com/SodiumCXI/talknado-server-linux/mai
 При запуске сервера отметьте **"Проброс портов UPnP"**. Talknado попытается автоматически пробросить порт через Open.NAT. Проброс удаляется при остановке сервера. Требуется статический публичный IP.
 
 ### Вариант B - ZeroTier (работает всегда)
-1. Установите [ZeroTier](https://www.zerotier.com/) на каждом устройстве.
+1. Установите **[ZeroTier](https://www.zerotier.com/)** на каждом устройстве.
 2. Все участники присоединяются к одной сети ZeroTier (Network ID).
 3. Запустите Talknado и введите ключ подключения из приложения хоста.

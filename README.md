@@ -67,6 +67,6 @@ From step 4 onward all traffic - control and media - is encrypted with the sessi
 When starting a server, check **"Enable UPnP port forwarding"**. Talknado will attempt to map the port automatically via Open.NAT. The mapping is removed when the server stops. Requires a static public IP.
 
 ### Option B - ZeroTier (always works)
-1. Install [ZeroTier](https://www.zerotier.com/) on each device.
+1. Install **[ZeroTier](https://www.zerotier.com/)** on each device.
 2. All participants join the same ZeroTier network (Network ID).
 3. Start Talknado and enter the connection key from the host's application.

@@ -67,6 +67,6 @@ curl -fsSL https://raw.githubusercontent.com/SodiumCXI/talknado-server-linux/mai
 启动服务器时，勾选 **"UPnP 端口转发"**。Talknado 将尝试通过 Open.NAT 自动映射端口。服务器停止时映射将被移除。需要静态公网 IP。
 
 ### 方案 B - ZeroTier（始终有效）
-1. 在每台设备上安装 [ZeroTier](https://www.zerotier.com/)。
+1. 在每台设备上安装 **[ZeroTier](https://www.zerotier.com/)**。
 2. 所有参与者加入同一个 ZeroTier 网络（Network ID）。
 3. 启动 Talknado 并输入主机应用程序中的连接密钥。
