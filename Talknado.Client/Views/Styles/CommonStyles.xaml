@@ -112,6 +112,33 @@
         </Style.Triggers>
     </Style>
 
+    <Style x:Key="ControlPanelButtonBackground" TargetType="Border">
+        <Setter Property="Width" Value="34"/>
+        <Setter Property="Height" Value="29"/>
+        <Setter Property="Background" Value="{DynamicResource TitleBarBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Bottom"/>
+        <Setter Property="CornerRadius" Value="8,8,0,0"/>
+        <Setter Property="Margin" Value="0,0,5,0"/>
+    </Style>
+
+    <Style x:Key="MicrophoneButtonBackground" TargetType="Border" BasedOn="{StaticResource ControlPanelButtonBackground}">
+        <Setter Property="Background" Value="{DynamicResource TitleBarBrush}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding AudioManager.IsMicrophoneActive}" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ButtonActiveBorderBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ScreenShareButtonBackground" TargetType="Border" BasedOn="{StaticResource ControlPanelButtonBackground}">
+        <Setter Property="Background" Value="{DynamicResource TitleBarBrush}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding ScreenShareManager.IsSharing}" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ButtonActiveBorderBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- TextBlock styles -->
     
     <Style x:Key="PrimaryTextStyle" TargetType="TextBlock">
@@ -422,11 +449,20 @@
         </Setter>
     </Style>
 
+    <Style x:Key="MicrophoneButton" TargetType="Button" BasedOn="{StaticResource ControlPanelButton}">
+        <Setter Property="Background" Value="{DynamicResource UserItemButtonBrush}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding AudioManager.IsMicrophoneActive}" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ButtonActiveBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
     <Style x:Key="ScreenShareButton" TargetType="Button" BasedOn="{StaticResource ControlPanelButton}">
         <Setter Property="Background" Value="{DynamicResource UserItemButtonBrush}"/>
         <Style.Triggers>
             <DataTrigger Binding="{Binding ScreenShareManager.IsSharing}" Value="True">
-                <Setter Property="Background" Value="{DynamicResource ScreenShareOnBrush}"/>
+                <Setter Property="Background" Value="{DynamicResource ButtonActiveBrush}"/>
             </DataTrigger>
         </Style.Triggers>
     </Style>

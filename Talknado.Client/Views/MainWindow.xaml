@@ -114,27 +114,36 @@
                                              Focusable="False"
                                              Cursor="Hand"/>
                                     <StackPanel Grid.Column="2"/>
-                                    <Button Grid.Column="3"
-                                            Style="{DynamicResource ScreenShareButton}"
-                                            Command="{Binding ViewMonitorSelectionCommand}">
-                                        <svgc:SvgViewbox Source="/Resources/screen_share_white.svg" Width="22" VerticalAlignment="Center"/>
-                                    </Button>
-                                    <Button Grid.Column="4"
-                                            Style="{DynamicResource ControlPanelButton}"
-                                            Command="{Binding ToggleMicrophoneCommand}">
-                                        <svgc:SvgViewbox Width="24" VerticalAlignment="Center">
-                                            <svgc:SvgViewbox.Style>
-                                                <Style TargetType="svgc:SvgViewbox">
-                                                    <Setter Property="Source" Value="/Resources/mic_off_white.svg"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding AudioManager.IsMicrophoneActive}" Value="True">
-                                                            <Setter Property="Source" Value="/Resources/mic_on_white.svg"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </svgc:SvgViewbox.Style>
-                                        </svgc:SvgViewbox>
-                                    </Button>
+                                    <Grid Grid.Column="3">
+                                        <Border Style="{StaticResource ScreenShareButtonBackground}"/>
+                                        <Button Style="{DynamicResource ScreenShareButton}"
+                                                Command="{Binding ViewMonitorSelectionCommand}"
+                                                VerticalAlignment="Bottom"
+                                                HorizontalAlignment="Center">
+                                            <svgc:SvgViewbox Source="/Resources/screen_share_white.svg" Width="22" VerticalAlignment="Center"/>
+                                        </Button>
+                                    </Grid>
+
+                                    <Grid Grid.Column="4">
+                                        <Border Style="{StaticResource MicrophoneButtonBackground}"/>
+                                        <Button Style="{DynamicResource MicrophoneButton}"
+                                                Command="{Binding ToggleMicrophoneCommand}"
+                                                VerticalAlignment="Bottom"
+                                                HorizontalAlignment="Center">
+                                            <svgc:SvgViewbox Width="24" VerticalAlignment="Center">
+                                                <svgc:SvgViewbox.Style>
+                                                    <Style TargetType="svgc:SvgViewbox">
+                                                        <Setter Property="Source" Value="/Resources/mic_off_white.svg"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding AudioManager.IsMicrophoneActive}" Value="True">
+                                                                <Setter Property="Source" Value="/Resources/mic_on_white.svg"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </svgc:SvgViewbox.Style>
+                                            </svgc:SvgViewbox>
+                                        </Button>
+                                    </Grid>
                                 </Grid>
                             </Border>
                             <controls:UserListControl/>

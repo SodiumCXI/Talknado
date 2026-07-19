@@ -1,6 +1,7 @@
 ﻿using SharpDX;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
+using System.Diagnostics;
 using Buffer = System.Buffer;
 using Device = SharpDX.Direct3D11.Device;
 using MapFlags = SharpDX.Direct3D11.MapFlags;
@@ -23,6 +24,12 @@ public static class ScreenGrabber
     private static System.Drawing.Point _cursorPosition;
     private static bool _cursorVisible = false;
 
+    private static byte[]? _lastLinearFrame = null;
+    private static int _lastWidth;
+    private static int _lastHeight;
+    private static long _lastFrameTimestamp = 0;
+    private static readonly long _forceFrameInterval = Stopwatch.Frequency; // 1 сек
+
     static ScreenGrabber()
     {
         _factory = new Factory1();
@@ -44,6 +51,8 @@ public static class ScreenGrabber
         _device?.Dispose();
 
         _stagingTex = null;
+        _lastLinearFrame = null;
+        _lastFrameTimestamp = 0;
 
         using var adapter = _factory.GetAdapter1(_adapterIndex);
         using var output = adapter.GetOutput(_outputIndex).QueryInterface<Output1>();
@@ -65,9 +74,11 @@ public static class ScreenGrabber
         }
     }
 
-    public static byte[] CaptureFrame(out int width, out int height)
+    public static byte[]? CaptureFrame(out int width, out int height)
     {
-        Resource dxgiResource = null!;
+        width = 0;
+        height = 0;
+        Resource? dxgiResource = null;
         int retryCount = 0;
         const int maxRetries = 3;
 
@@ -75,51 +86,61 @@ public static class ScreenGrabber
         {
             try
             {
-                while (true)
+                if (_lastLinearFrame != null &&
+                    Stopwatch.GetTimestamp() - _lastFrameTimestamp >= _forceFrameInterval)
                 {
-                    var result = _duplicator.TryAcquireNextFrame(100, out var frameInfo, out dxgiResource);
+                    return BuildForcedFrame(out width, out height);
+                }
 
-                    if (result.Success)
-                    {
-                        if (frameInfo.PointerShapeBufferSize > 0)
-                        {
-                            _cursorShapeBuffer = new byte[frameInfo.PointerShapeBufferSize];
-                            unsafe
-                            {
-                                fixed (byte* bufPtr = _cursorShapeBuffer)
-                                {
-                                    _duplicator.GetFramePointerShape(
-                                        frameInfo.PointerShapeBufferSize,
-                                        (nint)bufPtr,
-                                        out _,
-                                        out _cursorShapeInfo);
-                                }
-                            }
-                        }
+                var result = _duplicator.TryAcquireNextFrame(100, out var frameInfo, out dxgiResource);
 
-                        if (frameInfo.LastMouseUpdateTime != 0)
-                        {
-                            _cursorVisible = frameInfo.PointerPosition.Visible;
-                            _cursorPosition = new System.Drawing.Point(
-                                frameInfo.PointerPosition.Position.X,
-                                frameInfo.PointerPosition.Position.Y);
-                        }
-
-                        if (frameInfo.LastPresentTime == 0)
-                        {
-                            _duplicator.ReleaseFrame();
-                            dxgiResource?.Dispose();
-                            continue;
-                        }
-                        break;
-                    }
-
+                if (!result.Success)
+                {
                     if (result.Code == SharpDX.DXGI.ResultCode.AccessLost.Code)
                         throw new SharpDXException(result);
 
                     if (result.Code != SharpDX.DXGI.ResultCode.WaitTimeout.Code)
                         result.CheckError();
+
+                    return null;
                 }
+
+                if (frameInfo.PointerShapeBufferSize > 0)
+                    {
+                        _cursorShapeBuffer = new byte[frameInfo.PointerShapeBufferSize];
+                        unsafe
+                        {
+                            fixed (byte* bufPtr = _cursorShapeBuffer)
+                            {
+                                _duplicator.GetFramePointerShape(
+                                    frameInfo.PointerShapeBufferSize,
+                                    (nint)bufPtr,
+                                    out _,
+                                    out _cursorShapeInfo);
+                            }
+                        }
+                    }
+
+                    if (frameInfo.LastMouseUpdateTime != 0)
+                    {
+                        _cursorVisible = frameInfo.PointerPosition.Visible;
+                        _cursorPosition = new System.Drawing.Point(
+                            frameInfo.PointerPosition.Position.X,
+                            frameInfo.PointerPosition.Position.Y);
+                    }
+
+                    if (frameInfo.LastPresentTime == 0)
+                    {
+                        _duplicator.ReleaseFrame();
+                        dxgiResource?.Dispose();
+                        dxgiResource = null;
+
+                        bool cursorMoved = frameInfo.LastMouseUpdateTime != 0;
+                        if (cursorMoved && _lastLinearFrame != null)
+                            return BuildForcedFrame(out width, out height);
+
+                        return null;
+                    }
 
                 try
                 {
@@ -169,6 +190,11 @@ public static class ScreenGrabber
                             }
                         }
 
+                        _lastLinearFrame = (byte[])linear.Clone();
+                        _lastWidth = width;
+                        _lastHeight = height;
+                        _lastFrameTimestamp = Stopwatch.GetTimestamp();
+
                         if (_cursorVisible && _cursorShapeBuffer != null)
                             DrawCursor(linear, width, height, dstStride);
 
@@ -184,6 +210,7 @@ public static class ScreenGrabber
                     _duplicator.ReleaseFrame();
                     dxgiResource?.Dispose();
                 }
+                
             }
             catch (SharpDXException ex) when (
                 ex.ResultCode.Code == SharpDX.DXGI.ResultCode.AccessLost.Code ||
@@ -197,7 +224,7 @@ public static class ScreenGrabber
                 Thread.Sleep(100);
                 ReinitializeIfNeeded();
                 dxgiResource?.Dispose();
-                dxgiResource = null!;
+                dxgiResource = null;
             }
             catch
             {
@@ -207,6 +234,20 @@ public static class ScreenGrabber
         }
 
         throw new InvalidOperationException("Failed to capture frame");
+    }
+
+    private static byte[] BuildForcedFrame(out int width, out int height)
+    {
+        width = _lastWidth;
+        height = _lastHeight;
+
+        var frame = (byte[])_lastLinearFrame!.Clone();
+
+        if (_cursorVisible && _cursorShapeBuffer != null)
+            DrawCursor(frame, width, height, width * 4);
+
+        _lastFrameTimestamp = Stopwatch.GetTimestamp();
+        return frame;
     }
 
     private static void DrawCursor(byte[] frame, int frameW, int frameH, int stride)

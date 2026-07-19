@@ -41,7 +41,7 @@ public class ClientManager(IUsersInfo usersInfo,
     private readonly IScreenMonitorManager _screenMonitorManager = screenMonitorManager;
 
     private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
-    private readonly string _clientVersion = "v1.5.2";
+    private readonly string _clientVersion = "v1.5.3";
 
     private TcpClient _tcpMainClient = null!;
 

@@ -62,7 +62,17 @@ public partial class ScreenMonitorManager : ObservableObject, IScreenMonitorMana
                     try
                     {
                         ScreenGrabber.SelectMonitor(ai, oi);
-                        byte[] frameData = ScreenGrabber.CaptureFrame(out int w, out int h);
+
+                        byte[]? frameData = null;
+                        int w = 0, h = 0;
+                        const int maxAttempts = 10;
+
+                        for (int attempt = 0; attempt < maxAttempts && frameData == null; attempt++)
+                            frameData = ScreenGrabber.CaptureFrame(out w, out h);
+
+                        if (frameData == null)
+                            continue;
+
                         snapshots.Add(new MonitorSnapshot(monitorNumber++, ai, oi, frameData, w, h));
                     }
                     catch { /* ignore */ }

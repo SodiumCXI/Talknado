@@ -38,7 +38,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" 
-                           Text="Talknado v1.5.2"
+                           Text="Talknado v1.5.3"
                            FontFamily="{StaticResource TitleBarFont}"
                            FontSize="{StaticResource SecondaryFontSize}"
                            FontWeight="DemiBold"

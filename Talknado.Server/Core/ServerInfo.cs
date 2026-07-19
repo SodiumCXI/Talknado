@@ -16,7 +16,7 @@ public interface IServerInfo
 public class ServerInfo : IServerInfo
 {
     private readonly string _serverVersion = "v1.1.6";
-    private readonly ImmutableArray<string> _validClientVersions = ["v1.5.1", "v1.5.2"];
+    private readonly ImmutableArray<string> _validClientVersions = ["v1.5.1", "v1.5.2", "v1.5.3"];
     private byte[]? _passwordHash = null;
 
     public int Port { get; set; }

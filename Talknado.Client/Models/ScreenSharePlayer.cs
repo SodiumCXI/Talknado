@@ -162,13 +162,14 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
                 continue;
             }
 
-            int targetFrames = _targetBufferFrames;
+            if (item.Value.Data.Length == 0)
+                continue;
 
-            float catchUpFactor = queueSize <= targetFrames
+            float catchUpFactor = queueSize <= _targetBufferFrames
                 ? 1.0f
-                : queueSize >= (MAX_BUFFER_FRAMES + targetFrames)
+                : queueSize >= (MAX_BUFFER_FRAMES + _targetBufferFrames)
                     ? 0.0f
-                    : 1.0f - ((float)(queueSize - targetFrames) / ((MAX_BUFFER_FRAMES + targetFrames) - targetFrames));
+                    : 1.0f - ((float)(queueSize - _targetBufferFrames) / MAX_BUFFER_FRAMES);
 
             int delay = (int)(item.Value.DeltaMs * catchUpFactor);
             if (delay > 0)
@@ -193,15 +194,15 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
             byte[] bgraPixels;
             int width, height;
 
-                bgraPixels = _decoder.Decode(frame.Data);
-                if (bgraPixels == null)
-                    return;
+            bgraPixels = _decoder.Decode(frame.Data);
+            if (bgraPixels == null)
+                return;
 
-                width = _decoder.Width;
-                height = _decoder.Height;
+            width = _decoder.Width;
+            height = _decoder.Height;
 
-                if (!_isInitialized || _currentWidth != width || _currentHeight != height)
-                    InitializeBitmap(width, height);
+            if (!_isInitialized || _currentWidth != width || _currentHeight != height)
+                InitializeBitmap(width, height);
 
             _frameCount++;
 
@@ -311,8 +312,15 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
 
             IsKeyFrame = encodedData[0] == 1;
             DeltaMs = BitConverter.ToInt32(encodedData, 1);
-            Data = new byte[encodedData.Length - 5];
-            Array.Copy(encodedData, 5, Data, 0, Data.Length);
+            if (encodedData.Length > 5)
+            {
+                Data = new byte[encodedData.Length - 5];
+                Array.Copy(encodedData, 5, Data, 0, Data.Length);
+            }
+            else
+            {
+                Data = [];
+            }
         }
     }
 }

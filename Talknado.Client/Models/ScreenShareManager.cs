@@ -64,7 +64,7 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
             LoopbackAudioCapture.InitializeAudio();
         }
 
-        _screenShareSendThread = new(() => ShareScreenLoop(outputIndex, _sendCancellationTokenSource.Token))
+        _screenShareSendThread = new(() => ShareScreenLoop(_sendCancellationTokenSource.Token))
         {
             IsBackground = true
         };
@@ -82,13 +82,22 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
         LoopbackAudioCapture.Stop();
     }
 
-    private void ShareScreenLoop(int outputIndex, CancellationToken token)
+    private void ShareScreenLoop(CancellationToken token)
     {
         const int INTERVAL = 1000 / TARGET_FPS;
         try
         {
 
-            _ = ScreenGrabber.CaptureFrame(out int w, out int h);
+            var firstFrame = ScreenGrabber.CaptureFrame(out int w, out int h);
+            if (firstFrame == null)
+            {
+                while (firstFrame == null && !token.IsCancellationRequested)
+                {
+                    Thread.Sleep(10);
+                    firstFrame = ScreenGrabber.CaptureFrame(out w, out h);
+                }
+                if (firstFrame == null) return;
+            }
             H264Encoder.Initialize(w, h);
 
             long lastCaptureTimestamp = Stopwatch.GetTimestamp();
@@ -101,18 +110,25 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
                 lastCaptureTimestamp = now;
 
                 var screenFrame = ScreenGrabber.CaptureFrame(out _, out _);
-                var encodedFrame = H264Encoder.Encode(screenFrame, deltaMs);
-
-                if (encodedFrame != null)
+                if (screenFrame != null)
                 {
-                    SendFramePacket(encodedFrame);
-
-                    if (_screenSharePlayer.IsWindowVisible)
+                    var encodedFrame = H264Encoder.Encode(screenFrame, deltaMs);
+                    if (encodedFrame != null)
                     {
-                        ProcessFrame(encodedFrame, token);
+                        SendFramePacket(encodedFrame);
+                        if (_screenSharePlayer.IsWindowVisible)
+                            ProcessFrame(encodedFrame, token);
+                        _screenSharePlayer.SaveLastKeyFrame(encodedFrame);
                     }
-                    _screenSharePlayer.SaveLastKeyFrame(encodedFrame);
+                }
+                else
+                {
+                    byte[] keepAlive = new byte[5];
 
+                    SendFramePacket(keepAlive);
+                    if (_screenSharePlayer.IsWindowVisible)
+                        ProcessFrame(keepAlive, token);
+                    _screenSharePlayer.SaveLastKeyFrame(keepAlive);
                 }
 
                 int delay = INTERVAL - (int)sw.ElapsedMilliseconds;
@@ -131,7 +147,6 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
     private void SendFramePacket(byte[] frameData)
     {
         var encryptedData = _cryptoSessionManager.EncryptMessage(frameData);
-
         _networkUtils.SendScreenSharePacketAsync(encryptedData).GetAwaiter().GetResult();
     }
 

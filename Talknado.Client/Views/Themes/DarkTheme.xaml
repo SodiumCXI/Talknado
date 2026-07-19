@@ -9,25 +9,25 @@
     <Color x:Key="ButtonTextColor">#ced2e6</Color>
     <Color x:Key="TitleBarColor">#3B4A57</Color>
     <Color x:Key="TitleBarTextColor">#E8EAF0</Color>
-    <Color x:Key="ScreenShareOnColor">#123d28</Color>
-    <Color x:Key="TitleBarButtonMouseOverColor">#5a7185</Color>
+    <Color x:Key="ButtonActiveColor">#123D28</Color>
+    <Color x:Key="ButtonActiveBorderColor">#288c5f</Color>
+    <Color x:Key="TitleBarButtonMouseOverColor">#5A7185</Color>
     <Color x:Key="TitleBarCloseButtonMouseOverColor">#D64550</Color>
 
     <!-- Input fields -->
     
-    <Color x:Key="TextBoxColor">#2f3640</Color>
+    <Color x:Key="TextBoxColor">#2F3640</Color>
 
     <!-- Text -->
     <Color x:Key="PrimaryTextColor">#CED2E6</Color>
     <Color x:Key="SecondaryTextColor">#A7ADB9</Color>
-    <Color x:Key="SelectedDeviceColor">#23783f</Color>
 
     <!-- Messages and elements -->
     
     <Color x:Key="MessageBackgroundColor">#313743</Color>
-    <Color x:Key="UserItemColor">#373e4b</Color>
-    <Color x:Key="UserItemButtonColor">#272c37</Color>
-    <Color x:Key="ErrorMessageColor">#e4848b</Color>
+    <Color x:Key="UserItemColor">#373E4b</Color>
+    <Color x:Key="UserItemButtonColor">#272C37</Color>
+    <Color x:Key="ErrorMessageColor">#E4848B</Color>
 
     <!-- Sliders -->
     <Color x:Key="TrackSliderColor">#242933</Color>
@@ -52,11 +52,11 @@
     <SolidColorBrush x:Key="ButtonTextBrush" Color="{StaticResource ButtonTextColor}"/>
     <SolidColorBrush x:Key="TitleBarBrush" Color="{StaticResource TitleBarColor}"/>
     <SolidColorBrush x:Key="TitleBarTextBrush" Color="{StaticResource TitleBarTextColor}"/>
-    <SolidColorBrush x:Key="ScreenShareOnBrush" Color="{StaticResource ScreenShareOnColor}"/>
+    <SolidColorBrush x:Key="ButtonActiveBrush" Color="{StaticResource ButtonActiveColor}"/>
+    <SolidColorBrush x:Key="ButtonActiveBorderBrush" Color="{StaticResource ButtonActiveBorderColor}"/>
     <SolidColorBrush x:Key="TextBoxBrush" Color="{StaticResource TextBoxColor}"/>
     <SolidColorBrush x:Key="PrimaryTextBrush" Color="{StaticResource PrimaryTextColor}"/>
     <SolidColorBrush x:Key="SecondaryTextBrush" Color="{StaticResource SecondaryTextColor}"/>
-    <SolidColorBrush x:Key="SelectedDeviceBrush" Color="{StaticResource SelectedDeviceColor}"/>
     <SolidColorBrush x:Key="MessageBackgroundBrush" Color="{StaticResource MessageBackgroundColor}"/>
     <SolidColorBrush x:Key="UserItemBrush" Color="{StaticResource UserItemColor}"/>
     <SolidColorBrush x:Key="UserItemButtonBrush" Color="{StaticResource UserItemButtonColor}"/>
