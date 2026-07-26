@@ -285,7 +285,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Slider">
                     <Grid>
-                        <Border Height="5"
+                        <Border Height="6"
                             Background="{TemplateBinding Background}"
                             CornerRadius="2"
                             BorderBrush="{DynamicResource BorderBrush}"
@@ -317,6 +317,53 @@
                             </Track.Thumb>
                             <Track.IncreaseRepeatButton>
                                 <RepeatButton Style="{StaticResource InvisibleRepeatButton}" Command="{x:Static Slider.IncreaseLarge}" Height="18"/>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ScreenShareSliderStyle" TargetType="Slider">
+        <Setter Property="Background" Value="{DynamicResource TrackSliderBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThumbSliderBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid>
+                        <Border Height="5"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="2"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"/>
+                        <Border x:Name="FillTrack"
+                        Height="5"
+                        Background="{TemplateBinding Foreground}"
+                        CornerRadius="2"
+                        HorizontalAlignment="Center"
+                        Width="{Binding Path=Value,
+                                        RelativeSource={RelativeSource AncestorType=Slider},
+                                        Converter={StaticResource SliderWidthConverter}}"/>
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource InvisibleRepeatButton}" Command="{x:Static Slider.DecreaseLarge}" Height="17"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border Width="10" 
+                                            Height="17" 
+                                            CornerRadius="2"
+                                            Background="{Binding Foreground, 
+                                                     RelativeSource={RelativeSource AncestorType=Slider}}"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource InvisibleRepeatButton}" Command="{x:Static Slider.IncreaseLarge}" Height="17"/>
                             </Track.IncreaseRepeatButton>
                         </Track>
                     </Grid>
@@ -447,24 +494,6 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
-    </Style>
-
-    <Style x:Key="MicrophoneButton" TargetType="Button" BasedOn="{StaticResource ControlPanelButton}">
-        <Setter Property="Background" Value="{DynamicResource UserItemButtonBrush}"/>
-        <Style.Triggers>
-            <DataTrigger Binding="{Binding AudioManager.IsMicrophoneActive}" Value="True">
-                <Setter Property="Background" Value="{DynamicResource ButtonActiveBrush}"/>
-            </DataTrigger>
-        </Style.Triggers>
-    </Style>
-
-    <Style x:Key="ScreenShareButton" TargetType="Button" BasedOn="{StaticResource ControlPanelButton}">
-        <Setter Property="Background" Value="{DynamicResource UserItemButtonBrush}"/>
-        <Style.Triggers>
-            <DataTrigger Binding="{Binding ScreenShareManager.IsSharing}" Value="True">
-                <Setter Property="Background" Value="{DynamicResource ButtonActiveBrush}"/>
-            </DataTrigger>
-        </Style.Triggers>
     </Style>
 
     <Style x:Key="TopPanelButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">

@@ -82,5 +82,17 @@ namespace Talknado.Client.Properties {
                 this["Language"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string Nickname {
+            get {
+                return ((string)(this["Nickname"]));
+            }
+            set {
+                this["Nickname"] = value;
+            }
+        }
     }
 }

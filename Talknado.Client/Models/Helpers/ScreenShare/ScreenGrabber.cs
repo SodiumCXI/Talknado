@@ -15,7 +15,7 @@ public static class ScreenGrabber
     private static DeviceContext _context = null!;
     private static OutputDuplication _duplicator = null!;
     private static Texture2D? _stagingTex = null;
-    private static Factory1 _factory = null!;
+    private readonly static Factory1 _factory = null!;
     private static int _adapterIndex = 0;
     private static int _outputIndex = 0;
 
@@ -252,8 +252,8 @@ public static class ScreenGrabber
 
     private static void DrawCursor(byte[] frame, int frameW, int frameH, int stride)
     {
-        int left = _cursorPosition.X - _cursorShapeInfo.HotSpot.X;
-        int top = _cursorPosition.Y - _cursorShapeInfo.HotSpot.Y;
+        int left = _cursorPosition.X;
+        int top = _cursorPosition.Y;
 
         int shapeW = _cursorShapeInfo.Width;
         int shapeH = _cursorShapeInfo.Height;

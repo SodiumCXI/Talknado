@@ -47,6 +47,8 @@ public partial class StartWindowViewModel : ObservableObject
             "zh" => 2,
             _ => 0
         };
+
+        UsernameTextBoxValue = Settings.Default.Nickname;
     }
 
     public void SetDispatcher(Dispatcher dispatcher)
@@ -84,6 +86,8 @@ public partial class StartWindowViewModel : ObservableObject
     {
         IsWaitingForConnection = true;
         ErrorMessage = string.Empty;
+        Settings.Default.Nickname = UsernameTextBoxValue;
+        Settings.Default.Save();
 
         Task.Run(() =>
         {

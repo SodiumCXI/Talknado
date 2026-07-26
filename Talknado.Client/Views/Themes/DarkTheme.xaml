@@ -6,11 +6,11 @@
     <Color x:Key="ButtonColor">#3B4A57</Color>
     <Color x:Key="ButtonMouseOverColor">#4A5A68</Color>
     <Color x:Key="ButtonPressedColor">#2C3A47</Color>
-    <Color x:Key="ButtonTextColor">#ced2e6</Color>
+    <Color x:Key="ButtonTextColor">#CED2E6</Color>
     <Color x:Key="TitleBarColor">#3B4A57</Color>
     <Color x:Key="TitleBarTextColor">#E8EAF0</Color>
     <Color x:Key="ButtonActiveColor">#123D28</Color>
-    <Color x:Key="ButtonActiveBorderColor">#288c5f</Color>
+    <Color x:Key="ButtonActiveBorderColor">#23C566</Color>
     <Color x:Key="TitleBarButtonMouseOverColor">#5A7185</Color>
     <Color x:Key="TitleBarCloseButtonMouseOverColor">#D64550</Color>
 

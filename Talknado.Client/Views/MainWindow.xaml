@@ -116,17 +116,17 @@
                                     <StackPanel Grid.Column="2"/>
                                     <Grid Grid.Column="3">
                                         <Border Style="{StaticResource ScreenShareButtonBackground}"/>
-                                        <Button Style="{DynamicResource ScreenShareButton}"
+                                        <Button Style="{DynamicResource ControlPanelButton}"
                                                 Command="{Binding ViewMonitorSelectionCommand}"
                                                 VerticalAlignment="Bottom"
-                                                HorizontalAlignment="Center">
+                                                HorizontalAlignment="Center" Cursor="Hand">
                                             <svgc:SvgViewbox Source="/Resources/screen_share_white.svg" Width="22" VerticalAlignment="Center"/>
                                         </Button>
                                     </Grid>
 
                                     <Grid Grid.Column="4">
                                         <Border Style="{StaticResource MicrophoneButtonBackground}"/>
-                                        <Button Style="{DynamicResource MicrophoneButton}"
+                                        <Button Style="{DynamicResource ControlPanelButton}"
                                                 Command="{Binding ToggleMicrophoneCommand}"
                                                 VerticalAlignment="Bottom"
                                                 HorizontalAlignment="Center">

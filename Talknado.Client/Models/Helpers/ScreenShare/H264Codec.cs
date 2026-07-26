@@ -39,7 +39,6 @@ public static unsafe class H264Encoder
             });
     }
 
-
     public static void Initialize(int inputWidth, int inputHeight)
     {
         if (_initialized)
@@ -57,7 +56,7 @@ public static unsafe class H264Encoder
 
         foreach (var codecName in codecNames)
         {
-            if (!_hasDiscreteGPU && (codecName == "h264_nvenс" || codecName == "h264_amf"))
+            if (!_hasDiscreteGPU && (codecName == "h264_nvenc" || codecName == "h264_amf"))
                 continue;
 
             _codec = ffmpeg.avcodec_find_encoder_by_name(codecName);
@@ -97,7 +96,6 @@ public static unsafe class H264Encoder
                 ffmpeg.av_opt_set(_codecContext->priv_data, "tune", "zerolatency", 0);
                 ffmpeg.av_opt_set(_codecContext->priv_data, "crf", "32", 0);
                 ffmpeg.av_opt_set(_codecContext->priv_data, "x264-params", "nal-hrd=cbr:force-cfr=1:aq-mode=0:ref=1", 0);
-                ffmpeg.av_opt_set(_codecContext->priv_data, "intra-refresh", "1", 0);
             }
 
             var ret = ffmpeg.avcodec_open2(_codecContext, _codec, null);

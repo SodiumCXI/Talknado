@@ -52,7 +52,7 @@
                                FontWeight="DemiBold"
                                Margin="4,0"
                                Text="FPS"/>
-                    <Slider Style="{DynamicResource ModernSliderStyle}"
+                    <Slider Style="{DynamicResource ScreenShareSliderStyle}"
                             Foreground="{DynamicResource SecondaryThumbSliderBrush}"
                             Width="100"
                             Minimum="0" Maximum="100"

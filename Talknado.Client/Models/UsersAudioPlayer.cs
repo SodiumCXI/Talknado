@@ -126,12 +126,13 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         private WasapiOut? WasapiOut { get; set; }
         private BufferedWaveProvider WaveProvider { get; }
         private MMDevice? Device { get; set; }
+        public int ConsecutiveLosses { get; private set; }
 
         private readonly ushort _userId;
         private readonly OpusCodecDecoder _decoder = new();
         private readonly Queue<byte[]> _packetQueue = new();
         private readonly object _queueLock = new();
-        public int ConsecutiveLosses { get; private set; }
+        private readonly EnergyVad _energyVad = new();
 
         private const int MIN_BUFFER_SIZE = 3;
         private const int MAX_BUFFER_SIZE = 15;
@@ -227,7 +228,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             {
                 byte[] pcmData = _decoder.Decode(opusData);
 
-                if (EnergyVad.IsSpeech(pcmData))
+                if (_energyVad.IsSpeech(pcmData))
                     _usersInfo.UpdateSpeakingState(_userId, true);
                 else
                     _usersInfo.UpdateSpeakingState(_userId, false);

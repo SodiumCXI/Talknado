@@ -1,12 +1,12 @@
 ﻿namespace Talknado.Client.Models.Helpers.Audio;
 
-public static class EnergyVad
+public class EnergyVad
 {
     private static readonly double _threshold = 200.0;
     private static readonly int _hangoverFrames = 40;
-    private static int _hangoverCount;
+    private int _hangoverCount;
 
-    public static bool IsSpeech(byte[] pcm)
+    public bool IsSpeech(byte[] pcm)
     {
         double rms = ComputeRms(pcm);
 
@@ -25,7 +25,7 @@ public static class EnergyVad
         return false;
     }
 
-    public static double ComputeRms(byte[] pcm)
+    private static double ComputeRms(byte[] pcm)
     {
         int sampleCount = pcm.Length / 2;
         if (sampleCount == 0) return 0;
