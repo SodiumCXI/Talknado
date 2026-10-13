@@ -1,0 +1,119 @@
+# Публикация релиза с тегом vX.Y.Z на GitHub собирает portable-архив и
+# установщик клиента, архив сервера для Linux и прикладывает их к этому же
+# релизу. Ручной запуск (Run workflow) собирает и проверяет всё то же, но
+# ничего не прикладывает: файлы остаются в артефактах запуска.
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # Версия одна — в Talknado.Client.csproj; тег обязан с ней совпадать
+      - name: Read version
+        shell: pwsh
+        run: |
+          $version = (Select-Xml -Path Talknado.Client/Talknado.Client.csproj -XPath '//Version').Node.InnerText
+          if ($env:GITHUB_EVENT_NAME -eq 'release' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            Write-Error "Tag $env:GITHUB_REF_NAME does not match version $version in Talknado.Client.csproj"
+            exit 1
+          }
+          "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Publish client
+        run: dotnet publish Talknado.Client -p:PublishProfile=win-x64-portable
+
+      - name: Portable archive
+        shell: pwsh
+        run: Compress-Archive -Path Talknado.Client/bin/publish/Talknado -DestinationPath Talknado_x64_portable.zip -CompressionLevel Optimal
+
+      - name: Installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y | Out-Null }
+          & $iscc /Q "/DAppVersion=$env:VERSION" installer/Talknado.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Move-Item installer/Output/Talknado_x64_setup.exe .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            Talknado_x64_portable.zip
+            Talknado_x64_setup.exe
+          if-no-files-found: error
+
+  linux-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish server
+        run: dotnet publish Talknado.Server.Linux -c Release -r linux-x64
+
+      # Обрезанная сборка ломается только при запуске, поэтому сервер
+      # поднимается здесь на настоящем Linux и отвечает на команды.
+      - name: Smoke test
+        run: |
+          bin=Talknado.Server.Linux/bin/Release/net8.0/linux-x64/publish/talknado-server-bin
+          sock=/tmp/talknado.sock
+          $bin version
+          TALKNADO_PASSWORD=ci $bin serve --control $sock --quality 1080p60 --bandwidth 10 > /tmp/server.log 2>&1 &
+          pid=$!
+          for i in $(seq 100); do [ -s /tmp/server.log ] && break; sleep 0.1; done
+          echo "Key: $(head -n 1 /tmp/server.log)"
+          $bin ctl $sock status
+          $bin ctl $sock users
+          $bin ctl $sock quality 720p30
+          kill $pid
+          for i in $(seq 100); do kill -0 $pid 2>/dev/null || break; sleep 0.1; done
+          if kill -0 $pid 2>/dev/null; then
+            echo "Server did not stop on SIGTERM within 10 s"
+            kill -9 $pid
+            exit 1
+          fi
+          wait $pid
+          echo "Server stopped"
+
+      - name: Server log
+        if: failure()
+        run: cat /tmp/server.log
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-server
+          path: Talknado.Server.Linux/bin/Release/net8.0/linux-x64/talknado-server-*-linux-x64.tar.gz
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'release'
+    needs: [windows, linux-server]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Attach files to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber

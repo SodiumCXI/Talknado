@@ -191,6 +191,8 @@ publish/
 # Note: Comment the next line if you want to checkin your web deploy settings,
 # but database connection strings (with potential passwords) will be unencrypted
 *.pubxml
+# Профиль релизной сборки клиента — общий для Visual Studio и GitHub Actions
+!Talknado.Client/Properties/PublishProfiles/win-x64-portable.pubxml
 *.publishproj
 
 # Microsoft Azure Web App publish settings. Comment the next line if you want to
@@ -402,3 +404,5 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+# Установщик Inno Setup
+installer/Output/

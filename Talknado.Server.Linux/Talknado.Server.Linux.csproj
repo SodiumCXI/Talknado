@@ -36,7 +36,7 @@
     </XmlPeek>
     <PropertyGroup>
       <PublishFullDir>$([System.IO.Path]::GetFullPath('$(PublishDir)').TrimEnd('\').TrimEnd('/'))</PublishFullDir>
-      <ServerPackage>$([System.IO.Path]::GetDirectoryName('$(PublishFullDir)'))\talknado-server-$(ServerVersion)-linux-x64.tar.gz</ServerPackage>
+      <ServerPackage>$([System.IO.Path]::Combine($([System.IO.Path]::GetDirectoryName('$(PublishFullDir)')), 'talknado-server-$(ServerVersion)-linux-x64.tar.gz'))</ServerPackage>
       <TarTool Condition="'$(OS)' == 'Windows_NT'">"$(SystemRoot)\System32\tar.exe"</TarTool>
       <TarTool Condition="'$(OS)' != 'Windows_NT'">tar</TarTool>
     </PropertyGroup>

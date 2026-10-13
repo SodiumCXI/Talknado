@@ -53,12 +53,14 @@ Server output goes to `~/.talknado/server.log`.
 
 ## Releasing
 
-One release for everything, tagged with the client version `vX.Y.Z`. Every release carries the server, even if the server did not change.
+Releases are built by GitHub Actions ([release.yml](/.github/workflows/release.yml)) when a release with a `vX.Y.Z` tag is published on GitHub. One release for everything, tagged with the client version: the portable client, the installer and `talknado-server-<server version>-linux-x64.tar.gz`, even if the server did not change. The files are attached to that release a few minutes after publishing; the server is started on a Linux runner first.
 
-1. If the server changed, raise `<Version>` in `Talknado.Server/Talknado.Server.csproj`; raise `MinClientVersion` in `Talknado.Server/Core/ServerInfo.cs` only if the change breaks older clients. If the server did not change, leave both as they are.
-2. Build the server:
-   ```bash
-   dotnet publish Talknado.Server.Linux -c Release -r linux-x64
-   ```
-   Publishing also packs `talknado-server-<server version>-linux-x64.tar.gz` into `Talknado.Server.Linux/bin/Release/net8.0/linux-x64/`.
-3. Attach that archive to the release, next to the client. The version in its name is what `install.sh` searches for, so do not rename it.
+1. Raise `<Version>` in `Talknado.Client/Talknado.Client.csproj` - the tag must match it.
+2. If the server changed, raise `<Version>` in `Talknado.Server/Talknado.Server.csproj`; raise `MinClientVersion` in `Talknado.Server/Core/ServerInfo.cs` only if the change breaks older clients.
+3. Create and publish a release with the tag `vX.Y.Z` on GitHub; the files are attached to it automatically.
+
+To build the server archive locally:
+
+```bash
+dotnet publish Talknado.Server.Linux -c Release -r linux-x64
+```
