@@ -53,7 +53,7 @@ Server output goes to `~/.talknado/server.log`.
 
 ## Releasing
 
-Releases are built by GitHub Actions ([release.yml](/.github/workflows/release.yml)) when a release with a `vX.Y.Z` tag is published on GitHub. One release for everything, tagged with the client version: the portable client, the installer and `talknado-server-<server version>-linux-x64.tar.gz`, even if the server did not change. The files are attached to that release a few minutes after publishing; the server is started on a Linux runner first.
+Releases are built by GitHub Actions ([release.yml](/.github/workflows/release.yml)) when a release with a `vX.Y.Z` tag is published on GitHub. One release for everything, tagged with the client version: the portable client, the installer and `talknado-server-v<server version>-linux-x64.tar.gz`, even if the server did not change. The files are attached to that release a few minutes after publishing; the server is started on a Linux runner first.
 
 1. Raise `<Version>` in `Talknado.Client/Talknado.Client.csproj` - the tag must match it.
 2. If the server changed, raise `<Version>` in `Talknado.Server/Talknado.Server.csproj`; raise `MinClientVersion` in `Talknado.Server/Core/ServerInfo.cs` only if the change breaks older clients.

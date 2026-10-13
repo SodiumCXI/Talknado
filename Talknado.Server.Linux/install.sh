@@ -8,7 +8,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Сервер лежит в каждом релизе Talknado архивом с версией сервера в имени:
-# talknado-server-<версия>-linux-x64.tar.gz. Без аргумента ставится сервер
+# talknado-server-v<версия>-linux-x64.tar.gz. Без аргумента ставится сервер
 # из последнего релиза, с аргументом — из самого нового релиза, где лежит
 # сервер этой версии. Серверы 1.1.x живут в прежнем отдельном репозитории,
 # там тег релиза совпадает с версией сервера.
@@ -23,11 +23,11 @@ echo "Installing Talknado Server..."
 if [ "$VERSION" = "latest" ]; then
     echo "Fetching latest release..."
     PACKAGE_URL=$(curl -fsSL "https://api.github.com/repos/$GITHUB_REPO/releases/latest" \
-        | grep -o 'https://[^"]*/talknado-server-[0-9.]*-linux-x64\.tar\.gz' | head -n 1)
+        | grep -o 'https://[^"]*/talknado-server-v[0-9.]*-linux-x64\.tar\.gz' | head -n 1)
 else
     echo "Looking for server v$VERSION..."
     PACKAGE_URL=$(curl -fsSL "https://api.github.com/repos/$GITHUB_REPO/releases?per_page=100" \
-        | grep -o "https://[^\"]*/talknado-server-${VERSION//./\\.}-linux-x64\.tar\.gz" | head -n 1)
+        | grep -o "https://[^\"]*/talknado-server-v${VERSION//./\\.}-linux-x64\.tar\.gz" | head -n 1)
 fi
 
 if [ -n "$PACKAGE_URL" ]; then

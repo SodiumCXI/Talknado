@@ -38,7 +38,7 @@ jobs:
 
       - name: Portable archive
         shell: pwsh
-        run: Compress-Archive -Path Talknado.Client/bin/publish/Talknado -DestinationPath Talknado_x64_portable.zip -CompressionLevel Optimal
+        run: Compress-Archive -Path Talknado.Client/bin/publish/Talknado -DestinationPath "Talknado_v$($env:VERSION)_x64_portable.zip" -CompressionLevel Optimal
 
       - name: Installer
         shell: pwsh
@@ -47,14 +47,14 @@ jobs:
           if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y | Out-Null }
           & $iscc /Q "/DAppVersion=$env:VERSION" installer/Talknado.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Move-Item installer/Output/Talknado_x64_setup.exe .
+          Move-Item "installer/Output/Talknado_v$($env:VERSION)_x64_setup.exe" .
 
       - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: |
-            Talknado_x64_portable.zip
-            Talknado_x64_setup.exe
+            Talknado_v*_x64_portable.zip
+            Talknado_v*_x64_setup.exe
           if-no-files-found: error
 
   linux-server:
@@ -100,7 +100,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: linux-server
-          path: Talknado.Server.Linux/bin/Release/net8.0/linux-x64/talknado-server-*-linux-x64.tar.gz
+          path: Talknado.Server.Linux/bin/Release/net8.0/linux-x64/talknado-server-v*-linux-x64.tar.gz
           if-no-files-found: error
 
   release:
