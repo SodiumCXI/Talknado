@@ -1,0 +1,394 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BINARY_PATH="$SCRIPT_DIR/talknado-server-bin"
+DATA_DIR="$HOME/.talknado"
+PID_FILE="$DATA_DIR/talknado.pid"
+KEY_FILE="$DATA_DIR/connection.key"
+PASSWORD_FILE="$DATA_DIR/password"
+SETTINGS_FILE="$DATA_DIR/settings"
+SOCKET_FILE="$DATA_DIR/control.sock"
+LOG_FILE="$DATA_DIR/server.log"
+
+QUALITIES="720p30, 1080p30, 1080p60"
+
+mkdir -p "$DATA_DIR"
+chmod 700 "$DATA_DIR"
+
+is_running() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if ps -p "$PID" > /dev/null 2>&1; then
+            return 0
+        else
+            rm -f "$PID_FILE"
+        fi
+    fi
+    return 1
+}
+
+get_setting() {
+    local value=""
+    if [ -f "$SETTINGS_FILE" ]; then
+        value=$(grep "^$1=" "$SETTINGS_FILE" | tail -n 1 | cut -d '=' -f 2-)
+    fi
+    echo "${value:-$2}"
+}
+
+save_setting() {
+    local rest=""
+    if [ -f "$SETTINGS_FILE" ]; then
+        rest=$(grep -v "^$1=" "$SETTINGS_FILE")
+    fi
+    { [ -n "$rest" ] && echo "$rest"; echo "$1=$2"; } > "$SETTINGS_FILE"
+    chmod 600 "$SETTINGS_FILE"
+}
+
+control() {
+    "$BINARY_PATH" ctl "$SOCKET_FILE" "$@"
+}
+
+require_running() {
+    if ! is_running; then
+        echo "Server not running"
+        return 1
+    fi
+    return 0
+}
+
+start_server() {
+    if is_running; then
+        echo "Server already running (PID: $(cat "$PID_FILE"))"
+        if [ -f "$KEY_FILE" ]; then
+            echo "Key: $(cat "$KEY_FILE")"
+        fi
+        return 0
+    fi
+
+    if [ ! -f "$PASSWORD_FILE" ]; then
+        echo "Error: Password not set. Use 'talknado set-password'"
+        return 1
+    fi
+
+    # Пароль — через окружение: аргументы процесса видны всем в ps.
+    TALKNADO_PASSWORD="$(cat "$PASSWORD_FILE")" "$BINARY_PATH" serve \
+        --control "$SOCKET_FILE" \
+        --quality "$(get_setting quality 720p30)" \
+        --bandwidth "$(get_setting bandwidth 0)" \
+        > "$LOG_FILE" 2>&1 < /dev/null &
+    PID=$!
+    echo "$PID" > "$PID_FILE"
+
+    KEY=""
+    for i in {1..50}; do
+        if [ -s "$LOG_FILE" ]; then
+            KEY=$(head -n 1 "$LOG_FILE")
+            if [ -n "$KEY" ]; then
+                break
+            fi
+        fi
+        if ! ps -p "$PID" > /dev/null 2>&1; then
+            break
+        fi
+        sleep 0.1
+    done
+
+    if ! ps -p "$PID" > /dev/null 2>&1; then
+        echo "Error: Server failed to start"
+        cat "$LOG_FILE"
+        rm -f "$PID_FILE"
+        return 1
+    fi
+
+    if [ -z "$KEY" ]; then
+        echo "Error: Key not received"
+        kill "$PID" 2>/dev/null
+        rm -f "$PID_FILE"
+        return 1
+    fi
+
+    echo "$KEY" > "$KEY_FILE"
+    chmod 600 "$KEY_FILE"
+    echo "Key: $KEY"
+
+    return 0
+}
+
+stop_server() {
+    if ! is_running; then
+        echo "Server not running"
+        return 0
+    fi
+
+    PID=$(cat "$PID_FILE")
+    kill "$PID" 2>/dev/null
+
+    for i in {1..10}; do
+        if ! ps -p "$PID" > /dev/null 2>&1; then
+            rm -f "$PID_FILE" "$SOCKET_FILE"
+            echo "Server stopped"
+            return 0
+        fi
+        sleep 1
+    done
+
+    kill -9 "$PID" 2>/dev/null
+    rm -f "$PID_FILE" "$SOCKET_FILE"
+    echo "Server stopped"
+
+    return 0
+}
+
+stop_all() {
+    if [ "$EUID" -ne 0 ]; then
+        echo "Error: stop-all requires root privileges"
+        exit 1
+    fi
+
+    echo "Stopping all Talknado servers..."
+    STOPPED=0
+
+    if [ -f "/root/.talknado/talknado.pid" ]; then
+        PID=$(cat "/root/.talknado/talknado.pid")
+        if ps -p "$PID" > /dev/null 2>&1; then
+            echo "Stopping server for root (PID: $PID)"
+            kill "$PID" 2>/dev/null
+            sleep 1
+            if ps -p "$PID" > /dev/null 2>&1; then
+                kill -9 "$PID" 2>/dev/null
+            fi
+            STOPPED=$((STOPPED + 1))
+        fi
+        rm -f "/root/.talknado/talknado.pid"
+    fi
+
+    for home_dir in /home/*; do
+        if [ -d "$home_dir" ]; then
+            pid_file="$home_dir/.talknado/talknado.pid"
+            if [ -f "$pid_file" ]; then
+                PID=$(cat "$pid_file")
+                if ps -p "$PID" > /dev/null 2>&1; then
+                    echo "Stopping server for $(basename "$home_dir") (PID: $PID)"
+                    kill "$PID" 2>/dev/null
+                    sleep 1
+                    if ps -p "$PID" > /dev/null 2>&1; then
+                        kill -9 "$PID" 2>/dev/null
+                    fi
+                    STOPPED=$((STOPPED + 1))
+                fi
+                rm -f "$pid_file"
+            fi
+        fi
+    done
+
+    if [ $STOPPED -eq 0 ]; then
+        echo "No running servers found"
+    else
+        echo "Stopped $STOPPED server(s)"
+    fi
+}
+
+restart_server() {
+    stop_server
+    sleep 1
+    start_server
+}
+
+set_password() {
+    if [ -z "$1" ]; then
+        echo "Usage: talknado set-password 'password'"
+        return 1
+    fi
+
+    PASSWORD="$1"
+
+    if echo "$PASSWORD" | grep -q '[[:space:]]'; then
+        echo "Error: Password cannot contain spaces"
+        return 1
+    fi
+
+    if [ ${#PASSWORD} -gt 40 ]; then
+        echo "Error: Password cannot exceed 40 characters"
+        return 1
+    fi
+
+    echo "$PASSWORD" > "$PASSWORD_FILE"
+    chmod 600 "$PASSWORD_FILE"
+    echo "Password set"
+
+    if is_running; then
+        echo "To apply changes, run: restart"
+    fi
+
+    return 0
+}
+
+show_status() {
+    if is_running; then
+        PID=$(cat "$PID_FILE")
+        echo "Running (PID: $PID)"
+        if [ -f "$KEY_FILE" ]; then
+            echo "Key: $(cat "$KEY_FILE")"
+        fi
+        control status
+    else
+        echo "Stopped"
+        echo "Screen share quality: $(get_setting quality 720p30)"
+        BANDWIDTH=$(get_setting bandwidth 0)
+        if [ "$BANDWIDTH" = "0" ]; then
+            echo "File bandwidth: unlimited"
+        else
+            echo "File bandwidth: $BANDWIDTH Mbit/s"
+        fi
+    fi
+}
+
+show_key() {
+    if [ ! -f "$KEY_FILE" ]; then
+        echo "Key not found"
+        return 1
+    fi
+
+    echo "Key: $(cat "$KEY_FILE")"
+
+    return 0
+}
+
+show_users() {
+    require_running || return 1
+    control users
+}
+
+kick_user() {
+    if [ -z "$1" ]; then
+        echo "Usage: talknado kick ID (see 'talknado users')"
+        return 1
+    fi
+    require_running || return 1
+    control kick "$1"
+}
+
+# Без значения — показать текущее. Значение сохраняется и применяется сразу,
+# если сервер запущен, иначе — при следующем запуске.
+set_quality() {
+    if [ -z "$1" ]; then
+        if is_running; then
+            control quality
+        else
+            echo "Screen share quality: $(get_setting quality 720p30)"
+        fi
+        return $?
+    fi
+
+    case "$1" in
+        720p30|1080p30|1080p60) ;;
+        *)
+            echo "Error: Quality must be one of: $QUALITIES"
+            return 1
+            ;;
+    esac
+
+    if is_running; then
+        control quality "$1" || return 1
+    else
+        echo "Screen share quality: $1 (applies on start)"
+    fi
+    save_setting quality "$1"
+}
+
+set_bandwidth() {
+    if [ -z "$1" ]; then
+        if is_running; then
+            control bandwidth
+        else
+            echo "File bandwidth: $(get_setting bandwidth 0) Mbit/s (0 = unlimited)"
+        fi
+        return $?
+    fi
+
+    if ! [[ "$1" =~ ^[0-9]+$ ]]; then
+        echo "Error: Bandwidth must be a whole number of Mbit/s, 0 = unlimited"
+        return 1
+    fi
+
+    if is_running; then
+        control bandwidth "$1" || return 1
+    else
+        echo "File bandwidth: $1 Mbit/s (applies on start)"
+    fi
+    save_setting bandwidth "$1"
+}
+
+show_version() {
+    "$BINARY_PATH" version
+}
+
+uninstall() {
+    if [ "$EUID" -ne 0 ]; then
+        echo "Error: Uninstall requires root privileges"
+        exit 1
+    fi
+
+    echo "Uninstalling Talknado Server..."
+    stop_all
+
+    if [ -d "/root/.talknado" ]; then
+        rm -rf "/root/.talknado"
+    fi
+
+    for home_dir in /home/*; do
+        if [ -d "$home_dir/.talknado" ]; then
+            rm -rf "$home_dir/.talknado"
+        fi
+    done
+
+    echo "Removed data directories"
+    rm -f /usr/local/bin/talknado /usr/local/bin/talknado-server-bin
+    echo "Removed binaries"
+    echo "Uninstall complete!"
+}
+
+show_help() {
+    cat << EOF
+Usage: talknado <command> [options]
+Commands:
+  start              Start the server
+  stop               Stop the server
+  stop-all           Stop all servers (requires root)
+  restart            Restart the server
+  status             Show server status and session settings
+  key                Show connection key
+  set-password 'pwd' Set server password
+  users              List connected users with ID, ping and address
+  kick ID            Kick a user and ban their address until restart
+  quality [VALUE]    Show or set the screen share quality cap: $QUALITIES
+  bandwidth [MBIT]   Show or set the file transfer limit in Mbit/s, 0 = unlimited
+  version            Show version information
+  uninstall          Uninstall Talknado Server (requires root)
+  help               Show this help
+Quality and bandwidth are saved and apply right away if the server is running.
+EOF
+}
+
+case "$1" in
+    start) start_server ;;
+    stop) stop_server ;;
+    stop-all) stop_all ;;
+    restart) restart_server ;;
+    set-password) set_password "$2" ;;
+    status) show_status ;;
+    key) show_key ;;
+    users) show_users ;;
+    kick) kick_user "$2" ;;
+    quality) set_quality "$2" ;;
+    bandwidth) set_bandwidth "$2" ;;
+    version|--version|-v) show_version ;;
+    uninstall) uninstall ;;
+    help|--help|-h) show_help ;;
+    *)
+        show_help
+        exit 1
+        ;;
+esac
+
+exit $?

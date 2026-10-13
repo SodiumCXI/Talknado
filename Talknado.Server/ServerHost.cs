@@ -29,6 +29,8 @@ public sealed class ServerHost : IDisposable
         _provider.GetRequiredService<IClientManager>(),
         _provider.GetRequiredService<IServerInfo>());
 
+    public int Port => _provider.GetRequiredService<IServerInfo>().Port;
+
     public (bool, string) StartServer(string password, bool withPortForwarding)
     {
         var serverManager = _provider.GetRequiredService<IServerManager>();

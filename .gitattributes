@@ -5,3 +5,5 @@
 *.config text eol=crlf
 *.settings text eol=crlf
 *.resx text eol=crlf
+*.sh text eol=lf
+Talknado.Server.Linux/talknado text eol=lf

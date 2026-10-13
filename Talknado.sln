@@ -10,6 +10,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Talknado.Client", "Talknado
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Talknado.Server", "Talknado.Server\Talknado.Server.csproj", "{0F4011EB-AC4D-439E-957F-428D595BF097}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Talknado.Server.Linux", "Talknado.Server.Linux\Talknado.Server.Linux.csproj", "{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -44,6 +46,18 @@ Global
 		{0F4011EB-AC4D-439E-957F-428D595BF097}.Release|x64.Build.0 = Release|Any CPU
 		{0F4011EB-AC4D-439E-957F-428D595BF097}.Release|x86.ActiveCfg = Release|Any CPU
 		{0F4011EB-AC4D-439E-957F-428D595BF097}.Release|x86.Build.0 = Release|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Debug|x64.Build.0 = Debug|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Debug|x86.Build.0 = Debug|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Release|x64.ActiveCfg = Release|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Release|x64.Build.0 = Release|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Release|x86.ActiveCfg = Release|Any CPU
+		{9AEA2694-F407-4AE1-8B1A-2047CEA5206C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

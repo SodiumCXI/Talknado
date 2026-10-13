@@ -12,7 +12,7 @@ public sealed class ServerAdmin(IUsersInfo usersInfo, IClientManager clientManag
     private readonly IClientManager _clientManager = clientManager;
     private readonly IServerInfo _serverInfo = serverInfo;
 
-    /// <summary>Потолок качества демонстрации: 0 — 720p30, 1 — 1080p30, 2 — 1080p60, 3 — без ограничения.</summary>
+    /// <summary>Потолок качества демонстрации: 0 — 720p30, 1 — 1080p30, 2 — 1080p60.</summary>
     public byte MaxShareQuality
     {
         get => _serverInfo.MaxShareQuality;
