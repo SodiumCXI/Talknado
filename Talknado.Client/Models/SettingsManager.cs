@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using NAudio.CoreAudioApi;
 using System.Collections.ObjectModel;
+using Talknado.Client.Models.Helpers.Audio;
 using Talknado.Client.Properties;
 using Talknado.Client.Properties.Localization;
 
@@ -10,6 +11,8 @@ public interface ISettingsManager
 {
     bool ShareScreenWithAudio { get; set; }
     bool AutoOpenScreenShareWindow { get; set; }
+    NoiseSuppressionModel NoiseSuppression { get; set; }
+    IReadOnlyList<NoiseSuppressionOption> NoiseSuppressionOptions { get; }
     string? SelectedInputDevice { get; set; }
     string? SelectedOutputDevice { get; set; }
     ObservableCollection<string> InputDevices { get; }
@@ -21,6 +24,11 @@ public interface ISettingsManager
     void LoadAudioDevices();
 }
 
+public sealed record NoiseSuppressionOption(NoiseSuppressionModel Model, string Title)
+{
+    public override string ToString() => Title;
+}
+
 public partial class SettingsManager : ObservableObject, ISettingsManager
 {
     [ObservableProperty]
@@ -28,6 +36,17 @@ public partial class SettingsManager : ObservableObject, ISettingsManager
 
     [ObservableProperty]
     private bool _autoOpenScreenShareWindow;
+
+    [ObservableProperty]
+    private NoiseSuppressionModel _noiseSuppression;
+
+    public IReadOnlyList<NoiseSuppressionOption> NoiseSuppressionOptions { get; } =
+    [
+        new(NoiseSuppressionModel.None, Strings.NoiseSuppressionNone),
+        new(NoiseSuppressionModel.RNNoise, Strings.NoiseSuppressionMedium),
+        new(NoiseSuppressionModel.DPDFNet2, Strings.NoiseSuppressionStrong),
+        new(NoiseSuppressionModel.DPDFNet8, Strings.NoiseSuppressionMaximum),
+    ];
 
     [ObservableProperty]
     private string? _selectedInputDevice;
@@ -40,6 +59,8 @@ public partial class SettingsManager : ObservableObject, ISettingsManager
 
     [ObservableProperty]
     private bool _isWindowVisible = false;
+
+
 
     public event Action? InputDeviceChanged;
     public event Action? OutputDeviceChanged;
@@ -56,6 +77,13 @@ public partial class SettingsManager : ObservableObject, ISettingsManager
     {
         ShareScreenWithAudio = Settings.Default.ShareScreenWithAudio;
         AutoOpenScreenShareWindow = Settings.Default.AutoOpenScreenShareWindow;
+        NoiseSuppression = Enum.TryParse<NoiseSuppressionModel>(Settings.Default.NoiseSuppression, out var model)
+            ? model
+            : NoiseSuppressionModel.DPDFNet2;
+
+        // Обработчик изменения не срабатывает, если сохранённое значение
+        // совпало с начальным, поэтому применяем явно.
+        NoiseSuppressor.Model = NoiseSuppression;
     }
 
     public void LoadAudioDevices()
@@ -126,6 +154,13 @@ public partial class SettingsManager : ObservableObject, ISettingsManager
     partial void OnAutoOpenScreenShareWindowChanged(bool value)
     {
         Settings.Default.AutoOpenScreenShareWindow = value;
+        Settings.Default.Save();
+    }
+
+    partial void OnNoiseSuppressionChanged(NoiseSuppressionModel value)
+    {
+        NoiseSuppressor.Model = value;
+        Settings.Default.NoiseSuppression = value.ToString();
         Settings.Default.Save();
     }
 

@@ -1,0 +1,52 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        КАРТА ТЕМЫ. Куда лезть, чтобы что-то поменять:
+
+        Metrics.xaml ......... все отступы, размеры, высоты, скругления.
+                               Внутри — список «что подвинуть → какой ключ».
+        Colors.xaml .......... все цвета. Только цвета, кистей тут нет.
+        Brushes.xaml ......... кисти по цветам. Правится только при добавлении
+                               нового цвета; для смены оттенка хватает Colors.
+        Typography.xaml ...... шрифт, кегли, начертания.
+        Icons.xaml ........... геометрии всех значков и их общий стиль.
+
+        Controls/ ............ шаблоны контролов: как нарисованы кнопка, поле
+                               ввода, флажок, ползунок, полоса прокрутки,
+                               заголовок окна. Отступов и цветов тут нет —
+                               только ссылки на ключи из файлов выше.
+                               Для правки внешнего вида сюда лезть не нужно.
+        Controls/Surface.xaml  исключение: тут лежат поверхности — карточка
+                               сообщения, строка участника, строка ввода.
+
+        Единственный словарь, который мержится в App.xaml.
+        Повторное подключение его же в окне даст вторую копию всех объектов
+        в памяти — не делать.
+
+        Colors.xaml здесь не указан: он подключён внутри Brushes.xaml,
+        иначе StaticResource на цвета не разрешается.
+    -->
+
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/Views/Themes/Brushes.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Typography.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Metrics.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Icons.xaml"/>
+
+        <ResourceDictionary Source="/Views/Themes/Controls/Window.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/ToolTip.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/Surface.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/Text.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/Button.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/TextBox.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/CheckBox.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/ComboBox.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/ListBox.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/TabControl.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/Slider.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/ProgressBar.xaml"/>
+        <ResourceDictionary Source="/Views/Themes/Controls/ScrollBar.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
+
+</ResourceDictionary>

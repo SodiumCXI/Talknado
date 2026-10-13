@@ -24,7 +24,13 @@ public static class ScreenGrabber
     private static System.Drawing.Point _cursorPosition;
     private static bool _cursorVisible = false;
 
-    private static byte[]? _lastLinearFrame = null;
+    // Кадр с курсором. Кусок под курсором сохраняется: когда экран не менялся,
+    // а курсор сдвинулся, кусок возвращается на место и курсор рисуется заново —
+    // без второй копии всего кадра.
+    private static byte[] _frame = [];
+    private static bool _hasFrame;
+    private static byte[] _underCursor = [];
+    private static int _underX, _underY, _underW, _underH;
     private static int _lastWidth;
     private static int _lastHeight;
     private static long _lastFrameTimestamp = 0;
@@ -51,7 +57,8 @@ public static class ScreenGrabber
         _device?.Dispose();
 
         _stagingTex = null;
-        _lastLinearFrame = null;
+        _hasFrame = false;
+        _underW = 0;
         _lastFrameTimestamp = 0;
 
         using var adapter = _factory.GetAdapter1(_adapterIndex);
@@ -74,6 +81,10 @@ public static class ScreenGrabber
         }
     }
 
+    /// <summary>
+    /// Кадр BGRA с курсором. Массив общий и переписывается следующим вызовом:
+    /// кто хранит кадр дольше, копирует его.
+    /// </summary>
     public static byte[]? CaptureFrame(out int width, out int height)
     {
         width = 0;
@@ -86,7 +97,7 @@ public static class ScreenGrabber
         {
             try
             {
-                if (_lastLinearFrame != null &&
+                if (_hasFrame &&
                     Stopwatch.GetTimestamp() - _lastFrameTimestamp >= _forceFrameInterval)
                 {
                     return BuildForcedFrame(out width, out height);
@@ -136,7 +147,7 @@ public static class ScreenGrabber
                         dxgiResource = null;
 
                         bool cursorMoved = frameInfo.LastMouseUpdateTime != 0;
-                        if (cursorMoved && _lastLinearFrame != null)
+                        if (cursorMoved && _hasFrame)
                             return BuildForcedFrame(out width, out height);
 
                         return null;
@@ -173,7 +184,9 @@ public static class ScreenGrabber
                         int srcStride = dataBox.RowPitch;
                         int dstStride = width * 4;
 
-                        byte[] linear = new byte[dstStride * height];
+                        if (_frame.Length != dstStride * height)
+                            _frame = new byte[dstStride * height];
+                        byte[] linear = _frame;
 
                         unsafe
                         {
@@ -190,15 +203,11 @@ public static class ScreenGrabber
                             }
                         }
 
-                        _lastLinearFrame = (byte[])linear.Clone();
                         _lastWidth = width;
                         _lastHeight = height;
-                        _lastFrameTimestamp = Stopwatch.GetTimestamp();
-
-                        if (_cursorVisible && _cursorShapeBuffer != null)
-                            DrawCursor(linear, width, height, dstStride);
-
-                        return linear;
+                        _hasFrame = true;
+                        _underW = 0;
+                        return BuildForcedFrame(out width, out height);
                     }
                     finally
                     {
@@ -241,13 +250,57 @@ public static class ScreenGrabber
         width = _lastWidth;
         height = _lastHeight;
 
-        var frame = (byte[])_lastLinearFrame!.Clone();
+        var frame = _frame;
+        int stride = width * 4;
+
+        RestoreUnderCursor(frame, stride);
 
         if (_cursorVisible && _cursorShapeBuffer != null)
-            DrawCursor(frame, width, height, width * 4);
+        {
+            SaveUnderCursor(frame, width, height, stride);
+            DrawCursor(frame, width, height, stride);
+        }
 
         _lastFrameTimestamp = Stopwatch.GetTimestamp();
         return frame;
+    }
+
+    private static void SaveUnderCursor(byte[] frame, int frameW, int frameH, int stride)
+    {
+        int shapeH = (OutputDuplicatePointerShapeType)_cursorShapeInfo.Type == OutputDuplicatePointerShapeType.Monochrome
+            ? _cursorShapeInfo.Height / 2
+            : _cursorShapeInfo.Height;
+
+        int x0 = Math.Max(_cursorPosition.X, 0);
+        int y0 = Math.Max(_cursorPosition.Y, 0);
+        int x1 = Math.Min(_cursorPosition.X + _cursorShapeInfo.Width, frameW);
+        int y1 = Math.Min(_cursorPosition.Y + shapeH, frameH);
+        if (x1 <= x0 || y1 <= y0)
+            return;
+
+        _underX = x0;
+        _underY = y0;
+        _underW = x1 - x0;
+        _underH = y1 - y0;
+
+        int rowBytes = _underW * 4;
+        if (_underCursor.Length < rowBytes * _underH)
+            _underCursor = new byte[rowBytes * _underH];
+
+        for (int y = 0; y < _underH; y++)
+            Buffer.BlockCopy(frame, (_underY + y) * stride + _underX * 4, _underCursor, y * rowBytes, rowBytes);
+    }
+
+    private static void RestoreUnderCursor(byte[] frame, int stride)
+    {
+        if (_underW == 0)
+            return;
+
+        int rowBytes = _underW * 4;
+        for (int y = 0; y < _underH; y++)
+            Buffer.BlockCopy(_underCursor, y * rowBytes, frame, (_underY + y) * stride + _underX * 4, rowBytes);
+
+        _underW = 0;
     }
 
     private static void DrawCursor(byte[] frame, int frameW, int frameH, int stride)

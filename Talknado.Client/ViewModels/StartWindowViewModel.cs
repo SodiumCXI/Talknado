@@ -99,6 +99,10 @@ public partial class StartWindowViewModel : ObservableObject
                     var usernameError = CheckUsername(username);
                     if (usernameError != null) { SetError(usernameError); return; }
 
+                    // Непустая ссылка от прошлой попытки выдала бы панель хоста
+                    // при гостевом входе.
+                    _serverHost = null;
+
                     string connectionKey;
                     if (withServer)
                     {
@@ -111,6 +115,7 @@ public partial class StartWindowViewModel : ObservableObject
                         {
                             SetError(serverResult);
                             _serverHost?.Dispose();
+                            _serverHost = null;
                             return;
                         }
 
@@ -128,11 +133,17 @@ public partial class StartWindowViewModel : ObservableObject
                         SetError(clientResult);
                         _serverHost?.Dispose();
                         _clientHost?.Dispose();
+                        _serverHost = null;
+                        _clientHost = null;
                         return;
                     }
 
                     _clientHost.SetConnectionKey(connectionKey);
                     _clientHost.SubscribeToClientDisconnected(_clientDisconnectedHandler);
+
+                    if (_serverHost != null)
+                        _clientHost.AttachServerAdmin(_serverHost.Admin);
+
                     IsVisible = false;
                 }
                 finally
@@ -181,6 +192,9 @@ public partial class StartWindowViewModel : ObservableObject
 
         _clientHost?.Dispose();
         _serverHost?.Dispose();
+
+        _clientHost = null;
+        _serverHost = null;
 
         IsVisible = true;
     }

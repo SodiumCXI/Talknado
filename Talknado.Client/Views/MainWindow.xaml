@@ -1,6 +1,8 @@
 ﻿<local:TalknadoWindow x:Class="Talknado.Client.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:l="clr-namespace:Talknado.Client.Properties.Localization"
         xmlns:local="clr-namespace:Talknado.Client.Views"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
@@ -8,192 +10,334 @@
         xmlns:controls="clr-namespace:Talknado.Client.Views.Controls"
         xmlns:triggers="clr-namespace:Talknado.Client.Views.Triggers"
         xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
-        xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
-        Style="{StaticResource MainWindowStyle}" WindowStartupLocation="CenterScreen">
+        xmlns:vm="clr-namespace:Talknado.Client.ViewModels"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
+        x:Name="MainWindowName"
+        Style="{StaticResource AppWindowStyle}"
+        Title="Talknado"
+        Height="480" Width="880"
+        MinHeight="358" MinWidth="482"
+        WindowStartupLocation="CenterScreen"
+        AllowDrop="True"
+        DragOver="Window_DragOver"
+        Drop="Window_Drop">
+
     <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome 
-            CaptionHeight="0" 
-            ResizeBorderThickness="6"
-            CornerRadius="0"
-            GlassFrameThickness="0"
-            UseAeroCaptionButtons="False"/>
+        <shell:WindowChrome CaptionHeight="28"
+                            ResizeBorderThickness="6"
+                            CornerRadius="0"
+                            GlassFrameThickness="0,0,0,1"
+                            UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
+
     <local:TalknadoWindow.Resources>
         <cnv:InputTextBoxMaxHeightConverter x:Key="InputTextBoxMaxHeightConverter"/>
+        <cnv:ImageFillConverter x:Key="ImageFillConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
+        <!--
+            Состояние микрофона и демонстрации несёт цвет и форма значка,
+            а не заливка плитки: на залитой плитке значок сливается.
+        -->
+        <Style x:Key="MicIconStyle" TargetType="Path" BasedOn="{StaticResource IconStyle}">
+            <Setter Property="Data" Value="{StaticResource IconMicOff}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding AudioManager.IsMicrophoneActive}" Value="True">
+                    <Setter Property="Data" Value="{StaticResource IconMic}"/>
+                    <Setter Property="Stroke" Value="{DynamicResource IconActiveBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ScreenShareIconStyle" TargetType="Path" BasedOn="{StaticResource IconStyle}">
+            <Setter Property="Data" Value="{StaticResource IconScreenShare}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ScreenShareManager.IsSharing}" Value="True">
+                    <Setter Property="Data" Value="{StaticResource IconScreenShareStop}"/>
+                    <Setter Property="Stroke" Value="{DynamicResource IconActiveBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </local:TalknadoWindow.Resources>
-    <Border x:Name="BorderAround"
-            Style="{StaticResource BorderAround}">
-        <Grid Grid.RowSpan="2">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="25"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <Grid Grid.Row="0"
-                  x:Name="TitleBar"
-                  Background="{DynamicResource TitleBarBrush}"
-                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
-                  Grid.ColumnSpan="4">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0"/>
-                <Button Grid.Column="1"
-                        x:Name="MinimizeButton"
-                        Style="{DynamicResource MinimizeButtonStyle}"
-                        Click="MinimizeButton_Click"/>
-                <Button Grid.Column="2"
-                        x:Name="MaximizeButton"
-                        Style="{DynamicResource MaximizeButtonStyle}"
-                        Click="MaximizeButton_Click"/>
-                <Button Grid.Column="3"
-                        x:Name="CloseButton"
-                        Style="{DynamicResource CloseButtonStyle}"
-                        Click="CloseButton_Click"/>
-            </Grid>
-            <Grid Grid.Row="1"
-                  Grid.ColumnSpan="2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="375"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Border Grid.Column="0"
-                        Background="{DynamicResource LeftPanelBackgroundBrush}">
-                    <Border Background="{DynamicResource LeftPanelBackgroundBrush}"
-                            Margin="0,0,1,0">
-                        <Border.Effect>
-                            <DropShadowEffect Color="{DynamicResource BorderColor}"
-                                              Direction="0" 
-                                              ShadowDepth="1" 
-                                              BlurRadius="1" 
-                                              Opacity="0.5"/>
-                        </Border.Effect>
-                        <DockPanel LastChildFill="True">
-                            <StackPanel DockPanel.Dock="Top"
-                                    Orientation="Horizontal">
-                                <Button Content="{x:Static l:Strings.DisconnectButton}"
-                                        Style="{DynamicResource TopPanelButtonStyle}"
-                                        Command="{Binding SoftRebootCommand}"/>
-                                <Button Content="{x:Static l:Strings.SettingsButton}" 
-                                        Style="{DynamicResource TopPanelButtonStyle}"
-                                        Command="{Binding ViewSettingsCommand}"/>
-                                <Button Content="{x:Static l:Strings.AboutButton}" 
-                                        Style="{DynamicResource TopPanelButtonStyle}"
-                                        Command="{Binding OpenLinkCommand}"/>
+
+    <!-- Щелчок по пустому месту снимает фокус с поля ввода -->
+    <Grid Background="{DynamicResource WindowBackgroundBrush}"
+          PreviewMouseDown="Root_PreviewMouseDown">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Полоса заголовка -->
+        <Grid Grid.Row="0" x:Name="TitleBar"
+              Height="{DynamicResource TitleBarHeight}"
+              Background="{DynamicResource ChromeBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="2" x:Name="MinimizeButton"
+                    Style="{DynamicResource TitleBarButtonBaseStyle}"
+                    Click="MinimizeButton_Click">
+                <Path Style="{DynamicResource TitleBarIconStyle}" Data="{StaticResource IconWindowMinimize}"/>
+            </Button>
+
+            <Button Grid.Column="3" x:Name="MaximizeButton"
+                    Style="{DynamicResource TitleBarMaximizeButtonStyle}"
+                    Click="MaximizeButton_Click">
+                <Path Style="{DynamicResource TitleBarIconStyle}" Data="{StaticResource IconWindowMaximize}"/>
+            </Button>
+
+            <Button Grid.Column="4" x:Name="CloseButton"
+                    Style="{DynamicResource TitleBarCloseButtonStyle}"
+                    Click="CloseButton_Click">
+                <Path Style="{DynamicResource TitleBarIconStyle}" Data="{StaticResource IconWindowClose}"/>
+            </Button>
+        </Grid>
+
+        <!-- Содержимое -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="286" MinWidth="286" MaxWidth="482"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*" MinWidth="300"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Левая панель: участники сверху, звонок снизу -->
+            <DockPanel Grid.Column="0" Background="{DynamicResource SurfaceBrush}">
+
+                <Border DockPanel.Dock="Bottom" Padding="{DynamicResource PadBottomHost}">
+                    <StackPanel>
+                        <!--
+                            Звонок слева, окно справа: ряд занимает всю ширину
+                            панели, а не жмётся в левый угол.
+                        -->
+                        <DockPanel LastChildFill="False">
+                            <!-- Ключ спрятан в кнопку: щелчок копирует, рядом всплывает подтверждение -->
+                            <Grid DockPanel.Dock="Left" Margin="{DynamicResource GapInline}">
+                                <Button x:Name="CopyKeyButton"
+                                        Style="{DynamicResource CallIconButtonStyle}"
+                                        Click="CopyKeyButton_Click"
+                                        Cursor="Hand"
+                                        ToolTip="{x:Static l:Strings.ConnectionKeyTooltip}">
+                                    <Path Style="{DynamicResource IconStyle}" Data="{StaticResource IconKey}"/>
+                                </Button>
+                                <Popup x:Name="CopiedPopup"
+                                       PlacementTarget="{Binding ElementName=CopyKeyButton}"
+                                       Placement="Top"
+                                       VerticalOffset="-6"
+                                       AllowsTransparency="True"
+                                       StaysOpen="True"
+                                       PopupAnimation="Fade">
+                                    <Border Background="{DynamicResource SurfaceHoverBrush}"
+                                            CornerRadius="{DynamicResource RadiusControl}"
+                                            Padding="{DynamicResource PadCard}">
+                                        <TextBlock Style="{DynamicResource MutedTextStyle}"
+                                                   Foreground="{DynamicResource IconActiveBrush}"
+                                                   Text="{x:Static l:Strings.CopiedText}"/>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+
+                            <Button DockPanel.Dock="Left"
+                                    Style="{DynamicResource CallIconButtonStyle}"
+                                    Command="{Binding ToggleMicrophoneCommand}"
+                                    Cursor="Hand"
+                                    Margin="{DynamicResource GapInline}"
+                                    ToolTip="{x:Static l:Strings.MicrophoneTooltip}">
+                                <Path Style="{StaticResource MicIconStyle}"/>
+                            </Button>
+
+                            <Button DockPanel.Dock="Left"
+                                    Style="{DynamicResource CallIconButtonStyle}"
+                                    Command="{Binding ViewMonitorSelectionCommand}"
+                                    Cursor="Hand"
+                                    ToolTip="{x:Static l:Strings.ScreenShareTooltip}">
+                                <Path Style="{StaticResource ScreenShareIconStyle}"/>
+                            </Button>
+
+                            <!-- Одной группой в порядке на экране: прижатые к краю по одной,
+                                 кнопки обходились бы клавишей Tab справа налево -->
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Style="{DynamicResource IconButtonStyle}"
+                                        Command="{Binding ViewHostPanelCommand}"
+                                        Cursor="Hand"
+                                        ToolTip="{x:Static l:Strings.HostPanelButton}"
+                                        Visibility="{Binding HostPanelManager.IsHost, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Path Style="{DynamicResource IconStyle}" Data="{StaticResource IconHostPanel}"/>
+                                </Button>
+
+                                <Button Style="{DynamicResource IconButtonStyle}"
+                                        Command="{Binding ViewSettingsCommand}"
+                                        Cursor="Hand"
+                                        ToolTip="{x:Static l:Strings.SettingsButton}">
+                                    <Path Style="{DynamicResource IconStyle}" Data="{StaticResource IconSettings}"/>
+                                </Button>
+
+                                <Button Style="{DynamicResource IconButtonStyle}"
+                                        Command="{Binding OpenLinkCommand}"
+                                        Cursor="Hand"
+                                        ToolTip="{x:Static l:Strings.AboutButton}">
+                                    <Path Style="{DynamicResource IconStyle}" Data="{StaticResource IconAbout}"/>
+                                </Button>
+
+                                <Button Style="{DynamicResource DangerIconButtonStyle}"
+                                        Command="{Binding SoftRebootCommand}"
+                                        Cursor="Hand"
+                                        ToolTip="{x:Static l:Strings.DisconnectButton}">
+                                    <Path Style="{DynamicResource IconStyle}" Data="{StaticResource IconDisconnect}"/>
+                                </Button>
                             </StackPanel>
-                            <Border DockPanel.Dock="Bottom"
-                                    Background="{DynamicResource TitleBarBrush}"
-                                    CornerRadius="8,8,0,0"
-                                    Height="29">
-                                <Grid>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+
+                <controls:UserListControl/>
+            </DockPanel>
+
+            <!-- Разделитель зон и он же ручка ширины левой панели -->
+            <GridSplitter Grid.Column="1"
+                          Style="{DynamicResource VerticalSplitterStyle}"
+                          ResizeBehavior="PreviousAndNext"
+                          ResizeDirection="Columns"/>
+
+            <!-- Правая панель: лента и строка ввода -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <controls:MessageListControl Grid.Row="0"/>
+
+                <Border Grid.Row="1" Padding="{DynamicResource PadBottomHost}">
+                    <Grid>
+                        <Border x:Name="Composer" Style="{DynamicResource ComposerStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Вложение ждёт Enter вместе с подписью -->
+                                <Grid Grid.Row="0" Grid.ColumnSpan="2"
+                                      DataContext="{Binding PendingAttachment}"
+                                      Margin="{DynamicResource GapRow}">
+                                    <Grid.Style>
+                                        <Style TargetType="Grid">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Grid.Style>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
-                                               Style="{DynamicResource PrimaryTextStyle}"
-                                               FontWeight="Bold"
-                                               Margin="9,0,0,0"
-                                               Text="{x:Static l:Strings.KeyLabel}" 
-                                               VerticalAlignment="Center"/>
-                                    <TextBox Grid.Column="1"
-                                             Style="{DynamicResource SelectableTextStyle}"
-                                             MaxWidth="250"
-                                             TextWrapping="NoWrap"
-                                             Background="Transparent"
-                                             Text="{Binding ConnectionInfo.FormattedConnectionKey}" 
-                                             VerticalAlignment="Center"
-                                             Margin="2,0,0,0"
-                                             PreviewMouseDown="TextBox_MouseDown"
-                                             IsReadOnly="True"
-                                             Focusable="False"
-                                             Cursor="Hand"/>
-                                    <StackPanel Grid.Column="2"/>
-                                    <Grid Grid.Column="3">
-                                        <Border Style="{StaticResource ScreenShareButtonBackground}"/>
-                                        <Button Style="{DynamicResource ControlPanelButton}"
-                                                Command="{Binding ViewMonitorSelectionCommand}"
-                                                VerticalAlignment="Bottom"
-                                                HorizontalAlignment="Center" Cursor="Hand">
-                                            <svgc:SvgViewbox Source="/Resources/screen_share_white.svg" Width="22" VerticalAlignment="Center"/>
-                                        </Button>
+
+                                    <Grid Grid.Column="0"
+                                          Width="{DynamicResource ControlHeight}"
+                                          Height="{DynamicResource ControlHeight}"
+                                          Margin="{DynamicResource GapInline}">
+                                        <Border Background="{DynamicResource ControlOnSurfaceBrush}"
+                                                CornerRadius="{DynamicResource RadiusControl}">
+                                            <Path Style="{DynamicResource IconStyle}" Data="{StaticResource IconFile}"/>
+                                        </Border>
+                                        <Border CornerRadius="{DynamicResource RadiusControl}"
+                                                Background="{Binding Thumbnail, Converter={StaticResource ImageFillConverter}}"
+                                                RenderOptions.BitmapScalingMode="HighQuality"/>
                                     </Grid>
 
-                                    <Grid Grid.Column="4">
-                                        <Border Style="{StaticResource MicrophoneButtonBackground}"/>
-                                        <Button Style="{DynamicResource ControlPanelButton}"
-                                                Command="{Binding ToggleMicrophoneCommand}"
-                                                VerticalAlignment="Bottom"
-                                                HorizontalAlignment="Center">
-                                            <svgc:SvgViewbox Width="24" VerticalAlignment="Center">
-                                                <svgc:SvgViewbox.Style>
-                                                    <Style TargetType="svgc:SvgViewbox">
-                                                        <Setter Property="Source" Value="/Resources/mic_off_white.svg"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding AudioManager.IsMicrophoneActive}" Value="True">
-                                                                <Setter Property="Source" Value="/Resources/mic_on_white.svg"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </svgc:SvgViewbox.Style>
-                                            </svgc:SvgViewbox>
-                                        </Button>
-                                    </Grid>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="{DynamicResource GapInline}">
+                                        <TextBlock Style="{DynamicResource BodyTextStyle}"
+                                                   Text="{Binding FileName}"
+                                                   ToolTip="{Binding FileName}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Style="{DynamicResource MutedTextStyle}" Text="{Binding SizeText}"/>
+                                    </StackPanel>
+
+                                    <Button Grid.Column="2"
+                                            Style="{DynamicResource IconButtonRaisedStyle}"
+                                            Command="{Binding DataContext.RemovePendingAttachmentCommand, ElementName=Composer}"
+                                            Click="ComposerButton_Click"
+                                            ToolTip="{x:Static l:Strings.RemoveAttachmentTooltip}"
+                                            VerticalAlignment="Center"
+                                            Cursor="Hand">
+                                        <Path Style="{DynamicResource IconStyle}" Data="{StaticResource IconWindowClose}"/>
+                                    </Button>
                                 </Grid>
-                            </Border>
-                            <controls:UserListControl/>
-                        </DockPanel>
-                    </Border>
-                </Border>
-                <Border Grid.Column="1"
-                        Background="{DynamicResource RightPanelBackgroundBrush}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <Border Grid.Row="0" Background="{DynamicResource RightPanelBackgroundBrush}">
-                            <controls:MessageListControl/>
+
+                                <TextBox Grid.Row="1" Grid.Column="0"
+                                         x:Name="InputTextBox"
+                                         PreviewKeyDown="InputTextBox_PreviewKeyDown"
+                                         Style="{DynamicResource MessageInputStyle}"
+                                         Text="{Binding InputTextBoxValue, UpdateSourceTrigger=PropertyChanged}"
+                                         Tag="{x:Static l:Strings.BackgroundMessageBoxText}"
+                                         VerticalAlignment="Center"
+                                         VerticalScrollBarVisibility="Auto">
+                                    <TextBox.MaxHeight>
+                                        <MultiBinding Converter="{StaticResource InputTextBoxMaxHeightConverter}">
+                                            <Binding ElementName="MainWindowName" Path="ActualHeight"/>
+                                            <Binding ElementName="TitleBar" Path="ActualHeight"/>
+                                        </MultiBinding>
+                                    </TextBox.MaxHeight>
+                                    <i:Interaction.Triggers>
+                                        <triggers:EnterKeyTrigger>
+                                            <i:CallMethodAction TargetObject="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                MethodName="AnimateInputMessage"/>
+                                            <i:InvokeCommandAction Command="{Binding SendMessageCommand}"/>
+                                        </triggers:EnterKeyTrigger>
+                                    </i:Interaction.Triggers>
+                                </TextBox>
+
+                                <Button Grid.Row="1" Grid.Column="1"
+                                        Style="{DynamicResource ComposerButtonStyle}"
+                                        Command="{Binding AttachFileCommand}"
+                                        Click="ComposerButton_Click"
+                                        Cursor="Hand"
+                                        Margin="6,0,0,0"
+                                        ToolTip="{x:Static l:Strings.AttachTooltip}">
+                                    <Path Style="{DynamicResource IconStyle}" Data="{StaticResource IconAttach}"/>
+                                </Button>
+                            </Grid>
                         </Border>
-                        <Border Grid.Row="1"
-                                Background="{DynamicResource TextBoxBrush}"
-                                CornerRadius="8,8,0,0">
-                            <Border.Effect>
-                                <DropShadowEffect Color="{DynamicResource BorderColor}"
-                                                  Direction="90"
-                                                  ShadowDepth="1"
-                                                  BlurRadius="2"
-                                                  Opacity="1"/>
-                            </Border.Effect>
-                            <TextBox x:Name="InputTextBox"
-                                     Style="{DynamicResource InputTextBoxStyle}"
-                                     Text="{Binding InputTextBoxValue, UpdateSourceTrigger=PropertyChanged}"
-                                     TextChanged="InputTextBox_TextChanged"
-                                     SizeChanged="InputTextBox_SizeChanged">
-                                <TextBox.MaxHeight>
-                                    <MultiBinding Converter="{StaticResource InputTextBoxMaxHeightConverter}">
-                                        <Binding ElementName="MainWindowName" Path="ActualHeight"/>
-                                        <Binding ElementName="TitleBar" Path="ActualHeight"/>
-                                    </MultiBinding>
-                                </TextBox.MaxHeight>
-                                <i:Interaction.Triggers>
-                                    <triggers:EnterKeyTrigger>
-                                        <i:CallMethodAction TargetObject="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
-                                                            MethodName="AnimateInputMessage"/>
-                                        <i:InvokeCommandAction Command="{Binding SendMessageCommand}"/>
-                                    </triggers:EnterKeyTrigger>
-                                </i:Interaction.Triggers>
-                            </TextBox>
+
+                        <!-- Кольцо фокуса рисует строка целиком, а не поле внутри -->
+                        <Border BorderBrush="{DynamicResource FocusBrush}"
+                                BorderThickness="{DynamicResource FocusBorderThickness}"
+                                CornerRadius="{DynamicResource RadiusControl}"
+                                IsHitTestVisible="False">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsKeyboardFocused, ElementName=InputTextBox}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
                         </Border>
                     </Grid>
                 </Border>
             </Grid>
-            <Canvas x:Name="AnimationCanvas" IsHitTestVisible="False"/>
         </Grid>
-    </Border>
+
+        <!-- Холст анимации отправки: поверх всего, щелчки не перехватывает -->
+        <Canvas Grid.Row="0" Grid.RowSpan="2"
+                x:Name="AnimationCanvas"
+                IsHitTestVisible="False"/>
+    </Grid>
 </local:TalknadoWindow>

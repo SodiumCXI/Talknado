@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using Talknado.Server.Core.Helpers;
@@ -9,13 +10,23 @@ public interface IClientManager
 {
     void ConnectClient(TcpClient tcpClient, CancellationToken token);
     void ReconnectClient(TcpClient tcpClient, ushort userId, CancellationToken token);
+    void KickUser(ushort userId);
+    void StopScreenShare();
 }
 
 public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
     ICryptoSessionManager cryptoSessionManager, IServerInfo serverInfo,
-    IScreenShareManager screenShareManager) : IClientManager, IDisposable
+    IScreenShareManager screenShareManager, IFileChannel fileChannel) : IClientManager, IDisposable
 {
     private readonly HashSet<int> _usedClientIds = [];
+    private readonly HashSet<ushort> _kickedIds = [];
+    private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(1);
+    private Timer? _pingTimer;
+
+    // Участники, закончившие вход. Пока идёт рукопожатие, клиент ждёт от
+    // сервера строго определённых ответов, и рассылка задержек, попавшая
+    // между ними, сорвала бы вход.
+    private readonly ConcurrentDictionary<ushort, byte> _readyIds = [];
     private readonly object _lockCommandExecution = new();
 
     private readonly IUsersInfo _usersInfo = usersInfo;
@@ -23,6 +34,7 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
     private readonly ICryptoSessionManager _cryptoSessionManager = cryptoSessionManager;
     private readonly IServerInfo _serverInfo = serverInfo;
     private readonly IScreenShareManager _screenShareManager = screenShareManager;
+    private readonly IFileChannel _fileChannel = fileChannel;
 
     public void ConnectClient(TcpClient tcpClient, CancellationToken token)
     {
@@ -46,8 +58,10 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
                 throw new TimeoutException("User did not connect to UDP");
 
             BroadcastAddNewUser(userId, username, token);
+            StartPingBroadcast();
 
             SendClientsList(stream, token);
+            _readyIds[userId] = 0;
         }
         catch
         {
@@ -64,16 +78,72 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
 
         try
         {
+            _readyIds.TryRemove(userId, out _);
             _usersInfo.UpdateUserTcpClient(userId, tcpClient);
 
             var data = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("#CTU"));
             _networkUtils.WritePacketAsync(stream, data, token).GetAwaiter().GetResult();
+            _readyIds[userId] = 0;
         }
         catch
         {
             DisconnectClient(userId);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Порядок важен: #KIK уходит до разрыва, иначе клиент его не получит.
+    /// Пометка в _kickedIds не даёт читающему циклу ждать возврата выгнанного.
+    /// </summary>
+    public void KickUser(ushort userId)
+    {
+        lock (_lockCommandExecution)
+        {
+            _kickedIds.Add(userId);
+
+            try
+            {
+                var (stream, token) = _usersInfo.GetUserStreamAndToken(userId);
+                var message = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("#KIK"));
+                _networkUtils.WritePacketAsync(stream, message, token).GetAwaiter().GetResult();
+            }
+            catch { /* ignore */ }
+
+            // Петлевой адрес не запрещаем: на нём сидит сам хост.
+            var address = _usersInfo.GetUserAddress(userId);
+            if (address != "127.0.0.1" && address != "::1")
+                _serverInfo.BanAddress(address);
+
+            try
+            {
+                _usersInfo.DisconnectUser(userId, true);
+            }
+            catch { /* ignore */ }
+        }
+    }
+
+    public void StopScreenShare()
+    {
+        var sharerId = _screenShareManager.ScreenSharerId;
+        if (sharerId == 0)
+            return;
+
+        _screenShareManager.ScreenSharerId = 0;
+
+        using var ms = new MemoryStream();
+        ms.Write(Encoding.UTF8.GetBytes("#CSS"));
+        ms.Write(BitConverter.GetBytes(sharerId));
+        var message = _cryptoSessionManager.EncryptMessage(ms.ToArray());
+
+        _networkUtils.BroadcastMessage(sharerId, message, CancellationToken.None);
+
+        try
+        {
+            var (stream, token) = _usersInfo.GetUserStreamAndToken(sharerId);
+            _networkUtils.WritePacketAsync(stream, message, token).GetAwaiter().GetResult();
+        }
+        catch { /* ignore */ }
     }
 
     private bool ValidatePassword(NetworkStream stream, ushort userId, CancellationToken token)
@@ -136,6 +206,54 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
         }
     }
 
+    private void StartPingBroadcast()
+    {
+        if (_pingTimer != null)
+            return;
+
+        var timer = new Timer(_ => BroadcastPings());
+        if (Interlocked.CompareExchange(ref _pingTimer, timer, null) == null)
+            timer.Change(PingInterval, PingInterval);
+        else
+            timer.Dispose();
+    }
+
+    /// <summary>
+    /// #PNG: пары «номер участника, задержка до сервера туда и обратно в мс».
+    /// Клиент складывает свою задержку с чужой — звук идёт через сервер.
+    /// Прежние сборки команду игнорируют.
+    /// </summary>
+    private void BroadcastPings()
+    {
+        try
+        {
+            using var ms = new MemoryStream();
+            ms.Write("#PNG"u8);
+
+            foreach (var user in _usersInfo.GetSessionUsers())
+            {
+                if (user.Ping < 0)
+                    continue;
+
+                ms.Write(BitConverter.GetBytes(user.Id));
+                ms.Write(BitConverter.GetBytes((ushort)Math.Min(user.Ping * 2, ushort.MaxValue)));
+            }
+
+            var message = _cryptoSessionManager.EncryptMessage(ms.ToArray());
+
+            foreach (var userId in _readyIds.Keys)
+            {
+                try
+                {
+                    var (stream, token) = _usersInfo.GetUserStreamAndToken(userId);
+                    _ = _networkUtils.WritePacketAsync(stream, message, token);
+                }
+                catch { /* участник уходит или переподключается: следующая рассылка через секунду */ }
+            }
+        }
+        catch { /* исключение в обратном вызове таймера уронило бы сервер */ }
+    }
+
     private void BroadcastAddNewUser(ushort userId, string username, CancellationToken token)
     {
         using var ms = new MemoryStream();
@@ -193,6 +311,9 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
             }
             catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex))
             {
+                if (_kickedIds.Contains(userId))
+                    break;
+
                 _usersInfo.DisconnectUser(userId, true);
 
                 try
@@ -237,9 +358,12 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
             var message = ms.ToArray();
             _networkUtils.BroadcastMessage(userId, _cryptoSessionManager.EncryptMessage(message), CancellationToken.None);
         }    
+        _readyIds.TryRemove(userId, out _);
         _usersInfo.DisconnectUser(userId, false);
+        _fileChannel.RemoveUser(userId);
         _cryptoSessionManager.TryRemoveSharedSecret(userId);
         _usedClientIds.Remove(userId);
+        _kickedIds.Remove(userId);
     }
 
     private bool WaitUntil(Func<bool> condition, TimeSpan timeout, TimeSpan pollInterval, NetworkStream stream, CancellationToken token)
@@ -295,7 +419,9 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
                 {
                     _screenShareManager.ScreenSharerId = userId;
 
-                    var acceptMessage = Encoding.UTF8.GetBytes($"#YYC");
+                    // Пятый байт — потолок качества. Прежние сборки читают
+                    // только первые четыре и лишний игнорируют.
+                    var acceptMessage = Encoding.UTF8.GetBytes($"#YYC").Append(_serverInfo.MaxShareQuality).ToArray();
                     _networkUtils.WritePacketAsync(stream, _cryptoSessionManager.EncryptMessage(acceptMessage), token);
 
                     using (var ms = new MemoryStream())
@@ -312,15 +438,7 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
 
             case var _ when command.Equals("#STO"):
 
-                using (var ms = new MemoryStream())
-                {
-                    ms.Write(Encoding.UTF8.GetBytes($"#CSS"));
-                    ms.Write(BitConverter.GetBytes(userId));
-                    var message = ms.ToArray();
-                    _networkUtils.BroadcastMessage(userId, _cryptoSessionManager.EncryptMessage(message), token);
-                    _networkUtils.WritePacketAsync(stream, _cryptoSessionManager.EncryptMessage(message), token);
-                }
-                _screenShareManager.ScreenSharerId = 0;
+                StopScreenShare();
 
                 break;
 
@@ -337,6 +455,7 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
 
     public void Dispose()
     {
+        _pingTimer?.Dispose();
         _usedClientIds.Clear();
         GC.SuppressFinalize(this);
     }

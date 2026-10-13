@@ -34,16 +34,16 @@ public class ScreenShareManager : IScreenShareManager, IDisposable
         {
             try
             {
-                var dataWithId = _networkUtils.ReceiveScreenSharePacketAsync(token).GetAwaiter().GetResult();
-                if (dataWithId == null)
-                    continue;
-
-                var userId = dataWithId.Value.Item2;
-                if (userId != ScreenSharerId)
-                    continue;
-
-                var data = dataWithId.Value.Item1;
-                _networkUtils.BroadcastScreenSharePacket(userId, data).GetAwaiter().GetResult();
+                var (packet, userId) = _networkUtils.ReceiveScreenSharePacket(token);
+                try
+                {
+                    if (userId == ScreenSharerId)
+                        _networkUtils.BroadcastScreenSharePacket(userId, packet.Span);
+                }
+                finally
+                {
+                    packet.Return();
+                }
             }
             catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex)) { /* ignore */ }
             catch

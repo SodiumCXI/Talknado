@@ -9,6 +9,10 @@ public partial class MonitorSelectionWindow : TalknadoWindow, IDisposable
 {
     public MonitorSelectionWindow()
     {
+        // Своя анимация свёртывания требует AllowsTransparency, которого у окна нет.
+        UseSystemCaption = true;
+        UseStateAnimations = false;
+
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
     }
@@ -48,7 +52,7 @@ public partial class MonitorSelectionWindow : TalknadoWindow, IDisposable
         if (isVisible)
         {
             vm.ScreenMonitorManager.BuildPreviews();
-            ResizeToFitMonitors(vm);
+            SetGridColumns(vm);
             Show();
         }
         else
@@ -58,34 +62,15 @@ public partial class MonitorSelectionWindow : TalknadoWindow, IDisposable
         }
     }
 
-    private void ResizeToFitMonitors(MonitorSelectionViewModel vm)
+    /// <summary>
+    /// Мониторы раскладываются квадратной сеткой: три в ряд при девяти, два при трёх и четырёх.
+    /// </summary>
+    private static void SetGridColumns(MonitorSelectionViewModel vm)
     {
-        var monitors = vm.ScreenMonitorManager.Monitors;
-        if (monitors.Count == 0) return;
+        int count = vm.ScreenMonitorManager.Monitors.Count;
+        if (count == 0) return;
 
-        const double previewHeight = 176;
-        const double itemMargin = 10;
-        const double outerMargin = 10;
-        const double padding = 42;
-
-        int count = monitors.Count;
-        int cols = (int)Math.Ceiling(Math.Sqrt(count));
-        int rows = (int)Math.Ceiling((double)count / cols);
-
-        vm.ScreenMonitorManager.GridColumns = cols;
-
-        double maxAspect = 0;
-        for (int i = 0; i < cols && i < count; i++)
-            maxAspect = Math.Max(maxAspect, monitors[i].AspectRatio);
-
-        double cellWidth = previewHeight * maxAspect + itemMargin * 2;
-        double totalWidth = outerMargin * 2 + cellWidth * cols;
-        double totalHeight = (padding + (previewHeight + itemMargin * 2) * rows) - itemMargin / 2 * (rows - 1);
-
-        MinWidth = totalWidth;
-        MinHeight = totalHeight;
-        Width = totalWidth;
-        Height = totalHeight;
+        vm.ScreenMonitorManager.GridColumns = (int)Math.Ceiling(Math.Sqrt(count));
     }
 
     protected override void OnMinimizeButtonClick() { }

@@ -6,7 +6,7 @@ namespace Talknado.Client.Models;
 
 public interface IMessagesManager
 {
-    void AddMessage(ushort userId, string message);
+    void AddMessage(ushort userId, string message, Attachment? attachment = null);
     ObservableCollection<MessagesManager.Message> Messages { get; }
 }
 public partial class MessagesManager(IUsersInfo usersInfo) : ObservableObject, IMessagesManager
@@ -16,9 +16,9 @@ public partial class MessagesManager(IUsersInfo usersInfo) : ObservableObject, I
     [ObservableProperty]
     private ObservableCollection<Message> _messages = [];
 
-    public void AddMessage(ushort userId, string message)
+    public void AddMessage(ushort userId, string message, Attachment? attachment = null)
     {
-        if (string.IsNullOrWhiteSpace(message))
+        if (string.IsNullOrWhiteSpace(message) && attachment == null)
         {
             return;
         }
@@ -27,14 +27,17 @@ public partial class MessagesManager(IUsersInfo usersInfo) : ObservableObject, I
         {
             string timestamp = DateTime.Now.ToString("HH:mm");
 
-            if (Messages.Count > 0 && Messages[^1].UserId == userId && Messages[^1].Timestamp == timestamp)
+            // Вложение всегда начинает свою карточку, и текст к карточке
+            // с вложением не дописывается: иначе он читался бы как подпись.
+            if (attachment == null && Messages.Count > 0 && Messages[^1].UserId == userId
+                && Messages[^1].Timestamp == timestamp && Messages[^1].Attachment == null)
             {
                 Messages[^1].Text += "\n" + message;
             }
             else
             {
                 var username = _usersInfo.GetUsernameByUserId(userId);
-                Messages.Add(new(userId, username, message, DateTime.Now.ToString("HH:mm")));
+                Messages.Add(new(userId, username, message, timestamp, attachment));
             }
         });
     }
@@ -44,16 +47,19 @@ public partial class MessagesManager(IUsersInfo usersInfo) : ObservableObject, I
         public ushort UserId { get; }
         public string Username { get; }
         public string Timestamp { get; }
+        public Attachment? Attachment { get; }
+        public bool HasAttachment => Attachment != null;
 
         [ObservableProperty]
         private string _text;
 
-        public Message(ushort userId, string username, string text, string timestamp)
+        public Message(ushort userId, string username, string text, string timestamp, Attachment? attachment = null)
         {
             UserId = userId;
             Username = username;
             Timestamp = timestamp;
             Text = text;
+            Attachment = attachment;
         }
     }
 }

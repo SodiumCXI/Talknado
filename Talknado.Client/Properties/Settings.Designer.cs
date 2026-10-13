@@ -49,6 +49,18 @@ namespace Talknado.Client.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("DPDFNet2")]
+        public string NoiseSuppression {
+            get {
+                return ((string)(this["NoiseSuppression"]));
+            }
+            set {
+                this["NoiseSuppression"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string SelectedInputDevice {
             get {
@@ -92,6 +104,30 @@ namespace Talknado.Client.Properties {
             }
             set {
                 this["Nickname"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int HostShareQuality {
+            get {
+                return ((int)(this["HostShareQuality"]));
+            }
+            set {
+                this["HostShareQuality"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int HostFileBandwidthMbits {
+            get {
+                return ((int)(this["HostFileBandwidthMbits"]));
+            }
+            set {
+                this["HostFileBandwidthMbits"] = value;
             }
         }
     }

@@ -1,0 +1,27 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!--
+        Moderustic — одно семейство на всё. Microsoft YaHei UI в цепочке
+        обязателен: без него китайский превращается в квадраты.
+
+        TextFormattingMode намеренно не задан: режим Display отключает
+        субпиксельное сглаживание, и на этом шрифте текст пикселит даже
+        в мелком кегле.
+    -->
+
+    <FontFamily x:Key="FontBase">pack://application:,,,/Views/Fonts/#Moderustic, Microsoft YaHei UI, Microsoft YaHei</FontFamily>
+    <FontFamily x:Key="FontHeading">pack://application:,,,/Views/Fonts/#Moderustic, Microsoft YaHei UI, Microsoft YaHei</FontFamily>
+
+    <FontWeight x:Key="WeightRegular">Medium</FontWeight>
+    <FontWeight x:Key="WeightMedium">SemiBold</FontWeight>
+    <FontWeight x:Key="WeightStrong">Bold</FontWeight>
+
+    <sys:Double x:Key="FontSizeBody">15</sys:Double>
+    <sys:Double x:Key="FontSizeSmall">13</sys:Double>
+    <!-- номер монитора в окне выбора: читается с расстояния поверх превью -->
+    <sys:Double x:Key="FontSizeBadge">28</sys:Double>
+
+
+</ResourceDictionary>

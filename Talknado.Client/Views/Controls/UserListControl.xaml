@@ -1,61 +1,166 @@
 ﻿<UserControl x:Class="Talknado.Client.Views.Controls.UserListControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:l="clr-namespace:Talknado.Client.Properties.Localization"
+             xmlns:vm="clr-namespace:Talknado.Client.ViewModels"
              xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
-             xmlns:svgc="http://sharpvectors.codeplex.com/svgc/">
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}">
+
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-        <cnv:MicIconConverter x:Key="MicIconConverter"/>
+        <cnv:UsernameToInitialsConverter x:Key="InitialsConverter"/>
+        <cnv:UsernameToAvatarBrushConverter x:Key="AvatarBrushConverter"/>
+        <cnv:PingTextConverter x:Key="PingTextConverter"/>
+        <cnv:PingBrushConverter x:Key="PingBrushConverter"
+                                Good="{StaticResource PingGoodBrush}"
+                                Fair="{StaticResource PingFairBrush}"
+                                Poor="{StaticResource PingPoorBrush}"/>
     </UserControl.Resources>
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <ItemsControl ItemsSource="{Binding Users}"
-                  AlternationCount="2"
-                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                  Margin="0,2,0,0">
-            <ItemsControl.ItemTemplate>
+
+    <!--
+        Высота строки фиксирована метрикой RowHeight: длина имени, число
+        значков и раскрытый ползунок её не меняют.
+
+        «Говорит» показывается обводкой вокруг всей строки — той же, что
+        кольцо фокуса у поля ввода. Значок микрофона только у выключенного.
+    -->
+
+    <Grid>
+        <!-- Continue: Tab проходит по кнопкам всех строк, а не только первой -->
+        <ListBox ItemsSource="{Binding Users}"
+                 KeyboardNavigation.TabNavigation="Continue"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="{DynamicResource PadFeed}"
+                 HorizontalContentAlignment="Stretch"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 VirtualizingPanel.ScrollUnit="Pixel">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <!-- Отрицательный отступ снимает промежуток у последней строки -->
+                    <VirtualizingStackPanel Margin="{DynamicResource GapRowTrim}"/>
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Focusable" Value="False"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <ContentPresenter/>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+
+            <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <Border x:Name="ItemBorder"
-                            Margin="0,2" 
-                            Height="30"
-                            CornerRadius="8"
-                            Background="{DynamicResource UserItemBrush}">
-                        <Grid x:Name="ItemGrid"
-                              MouseLeave="ItemGrid_MouseLeave"
-                              Tag="{Binding ElementName=VolumeSliderContainer}">
+                    <Grid>
+                    <!--
+                        Уход мыши слушает строка целиком, а не сетка внутри:
+                        у строки свой отступ, и с сетки курсор сходит
+                        раньше, чем со строки.
+                    -->
+                    <Border x:Name="Row"
+                            Style="{DynamicResource UserRowStyle}"
+                            MouseLeave="Row_MouseLeave"
+                            LostKeyboardFocus="Row_LostKeyboardFocus"
+                            Tag="{Binding ElementName=VolumeSliderContainer}">
+                        <Grid x:Name="ItemGrid" Background="Transparent">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0"
-                                   Style="{DynamicResource PrimaryTextStyle}"
-                                   MaxWidth="165"
-                                   TextWrapping="NoWrap"
-                                   FontWeight="Bold"
-                                   Text="{Binding Username}"
-                                   VerticalAlignment="Center"
-                                   Margin="11,0,9,0"/>
-                            <svgc:SvgViewbox Grid.Column="1" Width="24" VerticalAlignment="Center">
-                                <svgc:SvgViewbox.Source>
-                                    <MultiBinding Converter="{StaticResource MicIconConverter}">
-                                        <Binding Path="IsMicrophoneActive"/>
-                                        <Binding Path="IsSpeaking"/>
-                                    </MultiBinding>
-                                </svgc:SvgViewbox.Source>
-                            </svgc:SvgViewbox>
-                            <StackPanel Grid.Column="2"/>
-                            <Button Grid.Column="3"
-                                    Style="{DynamicResource UserItemButton}"
+
+                            <!-- Аватар: цвет по нику, при перезапуске тот же -->
+                            <Grid Grid.Column="0"
+                                  Width="{DynamicResource AvatarSize}"
+                                  Height="{DynamicResource AvatarSize}"
+                                  Margin="{DynamicResource GapInline}"
+                                  VerticalAlignment="Center">
+                                <Ellipse Fill="{Binding Username, Converter={StaticResource AvatarBrushConverter}}"/>
+                                <TextBlock Style="{DynamicResource AvatarInitialsStyle}"
+                                           Text="{Binding Username, Converter={StaticResource InitialsConverter}}"/>
+                            </Grid>
+
+                            <!--
+                                Выключенный микрофон и задержка сразу за ником. Панель
+                                по ширине содержимого и прижата влево; длинный ник
+                                упирается в край колонки и обрезается, а значки остаются
+                                видны. Зазор после ника даёт отступ самого ника, тот же,
+                                что от аватара до ника.
+                            -->
+                            <DockPanel Grid.Column="1" HorizontalAlignment="Left">
+                                <StackPanel DockPanel.Dock="Right"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            Margin="{DynamicResource GapInline}">
+                                    <!-- Виден только выключенный микрофон -->
+                                    <Path x:Name="MicOffIcon"
+                                          Style="{DynamicResource IconStyle}"
+                                          Data="{StaticResource IconMicOff}"
+                                          Width="{DynamicResource MicOffIconSize}"
+                                          Height="{DynamicResource MicOffIconSize}"
+                                          Stroke="{DynamicResource TextMutedBrush}"
+                                          Margin="{DynamicResource MicOffIconMargin}"
+                                          VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Ping}" Value="-1">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+                                        <TextBlock Style="{DynamicResource MutedTextStyle}"
+                                                   Foreground="{Binding Ping, Converter={StaticResource PingBrushConverter}}"
+                                                   Text="{Binding Ping, Converter={StaticResource PingTextConverter}}"
+                                                   Margin="{DynamicResource PingTextMargin}"
+                                                   VerticalAlignment="Center"/>
+                                        <Path Style="{DynamicResource IconStyle}"
+                                              Data="{StaticResource IconSignal}"
+                                              Width="{DynamicResource StatusIconSize}"
+                                              Height="{DynamicResource StatusIconSize}"
+                                              Stroke="{Binding Ping, Converter={StaticResource PingBrushConverter}}"
+                                              VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <TextBlock x:Name="NameText"
+                                           Style="{DynamicResource UserNameStyle}"
+                                           Text="{Binding Username}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding Username}"/>
+                            </DockPanel>
+
+
+                            <!-- Смотреть демонстрацию экрана -->
+                            <Button Grid.Column="2"
+                                    Margin="{DynamicResource GapInline}"
+                                    Style="{DynamicResource IconButtonRaisedStyle}"
                                     Click="ViewScreenShareButton_Click"
+                                    Cursor="Hand"
+                                    ToolTip="{x:Static l:Strings.ViewScreenShareTooltip}"
                                     Visibility="{Binding IsScreenShareActive, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <Grid>
-                                    <svgc:SvgViewbox Source="/Resources/expand_white.svg" 
-                                                     Width="24" 
-                                                     VerticalAlignment="Center">
-                                        <svgc:SvgViewbox.Style>
-                                            <Style TargetType="svgc:SvgViewbox">
+                                    <Path Data="{StaticResource IconExpand}">
+                                        <Path.Style>
+                                            <Style TargetType="Path" BasedOn="{StaticResource IconStyle}">
+                                                <Setter Property="Width" Value="{DynamicResource IconSizeCompact}"/>
+                                                <Setter Property="Height" Value="{DynamicResource IconSizeCompact}"/>
                                                 <Setter Property="Visibility" Value="Visible"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsWaitingForScreenShareWindow}" Value="True">
@@ -63,47 +168,109 @@
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </svgc:SvgViewbox.Style>
-                                    </svgc:SvgViewbox>
-                                    <Path Style="{StaticResource LoadingSpinner}"
-                                             Visibility="{Binding IsWaitingForScreenShareWindow, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        </Path.Style>
+                                    </Path>
+                                    <Path Style="{DynamicResource SpinnerStyle}"
+                                          Visibility="{Binding IsWaitingForScreenShareWindow, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                 </Grid>
                             </Button>
-                            <StackPanel Grid.Column="4"
-                                        Orientation="Horizontal"
-                                        VerticalAlignment="Center">
+
+                            <!--
+                                Ползунок выезжает, кнопка динамика в это же
+                                время сжимается и гаснет. Ширина растёт от нуля,
+                                поэтому имя сжимается плавно, а не прыгает.
+                                Обрезка включается только на время выезда: у
+                                ползунка своя минимальная ширина, и он торчал бы
+                                из сжатого контейнера. В покое она срезала бы
+                                кольцо фокуса, которое рисуется снаружи.
+                            -->
+                            <Border x:Name="VolumeSliderContainer"
+                                    Grid.Column="3"
+                                    Margin="{DynamicResource GapInline}"
+                                    Width="0"
+                                    Background="Transparent"
+                                    Visibility="Collapsed"
+                                    Opacity="0"
+                                    VerticalAlignment="Center">
+                                <Slider Style="{DynamicResource VolumeSliderStyle}"
+                                        Minimum="0" Maximum="100"
+                                        SmallChange="5" LargeChange="20"
+                                        Value="{Binding Volume}"
+                                        Margin="8,0"
+                                        VerticalAlignment="Center"
+                                        KeyDown="VolumeSlider_KeyDown"/>
+                            </Border>
+
+            <!--
+                                Кнопка сжимается по ширине вместе с выездом
+                                ползунка, поэтому ряд не прыгает. Обёртка нужна
+                                ради обрезки на время сжатия: у самой кнопки
+                                ширина из стиля, и значок торчал бы наружу.
+                            -->
+                            <Border x:Name="SpeakerButtonHost"
+                                    Grid.Column="4"
+                                    Width="{DynamicResource ControlHeight}"
+                                    Background="Transparent"
+                                    VerticalAlignment="Center">
                                 <Button x:Name="SpeakerButton"
-                                        Style="{DynamicResource UserItemButton}"
+                                        Style="{DynamicResource IconButtonRaisedStyle}"
                                         Click="SpeakerButton_Click"
+                                        Cursor="Hand"
+                                        ToolTip="{x:Static l:Strings.VolumeTooltip}"
                                         Tag="{Binding ElementName=VolumeSliderContainer}">
-                                    <svgc:SvgViewbox Width="20">
-                                        <svgc:SvgViewbox.Style>
-                                            <Style TargetType="svgc:SvgViewbox">
-                                                <Setter Property="Source" Value="/Resources/speaker_high_white.svg"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Volume}" Value="0">
-                                                        <Setter Property="Source" Value="/Resources/speaker_mute_white.svg"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </svgc:SvgViewbox.Style>
-                                    </svgc:SvgViewbox>
+                                    <Path x:Name="SpeakerIcon"
+                                          Style="{DynamicResource IconStyle}"
+                                          Data="{StaticResource IconSpeaker}"/>
                                 </Button>
-                                <Border x:Name="VolumeSliderContainer" Width="Auto"
-                                        Height="30" Margin="5,0" Background="Transparent"
-                                        Visibility="Collapsed" Opacity="0" VerticalAlignment="Center">
-                                    <Slider Style="{DynamicResource ModernSliderStyle}"
-                                            Width="100"
-                                            Minimum="0" Maximum="100"
-                                            Value="{Binding Volume}"
-                                            Margin="5,0"
-                                            VerticalAlignment="Center"/>
-                                </Border>
-                            </StackPanel>
+                            </Border>
                         </Grid>
                     </Border>
+
+                    <!--
+                        Обводка «говорит» лежит поверх строки отдельным слоем,
+                        а не толщиной самой строки: иначе содержимое при
+                        появлении обводки сдвигалось бы внутрь на её толщину.
+                    -->
+                    <Border x:Name="SpeakingRing"
+                            Margin="{DynamicResource GapRow}"
+                            BorderBrush="{DynamicResource SpeakingBrush}"
+                            BorderThickness="{DynamicResource FocusBorderThickness}"
+                            CornerRadius="{DynamicResource RadiusControl}"
+                            Visibility="Collapsed"
+                            IsHitTestVisible="False"/>
+                    </Grid>
+
+                    <DataTemplate.Triggers>
+                        <DataTrigger Binding="{Binding IsMicrophoneActive}" Value="True">
+                            <Setter TargetName="MicOffIcon" Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsSpeaking}" Value="True">
+                            <Setter TargetName="SpeakingRing" Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Volume}" Value="0">
+                            <Setter TargetName="SpeakerIcon" Property="Data"
+                                    Value="{StaticResource IconSpeakerMute}"/>
+                        </DataTrigger>
+                    </DataTemplate.Triggers>
                 </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-    </ScrollViewer>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <TextBlock Text="{x:Static l:Strings.EmptyUsersText}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   TextWrapping="Wrap"
+                   IsHitTestVisible="False">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Users.Count}" Value="0">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </Grid>
 </UserControl>

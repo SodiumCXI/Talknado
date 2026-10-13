@@ -1,40 +1,176 @@
-﻿using RNNoise.NET;
+﻿using System.Buffers.Binary;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 
 namespace Talknado.Client.Models.Helpers.Audio;
 
+public enum NoiseSuppressionModel { None, RNNoise, DPDFNet2, DPDFNet8 }
+
 public static class NoiseSuppressor
 {
-    private static readonly Denoiser _denoiser = new();
+    private const string LibraryName = "rnnoise";
 
-    public static byte[] Denoise(byte[] microphoneBytes)
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr rnnoise_create(IntPtr model);
+
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int rnnoise_get_frame_size();
+
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    private static extern unsafe float rnnoise_process_frame(IntPtr state, float* output, float* input);
+
+    private static readonly object _lock = new();
+
+    private static IntPtr _state;
+    private static int _frameLength;
+    private static float[] _input = [];
+    private static float[] _output = [];
+
+    private static byte[] _result = [];
+
+    private sealed record LoadedDpdfNet(NoiseSuppressionModel Model, DpdfNet Net);
+
+    private static volatile NoiseSuppressionModel _model = NoiseSuppressionModel.RNNoise;
+    private static volatile LoadedDpdfNet? _dpdfNet;
+    private static int _dpdfNetLoadGeneration;
+    private static DpdfNet? _activeDpdfNet;
+
+    public static NoiseSuppressionModel Model
     {
-        var floatInput = BytesToFloats(microphoneBytes, microphoneBytes.Length);
-        _denoiser.Denoise(floatInput);
-        var processedBytes = FloatsToBytes(floatInput);
+        get => _model;
+        set
+        {
+            _model = value;
 
-        return processedBytes;
+            // Поколение отменяет загрузку, начатую до этого выбора: иначе модель,
+            // догрузившаяся позже, подменила бы выбранную.
+            int generation = Interlocked.Increment(ref _dpdfNetLoadGeneration);
+
+            if (value is NoiseSuppressionModel.DPDFNet2 or NoiseSuppressionModel.DPDFNet8)
+            {
+                if (_dpdfNet?.Model != value)
+                    Task.Run(() => LoadDpdfNet(value, generation));
+            }
+            else if (_dpdfNet != null)
+            {
+                Task.Run(() => SwapDpdfNet(null, generation));
+            }
+        }
     }
 
-    private static float[] BytesToFloats(byte[] buffer, int length)
+    // Загрузка модели занимает около трети секунды, в потоке захвата это пропуск
+    // звука. До её конца работает RNNoise.
+    private static void LoadDpdfNet(NoiseSuppressionModel model, int generation)
     {
-        int samples = length / 2;
-        var floats = new float[samples];
-        for (int i = 0; i < samples; i++)
+        try
         {
-            short sample = BitConverter.ToInt16(buffer, i * 2);
-            floats[i] = sample / 32768f;
+            string file = model == NoiseSuppressionModel.DPDFNet8 ? "dpdfnet8_48khz_hr.onnx" : "dpdfnet2_48khz_hr.onnx";
+            SwapDpdfNet(new LoadedDpdfNet(model, new DpdfNet(Path.Combine(AppContext.BaseDirectory, file))), generation);
         }
-        return floats;
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"DPDFNet unavailable: {ex.Message}");
+        }
     }
 
-    private static byte[] FloatsToBytes(float[] floats)
+    private static void SwapDpdfNet(LoadedDpdfNet? next, int generation)
     {
-        var buffer = new byte[floats.Length * 2];
-        for (int i = 0; i < floats.Length; i++)
+        DpdfNet? stale;
+
+        // Под той же блокировкой, что и обработка кадра: модель нельзя
+        // освободить, пока поток захвата прогоняет через неё кадр.
+        lock (_lock)
         {
-            short sample = (short)Math.Clamp(floats[i] * 32767f, short.MinValue, short.MaxValue);
-            BitConverter.GetBytes(sample).CopyTo(buffer, i * 2);
+            if (generation != Volatile.Read(ref _dpdfNetLoadGeneration))
+            {
+                stale = next?.Net;
+            }
+            else
+            {
+                stale = _dpdfNet?.Net;
+                _dpdfNet = next;
+                _activeDpdfNet = null;
+            }
         }
-        return buffer;
+
+        stale?.Dispose();
+    }
+
+    public static void Warmup()
+    {
+        lock (_lock)
+            EnsureCreated();
+    }
+
+    /// <summary>Возвращает буфер, переиспользуемый между вызовами.</summary>
+    public static unsafe byte[] Denoise(byte[] microphoneFrame)
+    {
+        var model = _model;
+        if (model == NoiseSuppressionModel.None)
+            return microphoneFrame;
+
+        lock (_lock)
+        {
+            EnsureCreated();
+
+            int sampleCount = Math.Min(microphoneFrame.Length / 2, _frameLength);
+
+            for (int i = 0; i < sampleCount; i++)
+                _input[i] = BinaryPrimitives.ReadInt16LittleEndian(microphoneFrame.AsSpan(i * 2));
+
+            for (int i = sampleCount; i < _frameLength; i++)
+                _input[i] = 0f;
+
+            var loaded = _dpdfNet;
+            var dpdfNet = loaded != null && loaded.Model == model ? loaded.Net : null;
+            if (dpdfNet != null)
+            {
+                if (_activeDpdfNet != dpdfNet)
+                {
+                    dpdfNet.Reset();
+                    _activeDpdfNet = dpdfNet;
+                }
+
+                // DPDFNet работает в шкале ±1, RNNoise — в шкале int16.
+                for (int i = 0; i < _frameLength; i++)
+                    _input[i] *= 1f / 32768f;
+
+                dpdfNet.Process(_input.AsSpan(0, _frameLength), _output.AsSpan(0, _frameLength));
+
+                for (int i = 0; i < _frameLength; i++)
+                    _output[i] *= 32768f;
+            }
+            else
+            {
+                _activeDpdfNet = null;
+
+                fixed (float* inPtr = _input)
+                fixed (float* outPtr = _output)
+                    rnnoise_process_frame(_state, outPtr, inPtr);
+            }
+
+            if (_result.Length != microphoneFrame.Length)
+                _result = new byte[microphoneFrame.Length];
+
+            for (int i = 0; i < sampleCount; i++)
+            {
+                short sample = (short)Math.Clamp(_output[i], short.MinValue, short.MaxValue);
+                BinaryPrimitives.WriteInt16LittleEndian(_result.AsSpan(i * 2), sample);
+            }
+
+            return _result;
+        }
+    }
+
+    private static void EnsureCreated()
+    {
+        if (_state != IntPtr.Zero)
+            return;
+
+        _state = rnnoise_create(IntPtr.Zero);
+        _frameLength = rnnoise_get_frame_size();
+        _input = new float[_frameLength];
+        _output = new float[_frameLength];
     }
 }

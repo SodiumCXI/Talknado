@@ -1,0 +1,95 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ctl="clr-namespace:Talknado.Client.Views.Controls">
+
+    <!--
+        Заполненная часть рисуется шаблоном DecreaseRepeatButton, а не
+        привязкой ширины через конвертер: ширина считается самим Track,
+        без пересчёта разметки на каждое движение мыши.
+
+        Нажатие в любое место дорожки ставит туда бегунок и сразу даёт его
+        тянуть (SliderDrag) — у всех ползунков, построенных на этом стиле.
+    -->
+
+    <Style x:Key="VolumeSliderStyle" TargetType="Slider">
+        <Setter Property="Background" Value="{DynamicResource TrackBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="MinWidth" Value="80"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRingStyle}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="IsMoveToPointEnabled" Value="True"/>
+        <Setter Property="ctl:SliderDrag.IsEnabled" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid Background="Transparent">
+                        <Border Height="4"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{DynamicResource RadiusTrack}"
+                                VerticalAlignment="Center"
+                                SnapsToDevicePixels="True"/>
+                        <!-- Tag — кисть поверх дорожки, у перемотки видео ею отмечена
+                             уже загруженная часть. У остальных ползунков пусто. -->
+                        <Border Height="4"
+                                Background="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                CornerRadius="{DynamicResource RadiusTrack}"
+                                VerticalAlignment="Center"
+                                SnapsToDevicePixels="True"/>
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.DecreaseLarge}"
+                                              Focusable="False" IsTabStop="False">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <!--
+                                                Отрицательный отступ справа на
+                                                половину бегунка: Track обрывает
+                                                заполнение у левого края кружка,
+                                                и между полосой и кружком
+                                                остаётся просвет.
+                                            -->
+                                            <Border x:Name="Fill"
+                                                    Height="4"
+                                                    Margin="0,0,-6,0"
+                                                    Background="{DynamicResource AccentBrush}"
+                                                    CornerRadius="{DynamicResource RadiusTrack}"
+                                                    VerticalAlignment="Center"/>
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Focusable="False">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Ellipse Width="12" Height="12"
+                                                    Fill="{DynamicResource TextPrimaryBrush}"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.IncreaseLarge}"
+                                              Focusable="False" IsTabStop="False">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Background="Transparent"/>
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Ползунок в заголовке окна демонстрации: тоньше, без своей дорожки -->
+    <Style x:Key="CompactSliderStyle" TargetType="Slider" BasedOn="{StaticResource VolumeSliderStyle}">
+        <Setter Property="Height" Value="16"/>
+    </Style>
+
+</ResourceDictionary>

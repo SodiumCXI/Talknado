@@ -138,6 +138,9 @@
   <data name="NicknameLabel" xml:space="preserve">
     <value>Nickname:</value>
   </data>
+  <data name="FpsFormat" xml:space="preserve">
+    <value>{0} FPS</value>
+  </data>
   <data name="ConnectionKeyLabel" xml:space="preserve">
     <value>Connection key:</value>
   </data>
@@ -233,5 +236,128 @@
   </data>
   <data name="OnlyOneScreenShareText" xml:space="preserve">
     <value>Only one user can share their screen at a time</value>
+  </data>
+  <data name="EmptyMessagesText" xml:space="preserve">
+    <value>No messages yet</value>
+  </data>
+  <data name="EmptyUsersText" xml:space="preserve">
+    <value>No one else is here yet</value>
+  </data>
+  <data name="MicrophoneTooltip" xml:space="preserve">
+    <value>Microphone</value>
+  </data>
+  <data name="ScreenShareTooltip" xml:space="preserve">
+    <value>Share screen</value>
+  </data>
+  <data name="VolumeTooltip" xml:space="preserve">
+    <value>Volume</value>
+  </data>
+  <data name="ViewScreenShareTooltip" xml:space="preserve">
+    <value>Watch screen</value>
+  </data>
+  <data name="ConnectionKeyTooltip" xml:space="preserve">
+    <value>Connection key</value>
+  </data>
+  <data name="HostPanelButton" xml:space="preserve">
+    <value>Host panel</value>
+  </data>
+  <data name="ShareQualityLabel" xml:space="preserve">
+    <value>Screen share quality limit</value>
+  </data>
+  <data name="ShareQualityLowText" xml:space="preserve">
+    <value>720p, 30 FPS</value>
+  </data>
+  <data name="ShareQualityMediumText" xml:space="preserve">
+    <value>1080p, 30 FPS</value>
+  </data>
+  <data name="ShareQualityHighText" xml:space="preserve">
+    <value>1080p, 60 FPS</value>
+  </data>
+  <data name="SessionUsersLabel" xml:space="preserve">
+    <value>Session participants</value>
+  </data>
+  <data name="KickUserTooltip" xml:space="preserve">
+    <value>Remove from session</value>
+  </data>
+  <data name="KickedFromSessionText" xml:space="preserve">
+    <value>The host removed you from the session.</value>
+  </data>
+  <data name="SessionNoticeTitle" xml:space="preserve">
+    <value>Session</value>
+  </data>
+  <data name="NoiseSuppressionLabel" xml:space="preserve">
+    <value>Noise Suppression:</value>
+  </data>
+  <data name="NoiseSuppressionTooltip" xml:space="preserve">
+    <value>Medium: low delay and load. Strong and Maximum suppress keyboard and background noise better, but add 30 ms of delay, use about 25% and 45% of one CPU core and can cut whispering.</value>
+  </data>
+  <data name="NoiseSuppressionNone" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="NoiseSuppressionMedium" xml:space="preserve">
+    <value>Medium (RNNoise)</value>
+  </data>
+  <data name="NoiseSuppressionStrong" xml:space="preserve">
+    <value>Strong (DPDFNet-2)</value>
+  </data>
+  <data name="NoiseSuppressionMaximum" xml:space="preserve">
+    <value>Maximum (DPDFNet-8)</value>
+  </data>
+  <data name="SizeBytesFormat" xml:space="preserve">
+    <value>{0} B</value>
+  </data>
+  <data name="SizeKilobytesFormat" xml:space="preserve">
+    <value>{0:0.#} KB</value>
+  </data>
+  <data name="SizeMegabytesFormat" xml:space="preserve">
+    <value>{0:0.#} MB</value>
+  </data>
+  <data name="SizeGigabytesFormat" xml:space="preserve">
+    <value>{0:0.##} GB</value>
+  </data>
+  <data name="AttachTooltip" xml:space="preserve">
+    <value>Attach file</value>
+  </data>
+  <data name="RemoveAttachmentTooltip" xml:space="preserve">
+    <value>Remove attachment</value>
+  </data>
+  <data name="DownloadText" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="ShowInFolderText" xml:space="preserve">
+    <value>Show in folder</value>
+  </data>
+  <data name="FileUnavailableText" xml:space="preserve">
+    <value>File is unavailable</value>
+  </data>
+  <data name="PlayTooltip" xml:space="preserve">
+    <value>Play (Space)</value>
+  </data>
+  <data name="PauseTooltip" xml:space="preserve">
+    <value>Pause (Space)</value>
+  </data>
+  <data name="CloseViewerTooltip" xml:space="preserve">
+    <value>Close (Esc)</value>
+  </data>
+  <data name="MediaOpenFailedText" xml:space="preserve">
+    <value>Could not open the video</value>
+  </data>
+  <data name="FileBandwidthLabel" xml:space="preserve">
+    <value>File transfer speed limit, Mbit/s</value>
+  </data>
+  <data name="FileBandwidthTooltip" xml:space="preserve">
+    <value>0 means no limit</value>
+  </data>
+  <data name="SaveToDownloadsTooltip" xml:space="preserve">
+    <value>Save to Downloads</value>
+  </data>
+  <data name="OpenFileTooltip" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="ClientVersionUnsupportedText" xml:space="preserve">
+    <value>The server does not support your Talknado version. Update the app.</value>
+  </data>
+  <data name="ServerVersionUnsupportedText" xml:space="preserve">
+    <value>The host runs an outdated Talknado version. The host needs to update the app.</value>
   </data>
 </root>

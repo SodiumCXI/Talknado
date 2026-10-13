@@ -1,0 +1,146 @@
+﻿<local:TalknadoWindow x:Class="Talknado.Client.Views.HostPanelWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:l="clr-namespace:Talknado.Client.Properties.Localization"
+        xmlns:local="clr-namespace:Talknado.Client.Views"
+        xmlns:vm="clr-namespace:Talknado.Client.ViewModels"
+        xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=vm:HostPanelViewModel}"
+        Style="{StaticResource AppWindowStyle}"
+        Title="{x:Static l:Strings.HostPanelButton}"
+        Width="350" MinWidth="350"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="28"
+                            ResizeBorderThickness="0"
+                            CornerRadius="0"
+                            GlassFrameThickness="0,0,0,1"
+                            UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+
+    <local:TalknadoWindow.Resources>
+        <cnv:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+    </local:TalknadoWindow.Resources>
+
+    <Grid Background="{DynamicResource WindowBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" x:Name="TitleBar"
+              Height="{DynamicResource TitleBarHeight}"
+              Background="{DynamicResource ChromeBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Style="{DynamicResource MutedTextStyle}"
+                       Text="{x:Static l:Strings.HostPanelButton}"
+                       Margin="{DynamicResource PadControl}"
+                       VerticalAlignment="Center"/>
+
+            <Button Grid.Column="1" x:Name="CloseButton"
+                    Style="{DynamicResource TitleBarCloseButtonStyle}"
+                    Click="CloseButton_Click">
+                <Path Style="{DynamicResource TitleBarIconStyle}" Data="{StaticResource IconWindowClose}"/>
+            </Button>
+        </Grid>
+
+        <StackPanel Grid.Row="1" Margin="{DynamicResource PadCard}">
+
+            <Border Style="{DynamicResource FormBlockStyle}" Margin="{DynamicResource GapBlock}">
+                <StackPanel>
+                    <TextBlock Style="{DynamicResource MutedTextStyle}"
+                               Text="{x:Static l:Strings.ShareQualityLabel}"
+                               Margin="{DynamicResource GapRow}"/>
+                    <ComboBox Style="{DynamicResource ComboBoxStyle}"
+                              ItemContainerStyle="{DynamicResource ComboBoxItemStyle}"
+                              ItemsSource="{Binding QualityLevels}"
+                              SelectedIndex="{Binding HostPanelManager.MaxShareQuality}"
+                              Cursor="Hand"/>
+
+
+                    <!-- Общий предел на все передачи файлов: защищает канал хоста для голоса и демонстрации -->
+                    <StackPanel Margin="{DynamicResource GapBlockTop}">
+                        <TextBlock Style="{DynamicResource MutedTextStyle}"
+                                   Text="{x:Static l:Strings.FileBandwidthLabel}"
+                                   Margin="{DynamicResource GapRow}"/>
+                        <TextBox Style="{DynamicResource InputStyle}"
+                                 Text="{Binding FileBandwidthText}"
+                                 MaxLength="5"
+                                 ToolTip="{x:Static l:Strings.FileBandwidthTooltip}"
+                                 KeyDown="BandwidthBox_KeyDown"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{DynamicResource FormBlockStyle}">
+                <StackPanel>
+                    <TextBlock Style="{DynamicResource MutedTextStyle}"
+                               Text="{x:Static l:Strings.SessionUsersLabel}"
+                               Margin="{DynamicResource GapRow}"/>
+
+                    <ListBox Style="{DynamicResource PlainListBoxStyle}"
+                             ItemContainerStyle="{DynamicResource PlainListBoxItemStyle}"
+                             ItemsSource="{Binding HostPanelManager.Users}"
+                             MaxHeight="{DynamicResource SessionListMaxHeight}">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <!-- Отрицательный отступ снимает промежуток у последней строки -->
+                                <VirtualizingStackPanel Margin="{DynamicResource GapRowTrim}"/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{DynamicResource SessionRowStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0"
+                                                   Style="{DynamicResource UserNameStyle}"
+                                                   Text="{Binding Username}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding Username}"/>
+
+                                        <TextBlock Grid.Column="1"
+                                                   Style="{DynamicResource MutedTextStyle}"
+                                                   Text="{Binding Address}"
+                                                   Margin="{DynamicResource GapInline}"
+                                                   VerticalAlignment="Center"/>
+
+                                        <!-- Слот держит ширину и у своей строки, иначе ряд разъезжается -->
+                                        <Grid Grid.Column="2" Width="{DynamicResource ControlHeight}">
+                                            <Button Style="{DynamicResource DangerIconButtonStyle}"
+                                                    Command="{Binding DataContext.KickCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                    CommandParameter="{Binding}"
+                                                    Cursor="Hand"
+                                                    ToolTip="{x:Static l:Strings.KickUserTooltip}"
+                                                    Visibility="{Binding IsLocal, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                                <Path Style="{DynamicResource IconStyle}" Data="{StaticResource IconKickUser}"/>
+                                            </Button>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</local:TalknadoWindow>

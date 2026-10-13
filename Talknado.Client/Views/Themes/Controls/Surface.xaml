@@ -1,0 +1,110 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        Три уровня: фон окна, панель, приподнятый элемент. Границ нет,
+        уровни отличаются яркостью. Зоны разделяет линия, а не рамка
+        вокруг каждой панели.
+    -->
+
+    <Style x:Key="FocusRingStyle">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Rectangle Margin="-3"
+                               Stroke="{DynamicResource FocusBrush}"
+                               StrokeThickness="2"
+                               RadiusX="10" RadiusY="10"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}"/>
+        <Setter Property="Padding" Value="{DynamicResource PadCard}"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
+    <!-- Блок формы: задаёт ширину полей внутри и отделяет их от фона окна -->
+    <Style x:Key="FormBlockStyle" TargetType="Border" BasedOn="{StaticResource CardStyle}">
+        <Setter Property="Background" Value="{DynamicResource SurfaceFormBrush}"/>
+    </Style>
+
+    <Style x:Key="RaisedStyle" TargetType="Border" BasedOn="{StaticResource CardStyle}">
+        <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
+    </Style>
+
+    <!--
+        Единственная явная линия в окне — вертикальная, между панелями,
+        и она же служит ручкой изменения ширины левой панели.
+    -->
+    <Style x:Key="VerticalSplitterStyle" TargetType="GridSplitter">
+        <!--
+            Ширина ровно 1: колонка занимает столько же, и линия стоит точно
+            на границе панелей. Область захвата мышью расширена отрицательным
+            отступом в шаблоне, чтобы не разгонять колонку.
+        -->
+        <Setter Property="Width" Value="1"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Cursor" Value="SizeWE"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Grid Background="Transparent" Margin="-3,0">
+                        <Border Width="1"
+                                HorizontalAlignment="Center"
+                                Background="{DynamicResource DividerBrush}"
+                                SnapsToDevicePixels="True"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Строка участника. Высота одна при любом имени и любом числе значков.
+        «Говорит» рисуется обводкой поверх строки в шаблоне списка.
+    -->
+    <Style x:Key="UserRowStyle" TargetType="Border">
+        <Setter Property="Height" Value="{DynamicResource RowHeight}"/>
+        <!--
+            Поверхность есть всегда: без неё кнопка внутри строки висит
+            на пустом месте сама по себе. Под курсором строка цвет не меняет:
+            участник — не кнопка, отзыв даёт сама кнопка.
+        -->
+        <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}"/>
+        <Setter Property="Margin" Value="{DynamicResource GapRow}"/>
+        <Setter Property="Padding" Value="{DynamicResource PadRow}"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
+    <!-- Строка участника в панели хоста: аватара нет, слева поле шире -->
+    <Style x:Key="SessionRowStyle" TargetType="Border" BasedOn="{StaticResource UserRowStyle}">
+        <Setter Property="Padding" Value="{DynamicResource PadSessionRow}"/>
+    </Style>
+
+    <!--
+        Строка ввода сообщения: поверхность, кольцо фокуса и кнопка отправки
+        живут здесь, а поле внутри остаётся прозрачным.
+    -->
+    <Style x:Key="ComposerStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}"/>
+        <Setter Property="Padding" Value="12,5,5,5"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
+    <Style x:Key="MessageCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}"/>
+        <Setter Property="Padding" Value="{DynamicResource PadCard}"/>
+        <Setter Property="Margin" Value="{DynamicResource GapRow}"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
+</ResourceDictionary>

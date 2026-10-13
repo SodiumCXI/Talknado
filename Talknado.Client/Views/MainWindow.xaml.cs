@@ -1,9 +1,13 @@
 ﻿using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
+using Talknado.Client.Models;
 using Talknado.Client.Properties.Localization;
 using Talknado.Client.ViewModels;
 
@@ -17,16 +21,70 @@ public interface IMainWindow
 
 public partial class MainWindow : TalknadoWindow, IMainWindow, IDisposable
 {
-    private readonly Thickness _defaultMargin;
-    private readonly Thickness _increasedMargin;
     private CancellationTokenSource? _copyFeedbackCts;
 
     public MainWindow()
     {
-        _defaultMargin = new Thickness(5, 0, 5, 0);
-        _increasedMargin = new Thickness(5);
+        // Своя анимация свёртывания требует AllowsTransparency, которого у окна нет.
+        UseSystemCaption = true;
+        UseStateAnimations = false;
 
         InitializeComponent();
+    }
+
+    // Фокус возвращается в поле ввода до открытия диалога: после его закрытия
+    // окно восстановит фокус туда, и Enter отправит сообщение, а не нажмёт
+    // скрепку повторно.
+    private void ComposerButton_Click(object sender, RoutedEventArgs e) => InputTextBox.Focus();
+
+    private void Window_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void Window_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files && DataContext is MainWindowViewModel vm)
+        {
+            vm.Attach(files[0]);
+            InputTextBox.Focus();
+        }
+    }
+
+    /// <summary>
+    /// Ctrl+V с картинкой или файлом в буфере обмена прикрепляет их, а не вставляет
+    /// текст. Картинка из буфера сохраняется во временную папку как PNG.
+    /// Ловится нажатие, а не команда Paste: без текста в буфере TextBox считает
+    /// вставку невозможной, и команда не выполняется вовсе.
+    /// </summary>
+    private void InputTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.V || Keyboard.Modifiers != ModifierKeys.Control || DataContext is not MainWindowViewModel vm)
+            return;
+
+        try
+        {
+            if (Clipboard.ContainsFileDropList() && Clipboard.GetFileDropList() is { Count: > 0 } files)
+            {
+                vm.Attach(files[0]!);
+                e.Handled = true;
+            }
+            else if (Clipboard.ContainsImage() && Clipboard.GetImage() is { } image)
+            {
+                Directory.CreateDirectory(FileTransferManager.CacheDirectory);
+                var path = Path.Combine(FileTransferManager.CacheDirectory, $"image_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(image));
+                using (var stream = File.Create(path))
+                    encoder.Save(stream);
+
+                vm.Attach(path);
+                e.Handled = true;
+            }
+        }
+        catch { /* буфер обмена занят другим приложением: вставка не происходит */ }
     }
 
     protected override void OnCloseButtonClick()
@@ -38,62 +96,45 @@ public partial class MainWindow : TalknadoWindow, IMainWindow, IDisposable
             Application.Current.Shutdown();
     }
 
-    private void TextBox_MouseDown(object sender, MouseButtonEventArgs e)
+    /// <summary>
+    /// Щелчок по пустому месту окна снимает фокус с поля ввода: иначе курсор
+    /// остаётся в нём и после клика в стороне.
+    /// </summary>
+    private void Root_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        var mwvm = DataContext as MainWindowViewModel;
-        var connectionKey = mwvm!.ConnectionInfo.ConnectionKey;
-        var formattedConnectionKey = mwvm!.ConnectionInfo.FormattedConnectionKey;
-
-        CopyTextWithFeedback((TextBox)sender, connectionKey, formattedConnectionKey, Strings.CopiedText);
+        if (e.OriginalSource is DependencyObject source && !IsWithinFocusable(source))
+            Keyboard.ClearFocus();
     }
 
-    private async void CopyTextWithFeedback(TextBox textBox, string textToCopy, string originalText, string copiedText)
+    private static bool IsWithinFocusable(DependencyObject source)
     {
+        for (var node = source; node != null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is TextBoxBase or ButtonBase or Slider or ComboBox or ListBoxItem)
+                return true;
+        }
+        return false;
+    }
+
+    private async void CopyKeyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+
+        Clipboard.SetText(vm.ConnectionInfo.ConnectionKey);
+
         _copyFeedbackCts?.Cancel();
         _copyFeedbackCts = new CancellationTokenSource();
         var token = _copyFeedbackCts.Token;
 
-        Clipboard.SetText(textToCopy);
-        textBox.Text = copiedText;
+        CopiedPopup.IsOpen = true;
 
         try
         {
-            await Task.Delay(1000, token);
-
-            if (!token.IsCancellationRequested && textBox.Text == copiedText)
-            {
-                textBox.Text = originalText;
-            }
+            await Task.Delay(1200, token);
+            CopiedPopup.IsOpen = false;
         }
-        catch (TaskCanceledException) { /* ignore */ }
-    }
-
-    private void InputTextBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (sender is TextBox textBox)
-        {
-            UpdateTextBoxMargin(textBox);
-        }
-    }
-
-    private void InputTextBox_SizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        if (sender is TextBox textBox)
-        {
-            UpdateTextBoxMargin(textBox);
-        }
-    }
-
-    private void UpdateTextBoxMargin(TextBox textBox)
-    {
-        if (textBox.LineCount > 1)
-        {
-            textBox.Margin = _increasedMargin;
-        }
-        else
-        {
-            textBox.Margin = _defaultMargin;
-        }
+        catch (TaskCanceledException) { /* пришёл следующий щелчок */ }
     }
 
     private Point GetTextBoxPosition(TextBox textBox)

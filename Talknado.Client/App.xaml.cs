@@ -1,4 +1,6 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using Talknado.Client.Models.Helpers.Audio;
@@ -11,6 +13,14 @@ public partial class App : Application
 {
     protected override void OnStartup(StartupEventArgs e)
     {
+#if DEBUG
+        // Ошибки привязок пишутся в файл: окно вывода есть только под отладчиком.
+        PresentationTraceSources.Refresh();
+        PresentationTraceSources.DataBindingSource.Listeners.Add(
+            new TextWriterTraceListener(Path.Combine(Path.GetTempPath(), "talknado-bindings.log")));
+        PresentationTraceSources.DataBindingSource.Switch.Level = SourceLevels.Warning;
+        Trace.AutoFlush = true;
+#endif
         var lang = Settings.Default.Language;
         if (string.IsNullOrEmpty(lang))
         {
@@ -28,6 +38,8 @@ public partial class App : Application
         base.OnStartup(e);
 
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        Models.FileTransferManager.CleanCache(includeCurrent: false);
 
         var culture = new CultureInfo(lang);
         Thread.CurrentThread.CurrentCulture = culture;
@@ -54,6 +66,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         LoopbackAudioCapture.Dispose();
+        Models.FileTransferManager.CleanCache(includeCurrent: true);
 
         base.OnExit(e);
     }

@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.Buffers;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 
@@ -8,18 +8,39 @@ public interface ICryptoSessionManager
 {
     void SharedSecretExchange(NetworkStream stream, CancellationToken token);
     public void ReceiveAndSetSessionKey(NetworkStream stream, CancellationToken token);
+
+    /// <summary>Пишет IV и шифротекст в <paramref name="destination"/>, возвращает длину.</summary>
+    int Encrypt(ReadOnlySpan<byte> message, Span<byte> destination);
+
+    /// <summary>
+    /// <paramref name="destination"/> не короче <paramref name="encrypted"/> без IV;
+    /// возвращает длину открытого текста.
+    /// </summary>
+    int Decrypt(ReadOnlySpan<byte> encrypted, Span<byte> destination);
+
     byte[] EncryptMessage(byte[] message);
     byte[] EncryptPassword(byte[] message);
     byte[] DecryptMessage(byte[] encryptedMessage);
 }
 
+/// <summary>
+/// Пакет — IV 16 байт и шифротекст AES-256-CBC с PKCS7. У каждого потока свой
+/// экземпляр Aes с готовым ключом: экземпляр не потокобезопасен, а создавать
+/// его на каждый пакет дорого.
+/// </summary>
 public class CryptoSessionManager(INetworkUtils networkUtils) : ICryptoSessionManager
 {
+    public const int IvSize = 16;
+
     private readonly INetworkUtils _networkUtils = networkUtils;
     private readonly ECDiffieHellman _clientECDH = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
     private readonly byte[] _sessionKey = new byte[32];
+    private readonly ThreadLocal<SessionCipher> _cipher = new(() => new SessionCipher());
+    private int _keyVersion;
 
     private byte[] _sharedSecret = null!;
+
+    public static int EncryptedLength(int messageLength) => IvSize + (messageLength / 16 + 1) * 16;
 
     public void SharedSecretExchange(NetworkStream stream, CancellationToken token)
     {
@@ -35,6 +56,7 @@ public class CryptoSessionManager(INetworkUtils networkUtils) : ICryptoSessionMa
         {
             _sessionKey[i] = (byte)(encryptedSessionKey[i] ^ _sharedSecret[i]);
         }
+        Interlocked.Increment(ref _keyVersion);
     }
 
     private void SetSharedSecret(byte[] serverPublicKey)
@@ -46,73 +68,65 @@ public class CryptoSessionManager(INetworkUtils networkUtils) : ICryptoSessionMa
         _sharedSecret = _clientECDH.DeriveKeyMaterial(serverECDH.PublicKey);
     }
 
+    private Aes SessionAes()
+    {
+        var cipher = _cipher.Value!;
+        int version = Volatile.Read(ref _keyVersion);
+        if (cipher.Version != version)
+        {
+            cipher.Aes.Key = _sessionKey;
+            cipher.Version = version;
+        }
+        return cipher.Aes;
+    }
+
+    public int Encrypt(ReadOnlySpan<byte> message, Span<byte> destination) =>
+        Encrypt(SessionAes(), message, destination);
+
+    public int Decrypt(ReadOnlySpan<byte> encrypted, Span<byte> destination) =>
+        SessionAes().DecryptCbc(encrypted[IvSize..], encrypted[..IvSize], destination, PaddingMode.PKCS7);
+
+    private static int Encrypt(Aes aes, ReadOnlySpan<byte> message, Span<byte> destination)
+    {
+        var iv = destination[..IvSize];
+        RandomNumberGenerator.Fill(iv);
+        return IvSize + aes.EncryptCbc(message, iv, destination[IvSize..], PaddingMode.PKCS7);
+    }
+
     public byte[] EncryptMessage(byte[] message)
     {
-        using var aes = Aes.Create();
-
-        aes.Key = _sessionKey;
-        aes.Padding = PaddingMode.PKCS7;
-
-        aes.GenerateIV();
-        byte[] iv = aes.IV;
-
-        using var encryptor = aes.CreateEncryptor();
-        using var memoryStream = new MemoryStream();
-
-        memoryStream.Write(iv, 0, iv.Length);
-
-        using var cryptoStream = new CryptoStream(memoryStream, encryptor, CryptoStreamMode.Write);
-
-        cryptoStream.Write(message, 0, message.Length);
-        cryptoStream.FlushFinalBlock();
-
-        return memoryStream.ToArray();
+        var result = new byte[EncryptedLength(message.Length)];
+        Encrypt(message, result);
+        return result;
     }
 
     public byte[] EncryptPassword(byte[] message)
     {
         using var aes = Aes.Create();
-
         aes.Key = _sharedSecret;
-        aes.Padding = PaddingMode.PKCS7;
 
-        aes.GenerateIV();
-        byte[] iv = aes.IV;
-
-        using var encryptor = aes.CreateEncryptor();
-        using var memoryStream = new MemoryStream();
-
-        memoryStream.Write(iv, 0, iv.Length);
-
-        using var cryptoStream = new CryptoStream(memoryStream, encryptor, CryptoStreamMode.Write);
-
-        cryptoStream.Write(message, 0, message.Length);
-        cryptoStream.FlushFinalBlock();
-
-        return memoryStream.ToArray();
+        var result = new byte[EncryptedLength(message.Length)];
+        Encrypt(aes, message, result);
+        return result;
     }
 
     public byte[] DecryptMessage(byte[] encryptedMessage)
     {
-        using var aes = Aes.Create();
+        var buffer = ArrayPool<byte>.Shared.Rent(encryptedMessage.Length);
+        try
+        {
+            int length = Decrypt(encryptedMessage, buffer);
+            return buffer.AsSpan(0, length).ToArray();
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
 
-        aes.Key = _sessionKey;
-        aes.Padding = PaddingMode.PKCS7;
-
-        byte[] iv = new byte[16];
-        Buffer.BlockCopy(encryptedMessage, 0, iv, 0, iv.Length);
-        aes.IV = iv;
-
-        int encryptedDataLength = encryptedMessage.Length - iv.Length;
-        byte[] encryptedData = new byte[encryptedDataLength];
-        Buffer.BlockCopy(encryptedMessage, iv.Length, encryptedData, 0, encryptedDataLength);
-
-        using var decryptor = aes.CreateDecryptor();
-        using var memoryStream = new MemoryStream(encryptedData);
-        using var cryptoStream = new CryptoStream(memoryStream, decryptor, CryptoStreamMode.Read);
-        using var resultStream = new MemoryStream();
-
-        cryptoStream.CopyTo(resultStream);
-        return resultStream.ToArray();
+    private sealed class SessionCipher
+    {
+        public Aes Aes { get; } = Aes.Create();
+        public int Version { get; set; } = -1;
     }
 }

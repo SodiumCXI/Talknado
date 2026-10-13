@@ -1,0 +1,291 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Геометрии значков: между соседними словарями одного уровня
+         StaticResource не разрешается, поэтому словарь подключён сюда -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/Views/Themes/Icons.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
+
+
+    <!--
+        Ни одной границы. Кнопка отличается от фона ступенью поверхности,
+        наведение — следующей ступенью. Фокус клавиатуры рисуется кольцом
+        снаружи через FocusVisualStyle, поэтому не давит на форму кнопки.
+    -->
+
+    <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+        <Setter Property="FontFamily" Value="{DynamicResource FontBase}"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightRegular}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
+        <Setter Property="Height" Value="{DynamicResource ControlHeight}"/>
+        <Setter Property="Padding" Value="{DynamicResource PadControl}"/>
+        <Setter Property="MinWidth" Value="88"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRingStyle}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{DynamicResource RadiusControl}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter x:Name="Cp"
+                                          Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          TextElement.Foreground="{TemplateBinding Foreground}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource TextDisabledBrush}"/>
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.6"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Первичное действие. Одно на экран -->
+    <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{DynamicResource RadiusControl}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter x:Name="Cp"
+                                          Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          TextElement.Foreground="{TemplateBinding Foreground}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentPressedBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
+                            <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource TextDisabledBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Значковая кнопка. Квадратная, без заливки в покое: в панели их
+        несколько подряд, и ряд залитых плиток спорит с содержимым.
+    -->
+    <Style x:Key="IconButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="{DynamicResource ControlHeight}"/>
+        <Setter Property="Height" Value="{DynamicResource ControlHeight}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRingStyle}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{DynamicResource RadiusControl}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Плитка вложения в ленте: картинка, превью видео. Своей поверхности
+        у кнопки нет, её рисует содержимое; фокус клавиатуры — кольцом снаружи.
+    -->
+    <Style x:Key="MediaTileButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRingStyle}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <ContentPresenter/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Кнопка поверх превью вложения: та же полупрозрачная плашка, что у длительности
+        видео, под курсором — ступень кнопки на поверхности.
+    -->
+    <Style x:Key="MediaBadgeButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="{DynamicResource MediaBadgeButtonSize}"/>
+        <Setter Property="Height" Value="{DynamicResource MediaBadgeButtonSize}"/>
+        <Setter Property="Background" Value="{DynamicResource MediaBadgeBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRingStyle}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{DynamicResource RadiusControl}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlOnSurfaceHoverBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Значковая кнопка на приподнятой поверхности: строка участника, строка ввода.
+        Нажатие — ступень вниз, а не в самый тёмный тон: провал через две
+        ступени читается как чёрная вспышка.
+    -->
+    <Style x:Key="IconButtonRaisedStyle" TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+        <Setter Property="Background" Value="{DynamicResource ControlOnSurfaceBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{DynamicResource RadiusControl}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlOnSurfaceHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Значок файла в карточке сообщения — он же единственная кнопка файла:
+        скачать, а после загрузки открыть.
+    -->
+    <Style x:Key="FileIconButtonStyle" TargetType="Button" BasedOn="{StaticResource IconButtonRaisedStyle}">
+        <Setter Property="Width" Value="{DynamicResource AttachmentIconBoxSize}"/>
+        <Setter Property="Height" Value="{DynamicResource AttachmentIconBoxSize}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <!--
+        Кнопка прикрепления внутри строки ввода: своя высота, прижата к нижнему
+        краю, при наборе в несколько строк остаётся внизу.
+    -->
+    <Style x:Key="ComposerButtonStyle" TargetType="Button" BasedOn="{StaticResource IconButtonRaisedStyle}">
+        <Setter Property="VerticalAlignment" Value="Bottom"/>
+    </Style>
+
+    <!--
+        Значковая кнопка на приподнятой подложке: панель звонка.
+        Включённое состояние даётся не заливкой, а цветом значка —
+        так он не сливается с фоном плитки.
+    -->
+    <Style x:Key="CallIconButtonStyle" TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+        <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
+    </Style>
+
+    <!--
+        Разрыв связи. Не залит красным: постоянная красная плашка в окне,
+        где сидят часами, читается как тревога. Опасность проявляется
+        при наведении.
+    -->
+    <Style x:Key="DangerIconButtonStyle" TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource DangerBrightBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+
+    <!--
+        Значок ожидания на кнопке действия. Вращение идёт через
+        RenderTransform, а не через анимацию размеров: разметка при этом
+        не пересчитывается.
+    -->
+    <Style x:Key="SpinnerStyle" TargetType="Path">
+        <Setter Property="Width" Value="{DynamicResource IconSizeCompact}"/>
+        <Setter Property="Height" Value="{DynamicResource IconSizeCompact}"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="Data" Value="{StaticResource IconSpinner}"/>
+        <!-- Всегда цвет включённого микрофона: спиннер стоит и на отключённой
+             серой кнопке, и вне кнопок, в окне просмотра -->
+        <Setter Property="Stroke" Value="{DynamicResource IconActiveBrush}"/>
+        <Setter Property="StrokeThickness" Value="{DynamicResource IconStroke}"/>
+        <Setter Property="StrokeStartLineCap" Value="Round"/>
+        <Setter Property="StrokeEndLineCap" Value="Round"/>
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <RotateTransform/>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <EventTrigger RoutedEvent="Loaded">
+                <BeginStoryboard>
+                    <Storyboard RepeatBehavior="Forever">
+                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                         From="0" To="360" Duration="0:0:0.8"/>
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger>
+        </Style.Triggers>
+    </Style>
+
+</ResourceDictionary>

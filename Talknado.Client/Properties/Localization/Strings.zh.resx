@@ -138,6 +138,9 @@
   <data name="NicknameLabel" xml:space="preserve">
     <value>昵称：</value>
   </data>
+  <data name="FpsFormat" xml:space="preserve">
+    <value>{0} FPS</value>
+  </data>
   <data name="ConnectionKeyLabel" xml:space="preserve">
     <value>连接密钥：</value>
   </data>
@@ -233,5 +236,128 @@
   </data>
   <data name="OnlyOneScreenShareText" xml:space="preserve">
     <value>同一时间只能有一个用户共享屏幕</value>
+  </data>
+  <data name="EmptyMessagesText" xml:space="preserve">
+    <value>暂无消息</value>
+  </data>
+  <data name="EmptyUsersText" xml:space="preserve">
+    <value>目前只有你一人</value>
+  </data>
+  <data name="MicrophoneTooltip" xml:space="preserve">
+    <value>麦克风</value>
+  </data>
+  <data name="ScreenShareTooltip" xml:space="preserve">
+    <value>共享屏幕</value>
+  </data>
+  <data name="VolumeTooltip" xml:space="preserve">
+    <value>音量</value>
+  </data>
+  <data name="ViewScreenShareTooltip" xml:space="preserve">
+    <value>观看屏幕</value>
+  </data>
+  <data name="ConnectionKeyTooltip" xml:space="preserve">
+    <value>连接密钥</value>
+  </data>
+  <data name="HostPanelButton" xml:space="preserve">
+    <value>主机面板</value>
+  </data>
+  <data name="ShareQualityLabel" xml:space="preserve">
+    <value>屏幕共享画质上限</value>
+  </data>
+  <data name="ShareQualityLowText" xml:space="preserve">
+    <value>720p，30 FPS</value>
+  </data>
+  <data name="ShareQualityMediumText" xml:space="preserve">
+    <value>1080p，30 FPS</value>
+  </data>
+  <data name="ShareQualityHighText" xml:space="preserve">
+    <value>1080p，60 FPS</value>
+  </data>
+  <data name="SessionUsersLabel" xml:space="preserve">
+    <value>会话参与者</value>
+  </data>
+  <data name="KickUserTooltip" xml:space="preserve">
+    <value>移出会话</value>
+  </data>
+  <data name="KickedFromSessionText" xml:space="preserve">
+    <value>主机已将你移出会话。</value>
+  </data>
+  <data name="SessionNoticeTitle" xml:space="preserve">
+    <value>会话</value>
+  </data>
+  <data name="NoiseSuppressionLabel" xml:space="preserve">
+    <value>降噪：</value>
+  </data>
+  <data name="NoiseSuppressionTooltip" xml:space="preserve">
+    <value>中等：延迟和负载低。强和最强能更好地抑制键盘声和背景噪声，但会增加 30 毫秒延迟，分别占用约 25% 和 45% 的单个处理器核心，并可能削弱耳语。</value>
+  </data>
+  <data name="NoiseSuppressionNone" xml:space="preserve">
+    <value>无</value>
+  </data>
+  <data name="NoiseSuppressionMedium" xml:space="preserve">
+    <value>中等（RNNoise）</value>
+  </data>
+  <data name="NoiseSuppressionStrong" xml:space="preserve">
+    <value>强（DPDFNet-2）</value>
+  </data>
+  <data name="NoiseSuppressionMaximum" xml:space="preserve">
+    <value>最强（DPDFNet-8）</value>
+  </data>
+  <data name="SizeBytesFormat" xml:space="preserve">
+    <value>{0} B</value>
+  </data>
+  <data name="SizeKilobytesFormat" xml:space="preserve">
+    <value>{0:0.#} KB</value>
+  </data>
+  <data name="SizeMegabytesFormat" xml:space="preserve">
+    <value>{0:0.#} MB</value>
+  </data>
+  <data name="SizeGigabytesFormat" xml:space="preserve">
+    <value>{0:0.##} GB</value>
+  </data>
+  <data name="AttachTooltip" xml:space="preserve">
+    <value>附加文件</value>
+  </data>
+  <data name="RemoveAttachmentTooltip" xml:space="preserve">
+    <value>移除附件</value>
+  </data>
+  <data name="DownloadText" xml:space="preserve">
+    <value>下载</value>
+  </data>
+  <data name="ShowInFolderText" xml:space="preserve">
+    <value>在文件夹中显示</value>
+  </data>
+  <data name="FileUnavailableText" xml:space="preserve">
+    <value>文件不可用</value>
+  </data>
+  <data name="PlayTooltip" xml:space="preserve">
+    <value>播放（空格）</value>
+  </data>
+  <data name="PauseTooltip" xml:space="preserve">
+    <value>暂停（空格）</value>
+  </data>
+  <data name="CloseViewerTooltip" xml:space="preserve">
+    <value>关闭（Esc）</value>
+  </data>
+  <data name="MediaOpenFailedText" xml:space="preserve">
+    <value>无法打开视频</value>
+  </data>
+  <data name="FileBandwidthLabel" xml:space="preserve">
+    <value>文件传输速度上限，Mbit/s</value>
+  </data>
+  <data name="FileBandwidthTooltip" xml:space="preserve">
+    <value>0 表示不限制</value>
+  </data>
+  <data name="SaveToDownloadsTooltip" xml:space="preserve">
+    <value>保存到“下载”</value>
+  </data>
+  <data name="OpenFileTooltip" xml:space="preserve">
+    <value>打开</value>
+  </data>
+  <data name="ClientVersionUnsupportedText" xml:space="preserve">
+    <value>服务器不支持您的 Talknado 版本。请更新应用。</value>
+  </data>
+  <data name="ServerVersionUnsupportedText" xml:space="preserve">
+    <value>主机的 Talknado 版本过旧。主机需要更新应用。</value>
   </data>
 </root>

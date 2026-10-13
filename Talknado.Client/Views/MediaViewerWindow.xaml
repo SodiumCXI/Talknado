@@ -1,0 +1,269 @@
+﻿<local:TalknadoWindow x:Class="Talknado.Client.Views.MediaViewerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:l="clr-namespace:Talknado.Client.Properties.Localization"
+        xmlns:local="clr-namespace:Talknado.Client.Views"
+        xmlns:vm="clr-namespace:Talknado.Client.ViewModels"
+        xmlns:m="clr-namespace:Talknado.Client.Models"
+        xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=vm:MediaViewerViewModel}"
+        Style="{StaticResource AppWindowStyle}"
+        Title="{Binding Manager.Current.FileName}"
+        Width="960" Height="600"
+        MinWidth="480" MinHeight="320"
+        WindowStartupLocation="Manual">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="28"
+                            ResizeBorderThickness="6"
+                            CornerRadius="0"
+                            GlassFrameThickness="0,0,0,1"
+                            UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+
+    <local:TalknadoWindow.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <cnv:BufferedRangesBrushConverter x:Key="BufferedRangesBrushConverter" Fill="{StaticResource TrackBufferedBrush}"/>
+    </local:TalknadoWindow.Resources>
+
+    <!--
+        Окно просмотра устроено как окно демонстрации экрана: своя полоса заголовка,
+        окно тянется и разворачивается. Esc закрывает, пробел ставит видео на паузу,
+        стрелки перематывают на 5 секунд.
+    -->
+    <Grid Background="{DynamicResource WindowBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" x:Name="TitleBar"
+              Height="{DynamicResource TitleBarHeight}"
+              Background="{DynamicResource ChromeBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Style="{DynamicResource BodyTextStyle}"
+                       Text="{Binding Manager.Current.FileName}"
+                       TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Center"
+                       Margin="{DynamicResource PadControl}"/>
+
+            <Button Grid.Column="1" x:Name="MaximizeButton"
+                    Style="{DynamicResource TitleBarMaximizeButtonStyle}"
+                    Click="MaximizeButton_Click">
+                <Path Style="{DynamicResource TitleBarIconStyle}" Data="{StaticResource IconWindowMaximize}"/>
+            </Button>
+
+            <Button Grid.Column="2" x:Name="CloseButton"
+                    Style="{DynamicResource TitleBarCloseButtonStyle}"
+                    Click="CloseButton_Click">
+                <Path Style="{DynamicResource TitleBarIconStyle}" Data="{StaticResource IconWindowClose}"/>
+            </Button>
+        </Grid>
+
+        <!-- Область под картинку: по её размеру плеер выбирает размер кадра -->
+        <Grid Grid.Row="1" SizeChanged="MediaArea_SizeChanged">
+            <!--
+                Картинка вписывается в окно, но не крупнее своего размера. Рамка задана
+                размером из объявления, поэтому превью и догрузившаяся картинка
+                занимают одно и то же место, а не прыгают по своим размерам.
+            -->
+            <Image Source="{Binding Image}"
+                   Stretch="Uniform"
+                   MaxWidth="{Binding Manager.Current.PixelWidth}"
+                   MaxHeight="{Binding Manager.Current.PixelHeight}"
+                   RenderOptions.BitmapScalingMode="HighQuality">
+                <Image.Style>
+                    <Style TargetType="Image">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Manager.Current.IsVideo}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Image.Style>
+            </Image>
+
+            <!-- Превью видео, пока плеер открывает файл -->
+            <Image Source="{Binding Image}"
+                   Stretch="Uniform"
+                   RenderOptions.BitmapScalingMode="LowQuality">
+                <Image.Style>
+                    <Style TargetType="Image">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding Manager.Current.IsVideo}" Value="True"/>
+                                    <Condition Binding="{Binding VideoSurface}" Value="{x:Null}"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Image.Style>
+            </Image>
+
+            <!-- Поверхность видео: без эффектов, прозрачности и трансформаций -->
+            <Image Source="{Binding VideoSurface}"
+                   Stretch="Uniform"
+                   RenderOptions.BitmapScalingMode="LowQuality"
+                   MouseLeftButtonUp="Video_MouseLeftButtonUp"/>
+
+            <!-- Ожидание данных: значок отдельным элементом по центру, а не эффектом над видео -->
+            <Border Style="{DynamicResource RaisedStyle}"
+                    Padding="{DynamicResource PadCard}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Visibility="{Binding IsBuffering, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Path Style="{DynamicResource SpinnerStyle}" Data="{StaticResource IconSpinner}"/>
+            </Border>
+
+            <Border Padding="{DynamicResource PadCard}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource RaisedStyle}">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Manager.Current.State}" Value="{x:Static m:AttachmentState.Failed}">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding OpenFailed}" Value="True">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock>
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource ErrorTextStyle}">
+                            <Setter Property="Text" Value="{x:Static l:Strings.FileUnavailableText}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding OpenFailed}" Value="True">
+                                    <Setter Property="Text" Value="{x:Static l:Strings.MediaOpenFailedText}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Border>
+        </Grid>
+
+        <!-- Управление видео: своей строкой под картинкой, а не поверх неё -->
+        <!-- До первого кадра полоса скрыта, но место держит: иначе видео
+             вписалось бы во всю высоту и сжалось бы при её появлении -->
+        <Border Grid.Row="2" x:Name="ControlBar"
+                Background="{DynamicResource SurfaceBrush}"
+                Padding="{DynamicResource PadFeed}">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Manager.Current.IsVideo}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding Manager.Current.IsVideo}" Value="True"/>
+                                <Condition Binding="{Binding VideoSurface}" Value="{x:Null}"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Hidden"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0"
+                        Style="{DynamicResource CallIconButtonStyle}"
+                        Command="{Binding TogglePlayCommand}"
+                        Margin="{DynamicResource GapInline}"
+                        Cursor="Hand">
+                    <Button.ToolTip>
+                        <ToolTip>
+                            <ToolTip.Style>
+                                <Style TargetType="ToolTip" BasedOn="{StaticResource {x:Type ToolTip}}">
+                                    <Setter Property="Content" Value="{x:Static l:Strings.PlayTooltip}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                            <Setter Property="Content" Value="{x:Static l:Strings.PauseTooltip}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ToolTip.Style>
+                        </ToolTip>
+                    </Button.ToolTip>
+                    <Path>
+                        <Path.Style>
+                            <Style TargetType="Path" BasedOn="{StaticResource IconStyle}">
+                                <Setter Property="Data" Value="{StaticResource IconPlay}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                        <Setter Property="Data" Value="{StaticResource IconPause}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+                </Button>
+
+                <!-- Цифры шрифта разной ширины: невидимый образец держит место под
+                     самое широкое время этого видео, и дорожка не дёргается -->
+                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="{DynamicResource GapInline}">
+                    <TextBlock Style="{DynamicResource MutedTextStyle}"
+                               Text="{Binding TimeTextReserve}"
+                               Visibility="Hidden"/>
+                    <TextBlock Style="{DynamicResource MutedTextStyle}"
+                               Text="{Binding TimeText}"/>
+                </Grid>
+
+                <!-- Без фокуса: стрелки перематывают через окно, а не двигают
+                     ползунок мимо плеера -->
+                <Slider Grid.Column="2" x:Name="PositionSlider"
+                        Style="{DynamicResource VolumeSliderStyle}"
+                        Minimum="0"
+                        Maximum="{Binding DurationSeconds}"
+                        Value="{Binding PositionSeconds}"
+                        Tag="{Binding BufferedRanges, Converter={StaticResource BufferedRangesBrushConverter}}"
+                        Focusable="False"
+                        VerticalAlignment="Center"
+                        Margin="{DynamicResource GapInline}"/>
+
+                <Path Grid.Column="3"
+                      Style="{DynamicResource IconStyle}"
+                      Stroke="{DynamicResource TextMutedBrush}"
+                      Data="{StaticResource IconSpeaker}"
+                      Margin="{DynamicResource GapInline}"
+                      VerticalAlignment="Center"/>
+
+                <Slider Grid.Column="4"
+                        Style="{DynamicResource VolumeSliderStyle}"
+                        Width="{DynamicResource ViewerVolumeWidth}"
+                        Minimum="0"
+                        Maximum="1"
+                        SmallChange="0.05" LargeChange="0.2"
+                        Value="{Binding Volume}"
+                        VerticalAlignment="Center"
+                        ToolTip="{x:Static l:Strings.VolumeTooltip}"/>
+            </Grid>
+        </Border>
+    </Grid>
+</local:TalknadoWindow>

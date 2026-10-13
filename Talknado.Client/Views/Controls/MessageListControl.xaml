@@ -1,37 +1,361 @@
 ﻿<UserControl x:Class="Talknado.Client.Views.Controls.MessageListControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <ItemsControl ItemsSource="{Binding Messages}">
-            <ItemsControl.ItemTemplate>
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:Talknado.Client.Properties.Localization"
+             xmlns:vm="clr-namespace:Talknado.Client.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
+             xmlns:m="clr-namespace:Talknado.Client.Models"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}">
+
+    <UserControl.Resources>
+        <cnv:UsernameToInitialsConverter x:Key="InitialsConverter"/>
+        <cnv:UsernameToAvatarBrushConverter x:Key="AvatarBrushConverter"/>
+        <cnv:ImageFillConverter x:Key="ImageFillConverter"/>
+
+        <!-- Полоса загрузки вложения: видна только пока идёт загрузка -->
+        <Style x:Key="AttachmentProgressStyle" TargetType="ProgressBar" BasedOn="{StaticResource ThinProgressBarStyle}">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Downloading}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="AttachmentFailedStyle" TargetType="TextBlock" BasedOn="{StaticResource ErrorTextStyle}">
+            <Setter Property="Text" Value="{x:Static l:Strings.FileUnavailableText}"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Failed}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!--
+            Картинка и превью видео. Место под превью резервируется по размеру
+            из объявления, поэтому карточка не растёт, когда картинка догрузится.
+            Скругление даёт картинка-фон рамки, а не обрезка содержимого.
+            Кнопка сохранения в «Загрузки» появляется под курсором, после
+            сохранения она показывает файл в папке.
+        -->
+        <DataTemplate x:Key="MediaAttachmentTemplate" DataType="{x:Type m:Attachment}">
+            <Button x:Name="Tile"
+                    Style="{DynamicResource MediaTileButtonStyle}"
+                    Command="{Binding DataContext.OpenAttachmentCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                    CommandParameter="{Binding}">
+                <!-- В узкой ленте превью сжимается целиком, с сохранением пропорций -->
+                <Viewbox Stretch="Uniform" StretchDirection="DownOnly">
+                <Grid Width="{Binding PreviewWidth}" Height="{Binding PreviewHeight}">
+                    <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="{DynamicResource RadiusControl}"/>
+                    <!-- Превью декодировано крупнее плитки: без HighQuality уменьшение
+                         идёт без сглаживания, и на краях появляются лесенки -->
+                    <Border CornerRadius="{DynamicResource RadiusControl}"
+                            Background="{Binding Thumbnail, Converter={StaticResource ImageFillConverter}}"
+                            RenderOptions.BitmapScalingMode="HighQuality"/>
+
+                    <!-- Кнопка воспроизведения и длительность: только у видео -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsVideo}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <Grid Width="{DynamicResource MediaBadgeSize}"
+                              Height="{DynamicResource MediaBadgeSize}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center">
+                            <Ellipse Fill="{DynamicResource MediaBadgeBrush}"/>
+                            <Path Style="{DynamicResource IconStyle}"
+                                  Data="{StaticResource IconPlay}"
+                                  Stroke="{DynamicResource TextPrimaryBrush}"/>
+                        </Grid>
+                        <Border Background="{DynamicResource MediaBadgeBrush}"
+                                CornerRadius="{DynamicResource RadiusControl}"
+                                Padding="{DynamicResource PadBadge}"
+                                Margin="{DynamicResource PadFeed}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom">
+                            <TextBlock Style="{DynamicResource BodyTextStyle}" Text="{Binding DurationText}"/>
+                        </Border>
+                    </Grid>
+
+                    <Button Command="{Binding DataContext.SaveAttachmentCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                            CommandParameter="{Binding}"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="{DynamicResource PadFeed}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource MediaBadgeButtonStyle}">
+                                <Setter Property="ToolTip" Value="{x:Static l:Strings.SaveToDownloadsTooltip}"/>
+                                <Setter Property="Visibility" Value="Hidden"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMouseOver, ElementName=Tile}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsSaved}" Value="True">
+                                        <Setter Property="ToolTip" Value="{x:Static l:Strings.ShowInFolderText}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Failed}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsOwn}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <Path>
+                            <Path.Style>
+                                <Style TargetType="Path" BasedOn="{StaticResource IconStyle}">
+                                    <Setter Property="Data" Value="{StaticResource IconDownload}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSaved}" Value="True">
+                                            <Setter Property="Data" Value="{StaticResource IconFolder}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                    </Button>
+
+                    <TextBlock Style="{StaticResource AttachmentFailedStyle}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+
+                    <!-- Только у картинки: видео качается по мере просмотра,
+                         и полоса под превью ничего бы не говорила -->
+                    <ProgressBar Value="{Binding Progress, Mode=OneWay}"
+                                 VerticalAlignment="Bottom"
+                                 Margin="{DynamicResource PadFeed}">
+                        <ProgressBar.Style>
+                            <Style TargetType="ProgressBar" BasedOn="{StaticResource AttachmentProgressStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsVideo}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ProgressBar.Style>
+                    </ProgressBar>
+                </Grid>
+                </Viewbox>
+            </Button>
+        </DataTemplate>
+
+        <!--
+            Файл: одна кнопка — сам значок. До загрузки на нём стрелка, щелчок качает
+            файл в «Загрузки». После — значок типа файла, как в проводнике, и щелчок
+            открывает файл программой по умолчанию.
+        -->
+        <DataTemplate x:Key="FileAttachmentTemplate" DataType="{x:Type m:Attachment}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0"
+                        Command="{Binding DataContext.OpenAttachmentCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                        CommandParameter="{Binding}"
+                        Margin="{DynamicResource GapInline}"
+                        VerticalAlignment="Center">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource FileIconButtonStyle}">
+                            <Setter Property="ToolTip" Value="{x:Static l:Strings.DownloadText}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Ready}">
+                                    <Setter Property="ToolTip" Value="{x:Static l:Strings.OpenFileTooltip}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Downloading}">
+                                    <Setter Property="IsEnabled" Value="False"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Failed}">
+                                    <Setter Property="IsEnabled" Value="False"/>
+                                    <Setter Property="ToolTip" Value="{x:Null}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <Grid>
+                        <Path>
+                            <Path.Style>
+                                <Style TargetType="Path" BasedOn="{StaticResource FileGlyphStyle}">
+                                    <Setter Property="Data" Value="{StaticResource IconDownload}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Ready}">
+                                            <Setter Property="Data" Value="{StaticResource IconFile}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Failed}">
+                                            <Setter Property="Data" Value="{StaticResource IconFile}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                    </Grid>
+                </Button>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Style="{DynamicResource BodyTextStyle}"
+                               Text="{Binding FileName}"
+                               ToolTip="{Binding FileName}"
+                               TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Style="{DynamicResource MutedTextStyle}" Text="{Binding SizeText}"/>
+                    <TextBlock Style="{StaticResource AttachmentFailedStyle}"/>
+                    <ProgressBar Style="{StaticResource AttachmentProgressStyle}"
+                                 Value="{Binding Progress, Mode=OneWay}"
+                                 Margin="{DynamicResource GapRowTop}"/>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <!--
+        ListBox, а не ItemsControl в ScrollViewer: у второго виртуализация
+        не работает вовсе, и лента строит все сообщения целиком.
+
+        Лента доезжает до низа сама, но только если пользователь уже был внизу:
+        иначе чтение старых сообщений сбрасывало бы его вниз на каждое новое.
+    -->
+
+    <Grid>
+        <ListBox ItemsSource="{Binding Messages}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="{DynamicResource PadFeed}"
+                 HorizontalContentAlignment="Stretch"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 ScrollViewer.CanContentScroll="True"
+                 VirtualizingStackPanel.IsVirtualizing="True"
+                 VirtualizingStackPanel.VirtualizationMode="Recycling"
+                 VirtualizingPanel.ScrollUnit="Pixel"
+                 ScrollViewer.ScrollChanged="Messages_ScrollChanged">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <!-- Отрицательный отступ снимает промежуток у последней строки -->
+                    <VirtualizingStackPanel Margin="{DynamicResource GapRowTrim}"/>
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="0"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Focusable" Value="False"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <ContentPresenter/>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+
+            <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <Border Style="{DynamicResource MessageBorderStyle}">
-                        <StackPanel Orientation="Vertical">
-                            <Grid Grid.ColumnSpan="2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           Style="{DynamicResource SecondaryTextStyle}"
-                                           Text="{Binding Username}"
-                                           Margin="0,0,0,2"
-                                           VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="1"
-                                           Style="{DynamicResource SecondaryTextStyle}"
-                                           Text="{Binding Timestamp}"
-                                           Margin="0,0,0,2"
-                                           VerticalAlignment="Center"
-                                           HorizontalAlignment="Right"/>
+                    <Border Style="{DynamicResource MessageCardStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!--
+                                Аватар тот же, что в списке участников: цвет
+                                по нику, поэтому автор узнаётся до чтения имени.
+                            -->
+                            <Grid Grid.Column="0"
+                                  Width="{DynamicResource AvatarSize}"
+                                  Height="{DynamicResource AvatarSize}"
+                                  Margin="{DynamicResource GapInline}"
+                                  VerticalAlignment="Top">
+                                <Ellipse Fill="{Binding Username, Converter={StaticResource AvatarBrushConverter}}"/>
+                                <TextBlock Style="{DynamicResource AvatarInitialsStyle}"
+                                           Text="{Binding Username, Converter={StaticResource InitialsConverter}}"/>
                             </Grid>
-                            <TextBox Style="{DynamicResource SelectableTextStyle}"
-                                     Margin="-2,0,-2,4"
-                                     Text="{Binding Text}"
-                                     VerticalAlignment="Top"/>
-                        </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+                                <!-- Шапка отделена от текста, иначе имя липнет к сообщению -->
+                                <Grid Margin="{DynamicResource GapRow}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Style="{DynamicResource MessageAuthorStyle}"
+                                               Foreground="{Binding Username, Converter={StaticResource AvatarBrushConverter}}"
+                                               Text="{Binding Username}"
+                                               Margin="{DynamicResource GapInline}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="1"
+                                               Style="{DynamicResource MessageTimeStyle}"
+                                               Text="{Binding Timestamp}"/>
+                                </Grid>
+                                <ContentControl Content="{Binding Attachment}" Focusable="False">
+                                    <ContentControl.Style>
+                                        <Style TargetType="ContentControl">
+                                            <Setter Property="ContentTemplate" Value="{StaticResource MediaAttachmentTemplate}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Attachment.Kind}" Value="{x:Static m:AttachmentKind.File}">
+                                                    <Setter Property="ContentTemplate" Value="{StaticResource FileAttachmentTemplate}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HasAttachment}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ContentControl.Style>
+                                </ContentControl>
+                                <TextBox Text="{Binding Text, Mode=OneWay}">
+                                    <TextBox.Style>
+                                        <Style TargetType="TextBox" BasedOn="{StaticResource MessageTextStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasAttachment}" Value="True">
+                                                    <Setter Property="Margin" Value="{DynamicResource MessageCaptionMargin}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Text}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBox.Style>
+                                </TextBox>
+                            </StackPanel>
+                        </Grid>
                     </Border>
                 </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-    </ScrollViewer>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Пустое состояние: не забытый серый прямоугольник -->
+        <TextBlock Text="{x:Static l:Strings.EmptyMessagesText}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   TextWrapping="Wrap"
+                   IsHitTestVisible="False">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Messages.Count}" Value="0">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </Grid>
 </UserControl>

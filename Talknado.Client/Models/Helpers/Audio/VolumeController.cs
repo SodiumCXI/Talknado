@@ -2,16 +2,15 @@
 
 public static class VolumeController
 {
-    public static void AdjustVolume(byte[] audioData, float volumeMultiplier)
+    public static void AdjustVolume(Span<byte> audioData, float volumeMultiplier)
     {
         if (volumeMultiplier == 0f)
         {
-            Array.Clear(audioData, 0, audioData.Length);
+            audioData.Clear();
             return;
         }
 
-        short[] samples = new short[audioData.Length / 2];
-        Buffer.BlockCopy(audioData, 0, samples, 0, audioData.Length);
+        var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, short>(audioData);
 
         for (int i = 0; i < samples.Length; i++)
         {
@@ -19,7 +18,5 @@ public static class VolumeController
 
             samples[i] = (short)Math.Clamp(adjustedSample, short.MinValue, short.MaxValue);
         }
-
-        Buffer.BlockCopy(samples, 0, audioData, 0, audioData.Length);
     }
 }

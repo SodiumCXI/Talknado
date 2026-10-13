@@ -13,6 +13,7 @@ public static class CoreServicesRegistration
         services.AddSingleton<INetworkUtils, NetworkUtils>();
         services.AddSingleton<AudioManager>();
         services.AddSingleton<IScreenShareManager, ScreenShareManager>();
+        services.AddSingleton<IFileChannel, FileChannel>();
         services.AddSingleton<IClientManager, ClientManager>();
         services.AddSingleton<IServerManager, ServerManager>();
 

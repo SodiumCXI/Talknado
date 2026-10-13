@@ -2,6 +2,7 @@
 using Talknado.Client.Infrastructure;
 using Talknado.Client.Models;
 using Talknado.Client.Views;
+using Talknado.Server;
 
 namespace Talknado.Client;
 
@@ -31,6 +32,11 @@ public sealed class ClientHost : IDisposable
             window.Activate();
         }
         return result;
+    }
+
+    public void AttachServerAdmin(ServerAdmin admin)
+    {
+        _provider.GetRequiredService<IHostPanelManager>().Attach(admin);
     }
 
     public void CloseConnection()

@@ -1,23 +1,32 @@
 ﻿using FFmpeg.AutoGen;
+using System.Buffers.Binary;
 using System.Management;
-using System.Runtime.InteropServices;
 
 namespace Talknado.Client.Models.Helpers.ScreenShare;
 
 public static unsafe class H264Encoder
 {
-    private const int MAX_PIXELS = 921600;
+    private static ShareQualityProfile _profile = ShareQuality.Resolve(0);
 
     private static AVCodec* _codec;
     private static AVCodecContext* _codecContext;
     private static AVFrame* _frame;
     private static AVPacket* _packet;
-    private static SwsContext* _swsContext;
     private static int _width;
     private static int _height;
     private static int _frameCount = 0;
     private static bool _initialized = false;
     private static readonly bool _hasDiscreteGPU;
+
+    // Перевод BGRA в YUV на процессоре — самая дорогая часть кадра: около 7 мс
+    // на 1080p в одном потоке. Без масштабирования строки кадра независимы,
+    // поэтому кадр режется на полосы по чётному числу строк, и полосы считаются
+    // параллельно. При масштабировании полоса одна: фильтр на стыке полос
+    // не видел бы соседних строк, и стык был бы заметен.
+    private static ConvertBand[] _bands = [];
+    private static byte* _bgra;
+    private static readonly Action<int> _convertBand = ConvertBandAt;
+    private static byte[] _output = [];
 
     static H264Encoder()
     {
@@ -39,6 +48,14 @@ public static unsafe class H264Encoder
             });
     }
 
+    public static bool HasHardwareEncoder => _hasDiscreteGPU;
+
+    public static void Initialize(int inputWidth, int inputHeight, ShareQualityProfile profile)
+    {
+        _profile = profile;
+        Initialize(inputWidth, inputHeight);
+    }
+
     public static void Initialize(int inputWidth, int inputHeight)
     {
         if (_initialized)
@@ -50,6 +67,8 @@ public static unsafe class H264Encoder
         CalculateScaledDimensions(inputWidth, inputHeight, out var width, out var height);
 
         _frameCount = 0;
+
+        var fps = _profile.Fps;
 
         string[] codecNames = ["h264_nvenc", "h264_amf", "libx264"];
         bool codecOpened = false;
@@ -66,10 +85,12 @@ public static unsafe class H264Encoder
             _codecContext = ffmpeg.avcodec_alloc_context3(_codec);
             _codecContext->width = width;
             _codecContext->height = height;
-            _codecContext->time_base = new AVRational { num = 1, den = 30 };
-            _codecContext->framerate = new AVRational { num = 30, den = 1 };
+            _codecContext->time_base = new AVRational { num = 1, den = fps };
+            _codecContext->framerate = new AVRational { num = fps, den = 1 };
             _codecContext->pix_fmt = AVPixelFormat.AV_PIX_FMT_YUV420P;
-            _codecContext->gop_size = 30;
+            // Опорный кадр раз в секунду при любой частоте: иначе на 60 кадрах
+            // опоздавший зритель ждал бы картинку вдвое дольше.
+            _codecContext->gop_size = fps;
             _codecContext->max_b_frames = 0;
 
             if (codecName.Contains("nvenc"))
@@ -124,12 +145,70 @@ public static unsafe class H264Encoder
 
         _packet = ffmpeg.av_packet_alloc();
 
-        _swsContext = ffmpeg.sws_getContext(
-            inputWidth, inputHeight, AVPixelFormat.AV_PIX_FMT_BGRA,
-            width, height, AVPixelFormat.AV_PIX_FMT_YUV420P,
-            ffmpeg.SWS_FAST_BILINEAR, null, null, null);
+        _bands = width == inputWidth && height == inputHeight && height % 2 == 0
+            ? CreateBands(width, height, Math.Clamp(Environment.ProcessorCount / 2, 1, 4))
+            : [new ConvertBand(inputWidth, 0, inputHeight, width, height, _frame)];
 
         _initialized = true;
+    }
+
+    private static ConvertBand[] CreateBands(int width, int height, int count)
+    {
+        int rowPairs = height / 2;
+        var bands = new ConvertBand[count];
+        for (int i = 0; i < count; i++)
+        {
+            int top = rowPairs * i / count * 2;
+            int bottom = rowPairs * (i + 1) / count * 2;
+            bands[i] = new ConvertBand(width, top, bottom - top, width, bottom - top, _frame);
+        }
+        return bands;
+    }
+
+    private static void ConvertBandAt(int index) => _bands[index].Convert(_bgra, _width * 4);
+
+    /// <summary>
+    /// Полоса строк исходного кадра со своим контекстом sws: контекст хранит
+    /// состояние между строками и не делится между потоками. Плоскости — в
+    /// постоянных массивах: неявное приведение byte_ptrArray8 к byte*[] создаёт
+    /// массив на каждый вызов.
+    /// </summary>
+    private sealed class ConvertBand
+    {
+        private readonly SwsContext* _context;
+        private readonly int _top;
+        private readonly int _srcHeight;
+        private readonly byte*[] _src = new byte*[4];
+        private readonly int[] _srcLinesize = new int[4];
+        private readonly byte*[] _dst = new byte*[4];
+        private readonly int[] _dstLinesize = new int[4];
+
+        public ConvertBand(int srcWidth, int top, int srcHeight, int dstWidth, int dstHeight, AVFrame* frame)
+        {
+            _top = top;
+            _srcHeight = srcHeight;
+            _context = ffmpeg.sws_getContext(
+                srcWidth, srcHeight, AVPixelFormat.AV_PIX_FMT_BGRA,
+                dstWidth, dstHeight, AVPixelFormat.AV_PIX_FMT_YUV420P,
+                ffmpeg.SWS_FAST_BILINEAR, null, null, null);
+
+            for (uint i = 0; i < 4; i++)
+            {
+                int rows = i == 0 ? top : top / 2;
+                _dst[i] = frame->data[i] == null ? null : frame->data[i] + rows * frame->linesize[i];
+                _dstLinesize[i] = frame->linesize[i];
+            }
+        }
+
+        public void Convert(byte* bgra, int stride)
+        {
+            _src[0] = bgra + (long)_top * stride;
+            _srcLinesize[0] = stride;
+            ffmpeg.sws_scale(_context, _src, _srcLinesize, 0, _srcHeight, _dst, _dstLinesize);
+            _src[0] = null;
+        }
+
+        public void Free() => ffmpeg.sws_freeContext(_context);
     }
 
     private static void CalculateScaledDimensions(int inputWidth, int inputHeight, out int width, out int height)
@@ -137,9 +216,9 @@ public static unsafe class H264Encoder
         width = inputWidth;
         height = inputHeight;
 
-        if (width * height > MAX_PIXELS)
+        if ((long)width * height > _profile.MaxPixels)
         {
-            double scale = Math.Sqrt((double)MAX_PIXELS / (width * height));
+            double scale = Math.Sqrt((double)_profile.MaxPixels / ((double)width * height));
             width = (int)(width * scale);
             height = (int)(height * scale);
 
@@ -148,7 +227,11 @@ public static unsafe class H264Encoder
         }
     }
 
-    public static byte[] Encode(byte[] bgraData, int deltaMs)
+    /// <summary>
+    /// Пакет: признак опорного кадра, интервал в мс и данные H.264. Пустой —
+    /// кодировщик кадр ещё не отдал. Массив общий и переписывается следующим вызовом.
+    /// </summary>
+    public static ReadOnlySpan<byte> Encode(byte[] bgraData, int deltaMs)
     {
         if (!_initialized)
             throw new InvalidOperationException("Encoder is not initialized. Call Initialize()");
@@ -158,9 +241,12 @@ public static unsafe class H264Encoder
 
         fixed (byte* pBgra = bgraData)
         {
-            byte*[] srcData = [pBgra];
-            int[] srcLinesize = [_width * 4];
-            ffmpeg.sws_scale(_swsContext, srcData, srcLinesize, 0, _height, _frame->data, _frame->linesize);
+            _bgra = pBgra;
+            if (_bands.Length == 1)
+                ConvertBandAt(0);
+            else
+                Parallel.For(0, _bands.Length, _convertBand);
+            _bgra = null;
         }
 
         _frame->pts = _frameCount++;
@@ -169,19 +255,22 @@ public static unsafe class H264Encoder
 
         int ret = ffmpeg.avcodec_receive_packet(_codecContext, _packet);
         if (ret == ffmpeg.AVERROR(ffmpeg.EAGAIN) || ret == ffmpeg.AVERROR_EOF)
-            return null!;
+            return default;
 
         if (ret < 0)
             throw new Exception($"Encoding error: {ret}");
 
+        int length = 5 + _packet->size;
+        if (_output.Length < length)
+            _output = new byte[length * 2];
+
         bool isKeyFrame = (_packet->flags & ffmpeg.AV_PKT_FLAG_KEY) != 0;
-        byte[] encodedData = new byte[5 + _packet->size];
-        encodedData[0] = isKeyFrame ? (byte)1 : (byte)0;
-        BitConverter.TryWriteBytes(encodedData.AsSpan(1, 4), deltaMs);
-        Marshal.Copy((IntPtr)_packet->data, encodedData, 5, _packet->size);
+        _output[0] = isKeyFrame ? (byte)1 : (byte)0;
+        BinaryPrimitives.WriteInt32LittleEndian(_output.AsSpan(1, 4), deltaMs);
+        new ReadOnlySpan<byte>(_packet->data, _packet->size).CopyTo(_output.AsSpan(5));
 
         ffmpeg.av_packet_unref(_packet);
-        return encodedData;
+        return _output.AsSpan(0, length);
     }
 
     public static void Resize(int width, int height)
@@ -193,11 +282,9 @@ public static unsafe class H264Encoder
     {
         if (!_initialized) return;
 
-        if (_swsContext != null)
-        {
-            ffmpeg.sws_freeContext(_swsContext);
-            _swsContext = null;
-        }
+        foreach (var band in _bands)
+            band.Free();
+        _bands = [];
 
         if (_packet != null)
         {
@@ -235,6 +322,11 @@ public unsafe class H264Decoder
     private int _height;
     private bool _initialized = false;
 
+    private readonly byte*[] _srcData = new byte*[4];
+    private readonly int[] _srcLinesize = new int[4];
+    private readonly byte*[] _dstData = new byte*[4];
+    private readonly int[] _dstLinesize = new int[4];
+
     public H264Decoder()
     {
         Initialize();
@@ -271,38 +363,33 @@ public unsafe class H264Decoder
         ffmpeg.avcodec_flush_buffers(_codecContext);
     }
 
-    public byte[] Decode(byte[] h264Data)
+    /// <summary>
+    /// true — кадр готов, его размер в <see cref="Width"/> и <see cref="Height"/>,
+    /// забрать его — <see cref="ConvertTo"/>.
+    /// </summary>
+    public bool Decode(ReadOnlySpan<byte> h264Data)
     {
         if (!_initialized)
             throw new InvalidOperationException("Decoder is not initialized. Call Initialize()");
 
-        AVPacket* pkt = ffmpeg.av_packet_alloc();
-        if (pkt == null)
-            throw new Exception("av_packet_alloc failed");
-
-        int ret = ffmpeg.av_new_packet(pkt, h264Data.Length);
-        if (ret < 0)
-            throw new Exception("av_new_packet failed");
-
+        int ret;
+        // Пакет без буфера FFmpeg: send_packet сам копирует данные с нужным
+        // запасом в конце, поэтому управляемый массив хватает закрепить на вызов.
         fixed (byte* src = h264Data)
         {
-            Buffer.MemoryCopy(
-                src,
-                pkt->data,
-                h264Data.Length,
-                h264Data.Length);
+            _packet->data = src;
+            _packet->size = h264Data.Length;
+            ret = ffmpeg.avcodec_send_packet(_codecContext, _packet);
+            _packet->data = null;
+            _packet->size = 0;
         }
-
-        ret = ffmpeg.avcodec_send_packet(_codecContext, pkt);
-        ffmpeg.av_packet_free(&pkt);
 
         if (ret < 0)
             throw new Exception($"avcodec_send_packet error {ret}");
 
-
         ret = ffmpeg.avcodec_receive_frame(_codecContext, _frame);
         if (ret == ffmpeg.AVERROR(ffmpeg.EAGAIN) || ret == ffmpeg.AVERROR_EOF)
-            return null!;
+            return false;
 
         if (ret < 0)
             throw new Exception($"Decoding error: {ret}");
@@ -318,15 +405,25 @@ public unsafe class H264Decoder
             ffmpeg.SWS_FAST_BILINEAR, null, null, null);
         }
 
-        byte[] bgraData = new byte[_width * _height * 4];
-        fixed (byte* pBgra = bgraData)
+        return true;
+    }
+
+    /// <summary>Последний декодированный кадр в BGRA, длина буфера — Width × Height × 4.</summary>
+    public void ConvertTo(byte[] bgra)
+    {
+        for (uint i = 0; i < 4; i++)
         {
-            byte*[] dstData = [pBgra];
-            int[] dstLinesize = [_width * 4];
-            ffmpeg.sws_scale(_swsContext, _frame->data, _frame->linesize, 0, _height, dstData, dstLinesize);
+            _srcData[i] = _frame->data[i];
+            _srcLinesize[i] = _frame->linesize[i];
         }
 
-        return bgraData;
+        fixed (byte* pBgra = bgra)
+        {
+            _dstData[0] = pBgra;
+            _dstLinesize[0] = _width * 4;
+            ffmpeg.sws_scale(_swsContext, _srcData, _srcLinesize, 0, _height, _dstData, _dstLinesize);
+            _dstData[0] = null;
+        }
     }
 
     public int Width => _width;

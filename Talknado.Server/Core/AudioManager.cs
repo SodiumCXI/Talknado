@@ -26,13 +26,15 @@ public class AudioManager : IDisposable
         {
             try
             {
-                var dataWithId = _networkUtils.ReceiveAudioPacketAsync(token).GetAwaiter().GetResult();
-                if (dataWithId == null)
-                    continue;
-
-                var data = dataWithId.Value.Item1;
-                var userId = dataWithId.Value.Item2;
-                _networkUtils.BroadcastAudioPacket(userId, data).GetAwaiter().GetResult();
+                var (packet, userId) = _networkUtils.ReceiveAudioPacket(token);
+                try
+                {
+                    _networkUtils.BroadcastAudioPacket(userId, packet.Span);
+                }
+                finally
+                {
+                    packet.Return();
+                }
             }
             catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex)) { /* ignore */ }
             catch

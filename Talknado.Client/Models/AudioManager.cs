@@ -1,8 +1,8 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using System.Buffers.Binary;
+using CommunityToolkit.Mvvm.ComponentModel;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
-using System.IO;
 using System.Windows;
 using Talknado.Client.Models.Helpers.Audio;
 using Talknado.Client.Models.Helpers.Network;
@@ -31,6 +31,10 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
     private Thread? _audioSendThread;
 
     private readonly OpusCodecEncoder _encoder = new(false);
+
+    private const int CaptureBufferMilliseconds = 20;
+
+    private const int FrameSamples = 480;
 
     [ObservableProperty]
     private bool _isMicrophoneActive = false;
@@ -126,21 +130,34 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         }
     }
 
+    // Пакет: номер участника (2 байта) и Opus. Поток приёма один, поэтому
+    // буфер под расшифровку общий на все пакеты.
     private void HandleReceiveAudio(CancellationToken token)
     {
+        var plain = new byte[CryptoSessionManager.EncryptedLength(sizeof(ushort) + OpusCodecEncoder.MaxPacketSize)];
+
         while (!token.IsCancellationRequested)
         {
             try
             {
-                var packet = _networkUtils.ReceiveAudioPacketAsync(token).GetAwaiter().GetResult();
-                var opusPacket = _cryptoSessionManager.DecryptMessage(packet);
+                var packet = _networkUtils.ReceiveAudioPacket(token);
+                int length;
+                try
+                {
+                    if (plain.Length < packet.Length)
+                        plain = new byte[packet.Length];
+                    length = _cryptoSessionManager.Decrypt(packet.Span, plain);
+                }
+                finally
+                {
+                    packet.Return();
+                }
 
-                SplitAudioPacket(opusPacket, out byte[] opusData, out ushort userId);
-
+                ushort userId = BinaryPrimitives.ReadUInt16LittleEndian(plain);
                 if (userId == 0 && !_screenSharePlayer.IsWindowVisible)
                     continue;
 
-                _usersAudioPlayer.Play(userId, opusData);
+                _usersAudioPlayer.Play(userId, plain.AsSpan(sizeof(ushort), length - sizeof(ushort)));
             }
             catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex))
             {
@@ -186,15 +203,34 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
                 return;
             }
 
-            capture = new WasapiCapture(device);
+            // По умолчанию WASAPI отдаёт блоки по 50 мс, и кадры уходят в сеть пачками.
+            capture = new WasapiCapture(device, false, CaptureBufferMilliseconds);
 
             int targetSampleRate = 48000;
             int sourceSampleRate = capture.WaveFormat.SampleRate;
             int sourceChannels = capture.WaveFormat.Channels;
 
-            const int frameBytes = 960;
+            // Цепочка одна на весь захват: ресемплер хранит состояние фильтра между блоками.
+            // ReadFully выключен, иначе недостающее дописывается нулями.
+            var captureBuffer = new BufferedWaveProvider(capture.WaveFormat)
+            {
+                BufferDuration = TimeSpan.FromMilliseconds(500),
+                DiscardOnBufferOverflow = true,
+                ReadFully = false
+            };
 
-            var audioBuffer = new List<byte>();
+            ISampleProvider provider = captureBuffer.ToSampleProvider();
+
+            if (sourceChannels > 1)
+                provider = provider.ToMono();
+
+            if (sourceSampleRate != targetSampleRate)
+                provider = new WdlResamplingSampleProvider(provider, targetSampleRate);
+
+            var frameSamples = new float[FrameSamples];
+            var frameData = new byte[FrameSamples * 2];
+            var opusData = new byte[OpusCodecEncoder.MaxPacketSize];
+            int filled = 0;
 
             capture.DataAvailable += (s, e) =>
             {
@@ -202,37 +238,28 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
 
                 try
                 {
-                    using var ms = new MemoryStream(e.Buffer, 0, e.BytesRecorded);
-                    using var rawSource = new RawSourceWaveStream(ms, capture.WaveFormat);
+                    captureBuffer.AddSamples(e.Buffer, 0, e.BytesRecorded);
 
-                    var provider = rawSource.ToSampleProvider();
-
-                    if (sourceChannels > 1)
-                        provider = provider.ToMono();
-
-                    if (sourceSampleRate != targetSampleRate)
-                        provider = new WdlResamplingSampleProvider(provider, targetSampleRate);
-
-                    float[] chunk = new float[4096];
                     int read;
-                    while ((read = provider.Read(chunk, 0, chunk.Length)) > 0)
+                    while ((read = provider.Read(frameSamples, filled, FrameSamples - filled)) > 0)
                     {
-                        for (int i = 0; i < read; i++)
-                        {
-                            short pcmSample = (short)Math.Clamp(chunk[i] * 32767f, -32768f, 32767f);
-                            audioBuffer.Add((byte)(pcmSample & 0xFF));
-                            audioBuffer.Add((byte)(pcmSample >> 8));
-                        }
-                    }
+                        filled += read;
 
-                    while (audioBuffer.Count >= frameBytes)
-                    {
-                        byte[] frameData = [.. audioBuffer.Take(frameBytes)];
-                        audioBuffer.RemoveRange(0, frameBytes);
+                        if (filled < FrameSamples)
+                            continue;
+
+                        filled = 0;
+
+                        for (int i = 0; i < FrameSamples; i++)
+                        {
+                            short pcmSample = (short)Math.Clamp(frameSamples[i] * 32767f, -32768f, 32767f);
+                            frameData[i * 2] = (byte)(pcmSample & 0xFF);
+                            frameData[i * 2 + 1] = (byte)(pcmSample >> 8);
+                        }
 
                         var denoisedData = NoiseSuppressor.Denoise(frameData);
-                        var opusData = _encoder.Encode(denoisedData);
-                        SendOpusPacket(opusData, _connectionInfo.LocalUserId);
+                        int opusLength = _encoder.Encode(denoisedData, opusData);
+                        SendOpusPacket(opusData.AsSpan(0, opusLength), _connectionInfo.LocalUserId);
                     }
                 }
                 catch (Exception ex)
@@ -241,6 +268,8 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
                     System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");
                 }
             };
+
+            NoiseSuppressor.Warmup();
 
             capture.StartRecording();
             token.WaitHandle.WaitOne();
@@ -260,19 +289,26 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         }
     }
 
-    private void SendScreenShareOpusData(byte[] audioData)
+    private void SendScreenShareOpusData(ReadOnlySpan<byte> audioData)
     {
         SendOpusPacket(audioData, 0);
     }
 
-    private void SendOpusPacket(byte[] opusData, ushort userId)
+    // Зовётся из потоков захвата микрофона и системного звука одновременно,
+    // поэтому буферы — на стеке вызова, а не общие.
+    private void SendOpusPacket(ReadOnlySpan<byte> opusData, ushort userId)
     {
-        var opusPacket = AddIdToAudioPacket(opusData, userId);
-        var encryptedOpusPacket = _cryptoSessionManager.EncryptMessage(opusPacket);
+        Span<byte> packet = stackalloc byte[sizeof(ushort) + OpusCodecEncoder.MaxPacketSize];
+        BinaryPrimitives.WriteUInt16LittleEndian(packet, userId);
+        opusData.CopyTo(packet[sizeof(ushort)..]);
+        packet = packet[..(sizeof(ushort) + opusData.Length)];
+
+        Span<byte> encrypted = stackalloc byte[CryptoSessionManager.EncryptedLength(sizeof(ushort) + OpusCodecEncoder.MaxPacketSize)];
+        int length = _cryptoSessionManager.Encrypt(packet, encrypted);
 
         try
         {
-            _networkUtils.SendAudioPacketAsync(encryptedOpusPacket).GetAwaiter().GetResult();
+            _networkUtils.SendAudioPacket(encrypted[..length]);
         }
         catch { /* ignore */ }
 
@@ -280,27 +316,6 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         {
             _usersAudioPlayer.Play(userId, opusData);
         }
-    }
-
-    private static byte[] AddIdToAudioPacket(byte[] audioData, ushort userId)
-    {
-        var userIdBytes = BitConverter.GetBytes(userId);
-        var result = new byte[userIdBytes.Length + audioData.Length];
-
-        Array.Copy(userIdBytes, 0, result, 0, userIdBytes.Length);
-        Array.Copy(audioData, 0, result, userIdBytes.Length, audioData.Length);
-
-        return result;
-    }
-
-    private static void SplitAudioPacket(byte[] audioPacket, out byte[] audioData, out ushort userId)
-    {
-        userId = BitConverter.ToUInt16(audioPacket, 0);
-
-        var audioDataLength = audioPacket.Length - sizeof(ushort);
-        audioData = new byte[audioDataLength];
-
-        Array.Copy(audioPacket, sizeof(ushort), audioData, 0, audioDataLength);
     }
 
     public void Dispose()

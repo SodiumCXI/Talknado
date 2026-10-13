@@ -124,7 +124,7 @@
     <value>Подключиться</value>
   </data>
   <data name="HostButton" xml:space="preserve">
-    <value>Запустить сервер</value>
+    <value>Запустить</value>
   </data>
   <data name="ServerChoice" xml:space="preserve">
     <value>Сервер</value>
@@ -137,6 +137,9 @@
   </data>
   <data name="NicknameLabel" xml:space="preserve">
     <value>Никнейм:</value>
+  </data>
+  <data name="FpsFormat" xml:space="preserve">
+    <value>{0} FPS</value>
   </data>
   <data name="ConnectionKeyLabel" xml:space="preserve">
     <value>Ключ подключения:</value>
@@ -233,5 +236,128 @@
   </data>
   <data name="OnlyOneScreenShareText" xml:space="preserve">
     <value>Экран может показывать только один пользователь одновременно</value>
+  </data>
+  <data name="EmptyMessagesText" xml:space="preserve">
+    <value>Сообщений пока нет</value>
+  </data>
+  <data name="EmptyUsersText" xml:space="preserve">
+    <value>Кроме вас пока никого нет</value>
+  </data>
+  <data name="MicrophoneTooltip" xml:space="preserve">
+    <value>Микрофон</value>
+  </data>
+  <data name="ScreenShareTooltip" xml:space="preserve">
+    <value>Демонстрация экрана</value>
+  </data>
+  <data name="VolumeTooltip" xml:space="preserve">
+    <value>Громкость</value>
+  </data>
+  <data name="ViewScreenShareTooltip" xml:space="preserve">
+    <value>Смотреть экран</value>
+  </data>
+  <data name="ConnectionKeyTooltip" xml:space="preserve">
+    <value>Ключ подключения</value>
+  </data>
+  <data name="HostPanelButton" xml:space="preserve">
+    <value>Панель хоста</value>
+  </data>
+  <data name="ShareQualityLabel" xml:space="preserve">
+    <value>Потолок качества демонстрации</value>
+  </data>
+  <data name="ShareQualityLowText" xml:space="preserve">
+    <value>720p, 30 FPS</value>
+  </data>
+  <data name="ShareQualityMediumText" xml:space="preserve">
+    <value>1080p, 30 FPS</value>
+  </data>
+  <data name="ShareQualityHighText" xml:space="preserve">
+    <value>1080p, 60 FPS</value>
+  </data>
+  <data name="SessionUsersLabel" xml:space="preserve">
+    <value>Участники сессии</value>
+  </data>
+  <data name="KickUserTooltip" xml:space="preserve">
+    <value>Исключить из сессии</value>
+  </data>
+  <data name="KickedFromSessionText" xml:space="preserve">
+    <value>Хост исключил вас из сессии.</value>
+  </data>
+  <data name="SessionNoticeTitle" xml:space="preserve">
+    <value>Сессия</value>
+  </data>
+  <data name="NoiseSuppressionLabel" xml:space="preserve">
+    <value>Шумоподавление:</value>
+  </data>
+  <data name="NoiseSuppressionTooltip" xml:space="preserve">
+    <value>Среднее: малая задержка и нагрузка. Сильное и максимальное лучше давят клавиатуру и фон, но добавляют 30 мс задержки, занимают около 25 % и 45 % одного ядра процессора и могут срезать шёпот.</value>
+  </data>
+  <data name="NoiseSuppressionNone" xml:space="preserve">
+    <value>Нет</value>
+  </data>
+  <data name="NoiseSuppressionMedium" xml:space="preserve">
+    <value>Среднее (RNNoise)</value>
+  </data>
+  <data name="NoiseSuppressionStrong" xml:space="preserve">
+    <value>Сильное (DPDFNet-2)</value>
+  </data>
+  <data name="NoiseSuppressionMaximum" xml:space="preserve">
+    <value>Максимальное (DPDFNet-8)</value>
+  </data>
+  <data name="SizeBytesFormat" xml:space="preserve">
+    <value>{0} Б</value>
+  </data>
+  <data name="SizeKilobytesFormat" xml:space="preserve">
+    <value>{0:0.#} КБ</value>
+  </data>
+  <data name="SizeMegabytesFormat" xml:space="preserve">
+    <value>{0:0.#} МБ</value>
+  </data>
+  <data name="SizeGigabytesFormat" xml:space="preserve">
+    <value>{0:0.##} ГБ</value>
+  </data>
+  <data name="AttachTooltip" xml:space="preserve">
+    <value>Прикрепить файл</value>
+  </data>
+  <data name="RemoveAttachmentTooltip" xml:space="preserve">
+    <value>Убрать вложение</value>
+  </data>
+  <data name="DownloadText" xml:space="preserve">
+    <value>Скачать</value>
+  </data>
+  <data name="ShowInFolderText" xml:space="preserve">
+    <value>Показать в папке</value>
+  </data>
+  <data name="FileUnavailableText" xml:space="preserve">
+    <value>Файл недоступен</value>
+  </data>
+  <data name="PlayTooltip" xml:space="preserve">
+    <value>Воспроизвести (Пробел)</value>
+  </data>
+  <data name="PauseTooltip" xml:space="preserve">
+    <value>Пауза (Пробел)</value>
+  </data>
+  <data name="CloseViewerTooltip" xml:space="preserve">
+    <value>Закрыть (Esc)</value>
+  </data>
+  <data name="MediaOpenFailedText" xml:space="preserve">
+    <value>Не удалось открыть видео</value>
+  </data>
+  <data name="FileBandwidthLabel" xml:space="preserve">
+    <value>Предел скорости передачи файлов, Мбит/с</value>
+  </data>
+  <data name="FileBandwidthTooltip" xml:space="preserve">
+    <value>0 — без ограничения</value>
+  </data>
+  <data name="SaveToDownloadsTooltip" xml:space="preserve">
+    <value>Сохранить в «Загрузки»</value>
+  </data>
+  <data name="OpenFileTooltip" xml:space="preserve">
+    <value>Открыть</value>
+  </data>
+  <data name="ClientVersionUnsupportedText" xml:space="preserve">
+    <value>Сервер не поддерживает вашу версию Talknado. Обновите приложение.</value>
+  </data>
+  <data name="ServerVersionUnsupportedText" xml:space="preserve">
+    <value>У хоста устаревшая версия Talknado. Хосту нужно обновить приложение.</value>
   </data>
 </root>

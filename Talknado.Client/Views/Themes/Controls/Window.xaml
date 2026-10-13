@@ -1,0 +1,101 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework">
+
+    <!--
+        AllowsTransparency здесь нет намеренно: он отключает аппаратное
+        ускорение всего окна, а это окно соседствует с показом чужого экрана
+        на 30 кадрах. Перетаскивание, двойной щелчок, прилипание к краям
+        и раскладки Windows 11 отдаются системе через WindowChrome
+        с ненулевым CaptionHeight.
+    -->
+
+    <Style x:Key="AppWindowStyle" TargetType="Window">
+        <Setter Property="Background" Value="{DynamicResource WindowBackgroundBrush}"/>
+        <!-- Значки вне кнопок берут цвет у окна; без него они чёрные -->
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource FontBase}"/>
+        <!-- None: только при нём WPF считает границы развёрнутого окна
+             правильно. WS_CAPTION ради анимации свёртывания добавляется
+             стилем окна в TalknadoWindow, уже после создания. -->
+        <Setter Property="WindowStyle" Value="None"/>
+        <Setter Property="UseLayoutRounding" Value="True"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
+    <!--
+        Кнопки заголовка: прямоугольные во всю высоту полосы, без радиуса.
+        Подсветка идёт от Tag, а не от IsMouseOver: при свёртывании окно
+        перестаёт получать сообщения мыши, MouseLeave не приходит, и кнопка
+        остаётся гореть после восстановления. Tag ставит код окна по
+        настоящему положению курсора.
+    -->
+
+    <Style x:Key="TitleBarButtonBaseStyle" TargetType="Button">
+        <Setter Property="Width" Value="{DynamicResource TitleBarButtonWidth}"/>
+        <Setter Property="Height" Value="{DynamicResource TitleBarHeight}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <!--
+            Фокус клавиатуры кнопкам заголовка не нужен: иначе после щелчка
+            кнопка остаётся подсвеченной как сфокусированная.
+            Управление окном с клавиатуры даёт системное меню Alt+Space.
+        -->
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Tag" Value="hover">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Кнопка разворота отличается только тем, что отвечает HTMAXBUTTON -->
+    <Style x:Key="TitleBarMaximizeButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonBaseStyle}"/>
+
+    <Style x:Key="TitleBarCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonBaseStyle}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Tag" Value="hover">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DangerSurfaceBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Значок в полосе заголовка мельче, чем в панелях -->
+    <Style x:Key="TitleBarIconStyle" TargetType="Path">
+        <Setter Property="Width" Value="{DynamicResource TitleBarIconSize}"/>
+        <Setter Property="Height" Value="{DynamicResource TitleBarIconSize}"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="StrokeThickness" Value="1.4"/>
+        <Setter Property="StrokeStartLineCap" Value="Round"/>
+        <Setter Property="StrokeEndLineCap" Value="Round"/>
+        <Setter Property="StrokeLineJoin" Value="Round"/>
+        <Setter Property="Stroke"
+                Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}"/>
+    </Style>
+
+</ResourceDictionary>

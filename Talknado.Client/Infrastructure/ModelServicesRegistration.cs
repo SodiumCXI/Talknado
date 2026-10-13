@@ -10,10 +10,15 @@ public static class ModelServicesRegistration
     public static IServiceCollection RegisterModelServices(this IServiceCollection services)
     {
         services.AddSingleton<ISettingsManager, SettingsManager>();
+        services.AddSingleton<IHostPanelManager, HostPanelManager>();
         services.AddSingleton<IScreenMonitorManager, ScreenMonitorManager>();
         services.AddSingleton<IConnectionInfo, ConnectionInfo>();
         services.AddSingleton<IUsersInfo, UsersInfo>();
         services.AddSingleton<IMessagesManager, MessagesManager>();
+        services.AddSingleton<IFileChannel, FileChannel>();
+        services.AddSingleton<IFileTransferManager, FileTransferManager>();
+        services.AddSingleton<IMediaViewerManager, MediaViewerManager>();
+        services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<INetworkUtils, NetworkUtils>();
         services.AddSingleton<ICryptoSessionManager, CryptoSessionManager>();
         services.AddSingleton<IUsersAudioPlayer, UsersAudioPlayer>();
@@ -32,6 +37,18 @@ public static class ModelServicesRegistration
         services.AddSingleton(sp => new SettingsWindow
         {
             DataContext = sp.GetRequiredService<SettingsWindowViewModel>()
+        });
+
+        services.AddSingleton<HostPanelViewModel>();
+        services.AddSingleton(sp => new HostPanelWindow
+        {
+            DataContext = sp.GetRequiredService<HostPanelViewModel>()
+        });
+
+        services.AddSingleton<MediaViewerViewModel>();
+        services.AddSingleton(sp => new MediaViewerWindow
+        {
+            DataContext = sp.GetRequiredService<MediaViewerViewModel>()
         });
 
         services.AddSingleton<ScreenShareViewModel>();

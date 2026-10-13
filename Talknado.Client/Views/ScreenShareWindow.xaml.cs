@@ -10,6 +10,10 @@ public partial class ScreenShareWindow : TalknadoWindow, IDisposable
 {
     public ScreenShareWindow()
     {
+        // Своя анимация свёртывания требует AllowsTransparency, которого у окна нет.
+        UseSystemCaption = true;
+        UseStateAnimations = false;
+
         InitializeComponent();
 
         DataContextChanged += OnDataContextChanged;
@@ -80,7 +84,7 @@ public partial class ScreenShareWindow : TalknadoWindow, IDisposable
         }
         catch (OperationCanceledException)
         {
-            if (vm.ScreenSharePlayer.LastKeyFrame != null)
+            if (vm.ScreenSharePlayer.HasLastKeyFrame)
             {
                 Application.Current?.Dispatcher.Invoke(Show);
                 vm.ScreenSharePlayer.UpdateSavedKeyFrame();

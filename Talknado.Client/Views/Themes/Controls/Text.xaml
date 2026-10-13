@@ -1,0 +1,105 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        TextFormattingMode не задаётся: Display отключает субпиксельное
+        сглаживание, и Moderustic в нём выглядит жёстко.
+    -->
+
+    <Style x:Key="BodyTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource FontBase}"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightRegular}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="MutedTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+    </Style>
+
+    <!-- Счётчик кадров в заголовке окна демонстрации: у цифр нет нижних выносных,
+         и по общей линии с именем он казался приподнятым — опущен на пиксель -->
+    <Style x:Key="FpsTextStyle" TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
+        <Setter Property="Margin" Value="0,1,0,-1"/>
+    </Style>
+
+    <Style x:Key="MonitorNumberStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+        <Setter Property="FontFamily" Value="{DynamicResource FontHeading}"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeBadge}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightStrong}"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!--
+        Имя автора в сообщении. Цвет приходит от элемента — тот же, что у
+        аватара автора, поэтому карточка узнаётся до чтения имени.
+    -->
+    <Style x:Key="MessageAuthorStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+        <Setter Property="FontWeight" Value="{DynamicResource WeightMedium}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Bottom"/>
+    </Style>
+
+    <!--
+        Время сообщения. Начертание как у имени: тонкое теряется
+        в углу карточки.
+    -->
+    <Style x:Key="MessageTimeStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightMedium}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Bottom"/>
+        <!-- Пиксель вверх: нижние выносные у цифр короче, чем у букв имени -->
+        <Setter Property="Margin" Value="0,0,0,1"/>
+    </Style>
+
+    <!--
+        Имя участника в строке. Пиксель вниз: у строчных букв нижние выносные
+        короче прописных, и по геометрическому центру имя читается приподнятым.
+        Восемь справа — зазор до следующего элемента строки.
+    -->
+    <Style x:Key="UserNameStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+        <Setter Property="Margin" Value="0,1,8,0"/>
+    </Style>
+
+    <!-- Инициал на аватаре: тёмный текст на цветном кружке, 6.5:1 -->
+    <Style x:Key="AvatarInitialsStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightMedium}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextOnAvatarBrush}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="ErrorTextStyle" TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
+        <Setter Property="Foreground" Value="{DynamicResource DangerBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <!-- Текст, который можно выделить и скопировать: сообщение, ключ подключения -->
+    <Style x:Key="CopyableTextStyle" TargetType="TextBox">
+        <Setter Property="FontFamily" Value="{DynamicResource FontBase}"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightRegular}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="IsReadOnly" Value="True"/>
+        <Setter Property="IsInactiveSelectionHighlightEnabled" Value="False"/>
+        <Setter Property="SelectionBrush" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <!--
+        Текст сообщения. Два пикселя влево: TextBox рисует текст с собственным
+        внутренним отступом, и по левому краю он не совпадает с именем автора.
+    -->
+    <Style x:Key="MessageTextStyle" TargetType="TextBox" BasedOn="{StaticResource CopyableTextStyle}">
+        <Setter Property="Margin" Value="-2,0,0,0"/>
+    </Style>
+
+</ResourceDictionary>

@@ -14,7 +14,7 @@ public interface IServerManager
 
 public class ServerManager(INetworkUtils networkUtils,
     IServerInfo serverInfo, IClientManager clientManager,
-    ICryptoSessionManager cryptoSessionManager) : IServerManager, IDisposable
+    ICryptoSessionManager cryptoSessionManager, IFileChannel fileChannel) : IServerManager, IDisposable
 {
     private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
 
@@ -26,6 +26,7 @@ public class ServerManager(INetworkUtils networkUtils,
     private readonly IServerInfo _serverInfo = serverInfo;
     private readonly IClientManager _clientManager = clientManager;
     private readonly ICryptoSessionManager _cryptoSessionManager = cryptoSessionManager;
+    private readonly IFileChannel _fileChannel = fileChannel;
 
     public (bool, string) Start(string? password)
     {
@@ -75,9 +76,24 @@ public class ServerManager(INetworkUtils networkUtils,
                     var tcpClient = _listener.AcceptTcpClient();
                     tcpClient.ReceiveTimeout = 3000;
 
-                    var stream = tcpClient.GetStream();
+                    if (tcpClient.Client.RemoteEndPoint is IPEndPoint remote
+                        && _serverInfo.IsAddressBanned(remote.Address.ToString()))
+                    {
+                        tcpClient.Close();
+                        continue;
+                    }
 
-                    if (!ValidateClientConnection(stream, token, out var userId))
+                    var stream = tcpClient.GetStream();
+                    var hello = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
+
+                    if (_fileChannel.IsHello(hello, out var fileChannelUserId))
+                    {
+                        _networkUtils.WritePacketAsync(stream, Encoding.UTF8.GetBytes("#ZBS"), token).GetAwaiter().GetResult();
+                        _fileChannel.Accept(tcpClient, fileChannelUserId);
+                        continue;
+                    }
+
+                    if (!ValidateClientConnection(hello, out var userId))
                     {
                         var data = Encoding.UTF8.GetBytes("#PNO");
                         _networkUtils.WritePacketAsync(stream, data, token).GetAwaiter().GetResult();
@@ -85,7 +101,9 @@ public class ServerManager(INetworkUtils networkUtils,
                         continue;
                     }
 
-                    var acceptData = Encoding.UTF8.GetBytes("#ZBS");
+                    // Вслед за #ZBS — версия сервера: клиент сам решает, не слишком ли
+                    // стар для него сервер. Клиентам до 2.0.0 сюда не дойти — им #PNO.
+                    var acceptData = Encoding.UTF8.GetBytes($"#ZBS{_serverInfo.ServerVersion.ToString(3)}");
                     _networkUtils.WritePacketAsync(stream, acceptData, token).GetAwaiter().GetResult();
 
                     if (userId != 0)
@@ -125,10 +143,9 @@ public class ServerManager(INetworkUtils networkUtils,
         }
     }
 
-    private bool ValidateClientConnection(NetworkStream stream, CancellationToken token, out ushort userId)
+    private bool ValidateClientConnection(byte[] data, out ushort userId)
     {
         userId = 0;
-        var data = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
 
         if (data == null)
             return false;
@@ -148,14 +165,7 @@ public class ServerManager(INetworkUtils networkUtils,
         }
         else
         {
-            var clientVersion = Encoding.UTF8.GetString(data);
-
-            foreach (var version in _serverInfo.GetValidClientVersions())
-            {
-                if (clientVersion == version) return true;
-            }
-
-            return false;
+            return _serverInfo.IsClientVersionSupported(Encoding.UTF8.GetString(data));
         }
     }
 

@@ -1,25 +1,27 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Talknado.Client.Models.Helpers.Network;
 using Talknado.Client.Models.Helpers.ScreenShare;
 
 namespace Talknado.Client.Models;
 
 public interface IScreenSharePlayer
 {
-    void SaveLastKeyFrame(byte[] h264Data);
+    void SaveLastKeyFrame(ReadOnlySpan<byte> h264Data);
     void ClearLastKeyFrame();
     void UpdateSavedKeyFrame();
-    void UpdateFrame(byte[] h264Data, CancellationToken token);
+    void UpdateFrame(ReadOnlySpan<byte> h264Data, CancellationToken token);
     void Clear();
     ImageSource DisplayImage { get; }
     int FramesPerSecond { get; }
     bool IsWindowVisible { get; set; }
     bool IsKeyFrameInitialized { get; set; }
-    byte[]? LastKeyFrame { get; }
+    bool HasLastKeyFrame { get; }
     string ScreenShareUsername { get; set; }
 }
 
@@ -28,7 +30,23 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     private WriteableBitmap _displayBitmap = null!;
     public ImageSource DisplayImage => _displayBitmap;
     public bool IsKeyFrameInitialized { get; set; } = false;
-    public byte[]? LastKeyFrame { get; private set; } = null;
+    public bool HasLastKeyFrame => _lastKeyFrameLength > 0;
+
+    // Опорный кадр приходит раз в секунду, поэтому копируется в один и тот же
+    // массив, а не в новый.
+    private byte[] _lastKeyFrame = [];
+    private int _lastKeyFrameLength;
+
+    // Кадр BGRA пишется декодером в _backPixels и меняется местами с
+    // _frontPixels; поток UI рисует последний готовый. Если он не успевает,
+    // промежуточные кадры пропускаются, а не копятся в очереди диспетчера.
+    private byte[] _backPixels = [];
+    private byte[] _frontPixels = [];
+    private int _frontWidth;
+    private int _frontHeight;
+    private readonly object _frontLock = new();
+    private int _renderPending;
+    private readonly Action _renderAction;
 
     private readonly Timer _statsTimer = null!;
     private int _frameCount;
@@ -53,6 +71,7 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     private double _jitterEma = 0;
     private int _lastDeltaMs = 33;
     private volatile int _targetBufferFrames = MIN_BUFFER_FRAMES;
+    private long _lastShownTicks;
 
     [ObservableProperty]
     private bool _isWindowVisible = false;
@@ -69,51 +88,74 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
             _frameCount = 0;
         }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
 
+        _renderAction = RenderFrame;
         _playbackTask = Task.Run(() => PlaybackLoop(_playbackCts.Token));
     }
 
-    public void SaveLastKeyFrame(byte[] h264Data)
-    {
-        var frame = new EncodedFrame(h264Data);
+    private static bool IsKeyFrame(ReadOnlySpan<byte> h264Data) => h264Data.Length >= 5 && h264Data[0] == 1;
 
-        if (!frame.IsKeyFrame)
+    public void SaveLastKeyFrame(ReadOnlySpan<byte> h264Data)
+    {
+        if (!IsKeyFrame(h264Data))
             return;
 
         lock (_saveLock)
         {
-            LastKeyFrame = [.. h264Data];
+            StoreKeyFrame(h264Data);
         }
+    }
+
+    private void StoreKeyFrame(ReadOnlySpan<byte> h264Data)
+    {
+        if (_lastKeyFrame.Length < h264Data.Length)
+            _lastKeyFrame = new byte[h264Data.Length * 2];
+
+        h264Data.CopyTo(_lastKeyFrame);
+        _lastKeyFrameLength = h264Data.Length;
     }
 
     public void ClearLastKeyFrame()
     {
-        LastKeyFrame = null;
+        lock (_saveLock)
+        {
+            _lastKeyFrameLength = 0;
+        }
     }
 
     public void UpdateSavedKeyFrame()
     {
-        if (LastKeyFrame == null)
-            return;
+        lock (_saveLock)
+        {
+            if (_lastKeyFrameLength == 0)
+                return;
 
-        UpdateFrame(LastKeyFrame, CancellationToken.None);
+            UpdateFrame(_lastKeyFrame.AsSpan(0, _lastKeyFrameLength), CancellationToken.None);
+        }
     }
 
-    public void UpdateFrame(byte[] h264Data, CancellationToken token)
+    public void UpdateFrame(ReadOnlySpan<byte> h264Data, CancellationToken token)
     {
-        var frame = new EncodedFrame(h264Data);
+        if (h264Data.Length < 5)
+            throw new ArgumentException("Data must contain at least 5 bytes");
+
+        bool isKeyFrame = IsKeyFrame(h264Data);
 
         if (!IsKeyFrameInitialized)
         {
-            if (!frame.IsKeyFrame)
+            if (!isKeyFrame)
                 return;
 
             lock (_saveLock)
             {
-                LastKeyFrame = [.. h264Data];
+                StoreKeyFrame(h264Data);
                 _decoder.FlushBuffers();
                 IsKeyFrameInitialized = true;
             }
         }
+
+        var frame = new EncodedFrame(
+            BinaryPrimitives.ReadInt32LittleEndian(h264Data[1..]),
+            h264Data.Length > 5 ? PooledBuffer.CopyOf(h264Data[5..]) : default);
 
         lock (_queueLock)
         {
@@ -171,11 +213,24 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
                     ? 0.0f
                     : 1.0f - ((float)(queueSize - _targetBufferFrames) / MAX_BUFFER_FRAMES);
 
-            int delay = (int)(item.Value.DeltaMs * catchUpFactor);
+            // Пауза отсчитывается от показа прошлого кадра, а не от конца его
+            // декодирования: иначе время декодирования прибавлялось к интервалу,
+            // и очередь стояла на двадцати кадрах — столько же задержки картинки.
+            long now = Stopwatch.GetTimestamp();
+            long due = _lastShownTicks + (long)(item.Value.DeltaMs * catchUpFactor * Stopwatch.Frequency / 1000);
+            _lastShownTicks = Math.Max(due, now);
+            int delay = (int)((due - now) * 1000 / Stopwatch.Frequency);
             if (delay > 0)
                 await Task.Delay(delay, token);
 
-            DecodeAndRender(item.Value, token);
+            try
+            {
+                DecodeAndRender(item.Value, token);
+            }
+            finally
+            {
+                item.Value.Data.Return();
+            }
         }
     }
 
@@ -183,26 +238,37 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     {
         if (!IsWindowVisible)
         {
-            if (_frameQueue.Count > 0)
-                _frameQueue.Clear();
+            lock (_queueLock)
+            {
+                while (_frameQueue.TryDequeue(out var stale))
+                    stale.Data.Return();
+            }
 
             return;
         }
 
         try
         {
-            byte[] bgraPixels;
-            int width, height;
-
-            bgraPixels = _decoder.Decode(frame.Data);
-            if (bgraPixels == null)
+            if (!_decoder.Decode(frame.Data.Span))
                 return;
 
-            width = _decoder.Width;
-            height = _decoder.Height;
+            int width = _decoder.Width;
+            int height = _decoder.Height;
 
             if (!_isInitialized || _currentWidth != width || _currentHeight != height)
                 InitializeBitmap(width, height);
+
+            if (_backPixels.Length != width * height * 4)
+                _backPixels = new byte[width * height * 4];
+
+            _decoder.ConvertTo(_backPixels);
+
+            lock (_frontLock)
+            {
+                (_backPixels, _frontPixels) = (_frontPixels, _backPixels);
+                _frontWidth = width;
+                _frontHeight = height;
+            }
 
             _frameCount++;
 
@@ -210,11 +276,10 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
                 return;
 
             var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.HasShutdownStarted)
+            if (dispatcher != null && !dispatcher.HasShutdownStarted &&
+                Interlocked.Exchange(ref _renderPending, 1) == 0)
             {
-                dispatcher.BeginInvoke(
-                    () => RenderFrame(bgraPixels, width, height),
-                    DispatcherPriority.Render);
+                dispatcher.BeginInvoke(_renderAction, DispatcherPriority.Render);
             }
         }
         catch (Exception ex)
@@ -242,11 +307,24 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
         _isInitialized = true;
     }
 
-    private unsafe void RenderFrame(byte[] bgraPixels, int width, int height)
+    private unsafe void RenderFrame()
     {
-        if (_displayBitmap == null)
-            return;
+        Volatile.Write(ref _renderPending, 0);
 
+        lock (_frontLock)
+        {
+            int width = _frontWidth;
+            int height = _frontHeight;
+
+            if (_displayBitmap == null || _displayBitmap.PixelWidth != width || _displayBitmap.PixelHeight != height)
+                return;
+
+            CopyToBitmap(_frontPixels, width, height);
+        }
+    }
+
+    private unsafe void CopyToBitmap(byte[] bgraPixels, int width, int height)
+    {
         _displayBitmap.Lock();
         try
         {
@@ -293,34 +371,18 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     {
         _playbackCts.Cancel();
         _playbackCts.Dispose();
+
+        lock (_queueLock)
+        {
+            while (_frameQueue.TryDequeue(out var frame))
+                frame.Data.Return();
+        }
         _statsTimer?.Dispose();
         _decoder.Cleanup();
 
         GC.SuppressFinalize(this);
     }
 
-    public readonly struct EncodedFrame
-    {
-        public bool IsKeyFrame { get; }
-        public int DeltaMs { get; }
-        public byte[] Data { get; }
-
-        public EncodedFrame(byte[] encodedData)
-        {
-            if (encodedData == null || encodedData.Length < 5)
-                throw new ArgumentException("Data must contain at least 5 bytes");
-
-            IsKeyFrame = encodedData[0] == 1;
-            DeltaMs = BitConverter.ToInt32(encodedData, 1);
-            if (encodedData.Length > 5)
-            {
-                Data = new byte[encodedData.Length - 5];
-                Array.Copy(encodedData, 5, Data, 0, Data.Length);
-            }
-            else
-            {
-                Data = [];
-            }
-        }
-    }
+    /// <summary>Данные H.264 из пула; возвращает тот, кто вынул кадр из очереди.</summary>
+    public readonly record struct EncodedFrame(int DeltaMs, PooledBuffer Data);
 }

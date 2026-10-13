@@ -1,40 +1,43 @@
-﻿using Concentus.Enums;
+using Concentus.Enums;
 using Concentus.Structs;
+using System.Runtime.InteropServices;
 
 namespace Talknado.Client.Models.Helpers.Audio;
 
 public class OpusCodecEncoder : IDisposable
 {
+    /// <summary>Наибольший пакет Opus.</summary>
+    public const int MaxPacketSize = 1275;
+
     private readonly OpusEncoder _encoder;
     private readonly short[] _shortBuffer;
-    private readonly byte[] _opusBuffer;
     private const int FRAME_SIZE = 480;
 
     public OpusCodecEncoder(bool isSystemAudio)
     {
+        // Микрофон тоже в AUDIO: режим VOIP кодирует шипящие как шум.
 #pragma warning disable CS0618
-        _encoder = isSystemAudio
-            ? new OpusEncoder(48000, 1, OpusApplication.OPUS_APPLICATION_AUDIO)
-            : new OpusEncoder(48000, 1, OpusApplication.OPUS_APPLICATION_VOIP);
-        _encoder.Bitrate = isSystemAudio ? 48000 : 24000;
+        _encoder = new OpusEncoder(48000, 1, OpusApplication.OPUS_APPLICATION_AUDIO);
+        _encoder.Bitrate = isSystemAudio ? 48000 : 32000;
 #pragma warning restore CS0618
 
         _shortBuffer = new short[FRAME_SIZE];
-        _opusBuffer = new byte[1275];
     }
 
-    public byte[] Encode(byte[] pcm)
+    /// <summary>Кадр int16 в пакет Opus; возвращает длину пакета.</summary>
+    public int Encode(ReadOnlySpan<byte> pcm, Span<byte> destination)
     {
         lock (_encoder)
         {
-            Buffer.BlockCopy(pcm, 0, _shortBuffer, 0, pcm.Length);
-#pragma warning disable CS0618
-            int length = _encoder.Encode(_shortBuffer, 0, FRAME_SIZE, _opusBuffer, 0, _opusBuffer.Length);
-#pragma warning restore CS0618
+            ReadOnlySpan<short> samples = MemoryMarshal.Cast<byte, short>(pcm);
+            if (samples.Length < FRAME_SIZE)
+            {
+                samples.CopyTo(_shortBuffer);
+                _shortBuffer.AsSpan(samples.Length).Clear();
+                samples = _shortBuffer;
+            }
 
-            byte[] result = new byte[length];
-            Array.Copy(_opusBuffer, result, length);
-            return result;
+            return _encoder.Encode(samples[..FRAME_SIZE], FRAME_SIZE, destination, destination.Length);
         }
     }
 
@@ -48,6 +51,9 @@ public class OpusCodecEncoder : IDisposable
 
 public class OpusCodecDecoder : IDisposable
 {
+    /// <summary>Байт PCM в одном кадре: 480 отсчётов int16.</summary>
+    public const int FrameBytes = FRAME_SIZE * 2;
+
     private readonly OpusDecoder _decoder;
     private readonly short[] _shortBuffer;
     private const int FRAME_SIZE = 480;
@@ -60,29 +66,23 @@ public class OpusCodecDecoder : IDisposable
         _shortBuffer = new short[FRAME_SIZE];
     }
 
-    public byte[] Decode(byte[] opus)
+    public void Decode(ReadOnlySpan<byte> opus, Span<byte> pcm)
     {
         lock (_decoder)
         {
-#pragma warning disable CS0618
-            _decoder.Decode(opus, 0, opus.Length, _shortBuffer, 0, FRAME_SIZE, false);
-#pragma warning restore CS0618
-            byte[] pcm = new byte[FRAME_SIZE * 2];
-            Buffer.BlockCopy(_shortBuffer, 0, pcm, 0, pcm.Length);
-            return pcm;
+            _decoder.Decode(opus, MemoryMarshal.Cast<byte, short>(pcm), FRAME_SIZE, false);
         }
     }
 
-    public byte[] DecodePLC()
+    /// <summary>Кадр на месте потерянного пакета.</summary>
+    public void DecodePLC(Span<byte> pcm)
     {
         lock (_decoder)
         {
 #pragma warning disable CS0618
             _decoder.Decode(null, 0, 0, _shortBuffer, 0, FRAME_SIZE, false);
 #pragma warning restore CS0618
-            byte[] pcm = new byte[FRAME_SIZE * 2];
-            Buffer.BlockCopy(_shortBuffer, 0, pcm, 0, pcm.Length);
-            return pcm;
+            MemoryMarshal.AsBytes(_shortBuffer.AsSpan()).CopyTo(pcm);
         }
     }
 

@@ -9,6 +9,10 @@ public partial class SettingsWindow : TalknadoWindow, IDisposable
 {
     public SettingsWindow()
     {
+        // Своя анимация свёртывания требует AllowsTransparency, которого у окна нет.
+        UseSystemCaption = true;
+        UseStateAnimations = false;
+
         InitializeComponent();
 
         DataContextChanged += OnDataContextChanged;

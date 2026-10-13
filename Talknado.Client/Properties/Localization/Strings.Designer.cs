@@ -19,6 +19,7 @@ namespace Talknado.Client.Properties.Localization {
     // с помощью такого средства, как ResGen или Visual Studio.
     // Чтобы добавить или удалить член, измените файл .ResX и снова запустите ResGen
     // с параметром /str или перестройте свой проект VS.
+    
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
@@ -111,6 +112,15 @@ namespace Talknado.Client.Properties.Localization {
         public static string ConnectionErrorText {
             get {
                 return ResourceManager.GetString("ConnectionErrorText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на {0} FPS.
+        /// </summary>
+        public static string FpsFormat {
+            get {
+                return ResourceManager.GetString("FpsFormat", resourceCulture);
             }
         }
         
@@ -408,6 +418,375 @@ namespace Talknado.Client.Properties.Localization {
         public static string UpnpRouterNotFoundText {
             get {
                 return ResourceManager.GetString("UpnpRouterNotFoundText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на No messages yet.
+        /// </summary>
+        public static string EmptyMessagesText {
+            get {
+                return ResourceManager.GetString("EmptyMessagesText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на No one else is here yet.
+        /// </summary>
+        public static string EmptyUsersText {
+            get {
+                return ResourceManager.GetString("EmptyUsersText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Microphone.
+        /// </summary>
+        public static string MicrophoneTooltip {
+            get {
+                return ResourceManager.GetString("MicrophoneTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Share screen.
+        /// </summary>
+        public static string ScreenShareTooltip {
+            get {
+                return ResourceManager.GetString("ScreenShareTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Volume.
+        /// </summary>
+        public static string VolumeTooltip {
+            get {
+                return ResourceManager.GetString("VolumeTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Watch screen.
+        /// </summary>
+        public static string ViewScreenShareTooltip {
+            get {
+                return ResourceManager.GetString("ViewScreenShareTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Connection key.
+        /// </summary>
+        public static string ConnectionKeyTooltip {
+            get {
+                return ResourceManager.GetString("ConnectionKeyTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Host panel.
+        /// </summary>
+        public static string HostPanelButton {
+            get {
+                return ResourceManager.GetString("HostPanelButton", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Screen share quality limit.
+        /// </summary>
+        public static string ShareQualityLabel {
+            get {
+                return ResourceManager.GetString("ShareQualityLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на 720p, 30 FPS.
+        /// </summary>
+        public static string ShareQualityLowText {
+            get {
+                return ResourceManager.GetString("ShareQualityLowText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на 1080p, 30 FPS.
+        /// </summary>
+        public static string ShareQualityMediumText {
+            get {
+                return ResourceManager.GetString("ShareQualityMediumText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на 1080p, 60 FPS.
+        /// </summary>
+        public static string ShareQualityHighText {
+            get {
+                return ResourceManager.GetString("ShareQualityHighText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Session participants.
+        /// </summary>
+        public static string SessionUsersLabel {
+            get {
+                return ResourceManager.GetString("SessionUsersLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Remove from session.
+        /// </summary>
+        public static string KickUserTooltip {
+            get {
+                return ResourceManager.GetString("KickUserTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на The host removed you from the session..
+        /// </summary>
+        public static string KickedFromSessionText {
+            get {
+                return ResourceManager.GetString("KickedFromSessionText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Session.
+        /// </summary>
+        public static string SessionNoticeTitle {
+            get {
+                return ResourceManager.GetString("SessionNoticeTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Noise Suppression:.
+        /// </summary>
+        public static string NoiseSuppressionLabel {
+            get {
+                return ResourceManager.GetString("NoiseSuppressionLabel", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Medium: low delay and load. Strong and Maximum suppress keyboard and background noise better....
+        /// </summary>
+        public static string NoiseSuppressionTooltip {
+            get {
+                return ResourceManager.GetString("NoiseSuppressionTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на None.
+        /// </summary>
+        public static string NoiseSuppressionNone {
+            get {
+                return ResourceManager.GetString("NoiseSuppressionNone", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Medium (RNNoise).
+        /// </summary>
+        public static string NoiseSuppressionMedium {
+            get {
+                return ResourceManager.GetString("NoiseSuppressionMedium", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Strong (DPDFNet-2).
+        /// </summary>
+        public static string NoiseSuppressionStrong {
+            get {
+                return ResourceManager.GetString("NoiseSuppressionStrong", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Maximum (DPDFNet-8).
+        /// </summary>
+        public static string NoiseSuppressionMaximum {
+            get {
+                return ResourceManager.GetString("NoiseSuppressionMaximum", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на {0} B.
+        /// </summary>
+        public static string SizeBytesFormat {
+            get {
+                return ResourceManager.GetString("SizeBytesFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на {0:0.#} KB.
+        /// </summary>
+        public static string SizeKilobytesFormat {
+            get {
+                return ResourceManager.GetString("SizeKilobytesFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на {0:0.#} MB.
+        /// </summary>
+        public static string SizeMegabytesFormat {
+            get {
+                return ResourceManager.GetString("SizeMegabytesFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на {0:0.##} GB.
+        /// </summary>
+        public static string SizeGigabytesFormat {
+            get {
+                return ResourceManager.GetString("SizeGigabytesFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Attach file.
+        /// </summary>
+        public static string AttachTooltip {
+            get {
+                return ResourceManager.GetString("AttachTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Remove attachment.
+        /// </summary>
+        public static string RemoveAttachmentTooltip {
+            get {
+                return ResourceManager.GetString("RemoveAttachmentTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Download.
+        /// </summary>
+        public static string DownloadText {
+            get {
+                return ResourceManager.GetString("DownloadText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Show in folder.
+        /// </summary>
+        public static string ShowInFolderText {
+            get {
+                return ResourceManager.GetString("ShowInFolderText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на File is unavailable.
+        /// </summary>
+        public static string FileUnavailableText {
+            get {
+                return ResourceManager.GetString("FileUnavailableText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Play (Space).
+        /// </summary>
+        public static string PlayTooltip {
+            get {
+                return ResourceManager.GetString("PlayTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Pause (Space).
+        /// </summary>
+        public static string PauseTooltip {
+            get {
+                return ResourceManager.GetString("PauseTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Close (Esc).
+        /// </summary>
+        public static string CloseViewerTooltip {
+            get {
+                return ResourceManager.GetString("CloseViewerTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Could not open the video.
+        /// </summary>
+        public static string MediaOpenFailedText {
+            get {
+                return ResourceManager.GetString("MediaOpenFailedText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на File transfer speed limit, Mbit/s.
+        /// </summary>
+        public static string FileBandwidthLabel {
+            get {
+                return ResourceManager.GetString("FileBandwidthLabel", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на 0 means no limit.
+        /// </summary>
+        public static string FileBandwidthTooltip {
+            get {
+                return ResourceManager.GetString("FileBandwidthTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Save to Downloads.
+        /// </summary>
+        public static string SaveToDownloadsTooltip {
+            get {
+                return ResourceManager.GetString("SaveToDownloadsTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Open.
+        /// </summary>
+        public static string OpenFileTooltip {
+            get {
+                return ResourceManager.GetString("OpenFileTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на The server does not support your Talknado version. Update the app..
+        /// </summary>
+        public static string ClientVersionUnsupportedText {
+            get {
+                return ResourceManager.GetString("ClientVersionUnsupportedText", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на The host runs an outdated Talknado version. The host needs to update the app..
+        /// </summary>
+        public static string ServerVersionUnsupportedText {
+            get {
+                return ResourceManager.GetString("ServerVersionUnsupportedText", resourceCulture);
             }
         }
     }

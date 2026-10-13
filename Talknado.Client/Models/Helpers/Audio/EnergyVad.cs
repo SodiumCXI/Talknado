@@ -6,7 +6,7 @@ public class EnergyVad
     private static readonly int _hangoverFrames = 40;
     private int _hangoverCount;
 
-    public bool IsSpeech(byte[] pcm)
+    public bool IsSpeech(ReadOnlySpan<byte> pcm)
     {
         double rms = ComputeRms(pcm);
 
@@ -25,17 +25,15 @@ public class EnergyVad
         return false;
     }
 
-    private static double ComputeRms(byte[] pcm)
+    private static double ComputeRms(ReadOnlySpan<byte> pcm)
     {
-        int sampleCount = pcm.Length / 2;
-        if (sampleCount == 0) return 0;
+        var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, short>(pcm);
+        if (samples.Length == 0) return 0;
 
         double sum = 0;
-        for (int i = 0; i < sampleCount; i++)
-        {
-            short sample = BitConverter.ToInt16(pcm, i * 2);
+        foreach (short sample in samples)
             sum += (double)sample * sample;
-        }
-        return Math.Sqrt(sum / sampleCount);
+
+        return Math.Sqrt(sum / samples.Length);
     }
 }

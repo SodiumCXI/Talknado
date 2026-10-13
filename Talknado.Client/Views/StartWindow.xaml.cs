@@ -1,32 +1,27 @@
-﻿using System.Windows;
+﻿using System.Reflection;
+using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Threading;
+using System.Windows.Input;
 using Talknado.Client.ViewModels;
 
 namespace Talknado.Client.Views;
 
 public partial class StartWindow : TalknadoWindow, IDisposable
 {
-    private double _originalHeight;
-    private bool _isHeightInitialized = false;
+    public static string ApplicationTitle { get; } =
+        $"Talknado v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)}";
 
     public StartWindow()
     {
+        // Своя анимация свёртывания требует AllowsTransparency, которого у окна нет.
+        UseSystemCaption = true;
+        UseStateAnimations = false;
+
         InitializeComponent();
 
         var startWindowViewModel = new StartWindowViewModel();
         startWindowViewModel.SetDispatcher(Dispatcher);
         DataContext = startWindowViewModel;
-
-        Loaded += (s, e) =>
-        {
-            if (!_isHeightInitialized)
-            {
-                _originalHeight = ActualHeight;
-                _isHeightInitialized = true;
-            }
-        };
 
         startWindowViewModel.PropertyChanged += (s, e) =>
         {
@@ -42,73 +37,42 @@ public partial class StartWindow : TalknadoWindow, IDisposable
                     else
                         Hide();
                 }
-                else if (e.PropertyName == nameof(startWindowViewModel.ErrorMessage))
-                {
-                    AdjustWindowHeight(startWindowViewModel);
-                }
                 else if (e.PropertyName == nameof(startWindowViewModel.IsServerTabSelected))
                 {
                     startWindowViewModel.ErrorMessage = string.Empty;
-                    AdjustWindowHeight(startWindowViewModel);
                 }
             });
         };
     }
 
-    private void AdjustWindowHeight(StartWindowViewModel viewModel)
+    // Щелчком TabItem фокусирует себя и, если фокус был не на соседней
+    // вкладке, передаёт его первому полю — нику; TabControl при смене вкладки
+    // тоже переносит фокус, если он был внутри неё. Поэтому вкладка выбирается
+    // здесь, без её собственной обработки щелчка, а фокус снимается до смены —
+    // в поля он не попадает ни на миг. С клавиатуры вкладки работают как обычно.
+    private void ModeTabs_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (!_isHeightInitialized)
+        if (e.OriginalSource is not DependencyObject source
+            || ItemsControl.ContainerFromElement((ItemsControl)sender, source) is not TabItem tab)
             return;
 
-        Dispatcher.BeginInvoke(new Action(() =>
-        {
-            UpdateLayout();
+        e.Handled = true;
+        if (tab.IsSelected)
+            return;
 
-            double errorHeight = 0;
-            double checkboxHeight = 0;
-
-            if (!string.IsNullOrEmpty(viewModel.ErrorMessage))
-            {
-                var errorTextBlocks = FindVisualChildren<TextBlock>(this)
-                    .Where(tb => tb.Visibility == Visibility.Visible &&
-                                 !string.IsNullOrEmpty(tb.Text) &&
-                                 tb.Text == viewModel.ErrorMessage);
-
-                foreach (var textBlock in errorTextBlocks)
-                    errorHeight = Math.Max(errorHeight, textBlock.ActualHeight + textBlock.Margin.Top + textBlock.Margin.Bottom);
-            }
-
-            if (viewModel.IsServerTabSelected)
-            {
-                var checkboxes = FindVisualChildren<CheckBox>(this)
-                    .Where(cb => cb.Visibility == Visibility.Visible);
-
-                foreach (var checkbox in checkboxes)
-                    checkboxHeight = Math.Max(checkboxHeight, checkbox.ActualHeight + checkbox.Margin.Top + checkbox.Margin.Bottom);
-            }
-
-            double newHeight = _originalHeight + errorHeight + checkboxHeight;
-            Height = newHeight;
-            MinHeight = newHeight;
-            MaxHeight = newHeight;
-
-        }), DispatcherPriority.Loaded);
+        if (((UIElement)sender).IsKeyboardFocusWithin)
+            Keyboard.ClearFocus();
+        tab.IsSelected = true;
     }
 
-    private IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
+    /// <summary>
+    /// Каретка в конец подставленного ника. По <c>GotKeyboardFocus</c>, а не <c>Loaded</c>:
+    /// фокус приходит и позже, например при щелчке по уже выбранной вкладке.
+    /// </summary>
+    private void PrefilledInput_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
-        if (depObj == null) yield break;
-
-        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
-        {
-            var child = VisualTreeHelper.GetChild(depObj, i);
-
-            if (child is T t)
-                yield return t;
-
-            foreach (T childOfChild in FindVisualChildren<T>(child))
-                yield return childOfChild;
-        }
+        if (sender is TextBox box)
+            box.CaretIndex = box.Text.Length;
     }
 
     protected override void OnMaximizeButtonClick()

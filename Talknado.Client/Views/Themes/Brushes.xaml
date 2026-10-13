@@ -1,0 +1,66 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
+                    mc:Ignorable="po">
+
+    <!--
+        Единственное место, где создаются кисти. Все заморожены.
+        Colors.xaml подключается сюда, а не в Theme.xaml: между соседними
+        словарями StaticResource не разрешается.
+    -->
+
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/Views/Themes/Colors.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
+
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="{StaticResource WindowBackgroundColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="ChromeBrush" Color="{StaticResource ChromeColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="SurfaceFormBrush" Color="{StaticResource SurfaceFormColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="{StaticResource SurfaceRaisedColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{StaticResource SurfaceHoverColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="SurfacePressedBrush" Color="{StaticResource SurfacePressedColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="ControlOnSurfaceBrush" Color="{StaticResource ControlOnSurfaceColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="ControlOnSurfaceHoverBrush" Color="{StaticResource ControlOnSurfaceHoverColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="DividerBrush" Color="{StaticResource DividerColor}" po:Freeze="True"/>
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="TextDisabledBrush" Color="{StaticResource TextDisabledColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="TextOnAccentBrush" Color="{StaticResource TextOnAccentColor}" po:Freeze="True"/>
+
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHoverColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="{StaticResource AccentPressedColor}" po:Freeze="True"/>
+
+    <SolidColorBrush x:Key="IconActiveBrush" Color="{StaticResource IconActiveColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="SpeakingBrush" Color="{StaticResource SpeakingColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="DangerBrightBrush" Color="{StaticResource DangerBrightColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="DangerSurfaceBrush" Color="{StaticResource DangerSurfaceColor}" po:Freeze="True"/>
+
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="{StaticResource ScrollThumbColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="{StaticResource ScrollThumbHoverColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="ScrollThumbDragBrush" Color="{StaticResource ScrollThumbDragColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="InputScrollThumbBrush" Color="{StaticResource InputScrollThumbColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="InputScrollThumbHoverBrush" Color="{StaticResource InputScrollThumbHoverColor}" po:Freeze="True"/>
+
+    <SolidColorBrush x:Key="Avatar1Brush" Color="{StaticResource Avatar1Color}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="Avatar2Brush" Color="{StaticResource Avatar2Color}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="Avatar3Brush" Color="{StaticResource Avatar3Color}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="Avatar4Brush" Color="{StaticResource Avatar4Color}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="Avatar5Brush" Color="{StaticResource Avatar5Color}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="Avatar6Brush" Color="{StaticResource Avatar6Color}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="TextOnAvatarBrush" Color="{StaticResource TextOnAvatarColor}" po:Freeze="True"/>
+
+    <SolidColorBrush x:Key="TrackBrush" Color="{StaticResource TrackColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="PingGoodBrush" Color="{StaticResource PingGoodColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="PingFairBrush" Color="{StaticResource PingFairColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="PingPoorBrush" Color="{StaticResource PingPoorColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="TrackBufferedBrush" Color="{StaticResource TrackBufferedColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="MonitorBadgeBrush" Color="{StaticResource MonitorBadgeColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="MediaBadgeBrush" Color="{StaticResource MediaBadgeColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="FocusBrush" Color="{StaticResource FocusColor}" po:Freeze="True"/>
+
+</ResourceDictionary>

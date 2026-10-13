@@ -1,0 +1,108 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        Палитра. Акцент один — бирюзовый.
+
+        Ступени серых: заголовок → боковая панель → область сообщений →
+        приподнятый элемент. Разделитель темнее любой зоны, поэтому читается
+        как линия, а не как ещё одна поверхность.
+    -->
+
+    <!-- Зоны -->
+    <Color x:Key="ChromeColor">#28323B</Color>
+    <Color x:Key="SurfaceColor">#1B232A</Color>
+    <Color x:Key="WindowBackgroundColor">#151C22</Color>
+    <!--
+        Блок формы на стартовом окне. Между фоном окна и обоймой
+        переключателя: чуть светлее первого, чуть темнее второй.
+    -->
+    <Color x:Key="SurfaceFormColor">#1B232A</Color>
+    <Color x:Key="SurfaceRaisedColor">#323C47</Color>
+    <Color x:Key="SurfaceHoverColor">#414D59</Color>
+    <Color x:Key="SurfacePressedColor">#272F38</Color>
+    <!--
+        Значковая кнопка на приподнятой поверхности — в строке участника
+        и в строке ввода. Шаг к наведению тот же 1.27.
+    -->
+    <Color x:Key="ControlOnSurfaceColor">#4F5C6A</Color>
+    <Color x:Key="ControlOnSurfaceHoverColor">#5E6C7A</Color>
+
+    <!-- Разделитель: самый тёмный тон в теме -->
+    <Color x:Key="DividerColor">#070A0D</Color>
+
+    <!-- Текст -->
+    <Color x:Key="TextPrimaryColor">#E9EEF3</Color>
+    <Color x:Key="TextMutedColor">#B6C0CA</Color>
+    <Color x:Key="TextDisabledColor">#869199</Color>
+    <Color x:Key="TextOnAccentColor">#06231F</Color>
+
+    <!-- Акцент -->
+    <Color x:Key="AccentColor">#35C2A8</Color>
+    <Color x:Key="AccentHoverColor">#45D4B9</Color>
+    <Color x:Key="AccentPressedColor">#2AA48E</Color>
+
+    <!--
+        Значок включённого состояния — микрофон, демонстрация. Ярче акцента:
+        он лежит на светлой плитке кнопки, и обычный акцент на ней глухой.
+    -->
+    <Color x:Key="IconActiveColor">#5EE8D0</Color>
+
+    <!-- Кольцо фокуса приглушено: полный акцент на поле ввода бьёт в глаза -->
+    <Color x:Key="FocusColor">#2A9E8A</Color>
+
+    <!-- Состояния -->
+    <Color x:Key="SpeakingColor">#35C2A8</Color>
+    <Color x:Key="DangerColor">#EE7480</Color>
+    <!-- Значок разрыва связи под курсором: ярче обычного опасного -->
+    <Color x:Key="DangerBrightColor">#FF8F9B</Color>
+    <!--
+        Заливка кнопки закрытия под курсором. Тёмная намеренно: на светлом
+        красном крестик пришлось бы делать тёмным, а он должен остаться белым.
+    -->
+    <Color x:Key="DangerSurfaceColor">#D13A4A</Color>
+
+    <!-- Задержка связи: меньше 100 мс, 100–499 мс, от 500 мс -->
+    <Color x:Key="PingGoodColor">#35C2A8</Color>
+    <Color x:Key="PingFairColor">#E3C065</Color>
+    <Color x:Key="PingPoorColor">#EE7480</Color>
+
+    <!-- Ползунок прокрутки: приглушён, как и кольцо фокуса -->
+    <Color x:Key="ScrollThumbColor">#2A343E</Color>
+    <Color x:Key="ScrollThumbHoverColor">#3A4550</Color>
+    <Color x:Key="ScrollThumbDragColor">#4B5764</Color>
+
+    <!--
+        Полоса в поле ввода: она лежит не на тёмном фоне ленты, а на
+        приподнятой поверхности строки, и общий ползунок на ней сливается.
+    -->
+    <Color x:Key="InputScrollThumbColor">#5A6674</Color>
+    <Color x:Key="InputScrollThumbHoverColor">#6B7887</Color>
+
+    <!--
+        Аватары участников. Не акцент, а различитель: цвет выбирается по нику
+        и ничего не сообщает о состоянии. Один тон насыщенности, и ни одного
+        зелёного: кольцо «говорит» рисуется акцентом и на зелёном аватаре
+        пропадало бы. Тёмный текст на каждом — 6.5:1.
+    -->
+    <Color x:Key="Avatar1Color">#4FA8C4</Color>
+    <Color x:Key="Avatar2Color">#DB84AE</Color>
+    <Color x:Key="Avatar3Color">#D9A05B</Color>
+    <Color x:Key="Avatar4Color">#B981C4</Color>
+    <Color x:Key="Avatar5Color">#7C97E8</Color>
+    <Color x:Key="Avatar6Color">#DE8478</Color>
+    <Color x:Key="TextOnAvatarColor">#0E1418</Color>
+
+    <Color x:Key="TrackColor">#101820</Color>
+    <!-- уже загруженная часть видео на дорожке перемотки -->
+    <Color x:Key="TrackBufferedColor">#4B5764</Color>
+
+    <!--
+        Номер монитора лежит поверх чужого экрана: плашка полупрозрачная,
+        чтобы под ней было видно картинку, но цифра оставалась читаемой.
+    -->
+    <Color x:Key="MonitorBadgeColor">#B3101820</Color>
+
+    <!-- Значки поверх превью вложения: кнопка воспроизведения, длительность -->
+    <Color x:Key="MediaBadgeColor">#B3101820</Color>
+</ResourceDictionary>

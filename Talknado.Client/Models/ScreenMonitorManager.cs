@@ -73,7 +73,7 @@ public partial class ScreenMonitorManager : ObservableObject, IScreenMonitorMana
                         if (frameData == null)
                             continue;
 
-                        snapshots.Add(new MonitorSnapshot(monitorNumber++, ai, oi, frameData, w, h));
+                        snapshots.Add(new MonitorSnapshot(monitorNumber++, ai, oi, [.. frameData], w, h));
                     }
                     catch { /* ignore */ }
                 }

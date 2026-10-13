@@ -23,6 +23,12 @@ public sealed class ServerHost : IDisposable
         }
     }
 
+    /// <summary>Панель хоста работает через этот объект, а не через сеть.</summary>
+    public ServerAdmin Admin => new(
+        _provider.GetRequiredService<IUsersInfo>(),
+        _provider.GetRequiredService<IClientManager>(),
+        _provider.GetRequiredService<IServerInfo>());
+
     public (bool, string) StartServer(string password, bool withPortForwarding)
     {
         var serverManager = _provider.GetRequiredService<IServerManager>();

@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace Talknado.Client.Models;
 
@@ -16,6 +17,7 @@ public interface IUsersInfo
     void UpdateMicrophoneState(ushort userId, bool isActive);
     void UpdateSpeakingState(ushort userId, bool isSpeaking);
     void UpdateScreenSharingState(ushort userId, bool isActive);
+    void UpdatePings(ReadOnlySpan<byte> body);
 }
 
 public partial class UsersInfo(IConnectionInfo connectionInfo) : ObservableObject, IUsersInfo
@@ -136,8 +138,37 @@ public partial class UsersInfo(IConnectionInfo connectionInfo) : ObservableObjec
         }
     }
 
+    /// <summary>
+    /// Сервер рассылает задержку каждого участника до себя (пары «номер, мс»).
+    /// Звук идёт через сервер, поэтому задержка до участника — моя плюс его;
+    /// в своей строке — своя до сервера.
+    /// </summary>
+    public void UpdatePings(ReadOnlySpan<byte> body)
+    {
+        var serverPings = new Dictionary<ushort, int>();
+        for (int i = 0; i + 4 <= body.Length; i += 4)
+            serverPings[BitConverter.ToUInt16(body[i..])] = BitConverter.ToUInt16(body[(i + 2)..]);
+
+        ushort localId = _connectionInfo.LocalUserId;
+        int own = serverPings.GetValueOrDefault(localId, -1);
+
+        Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            foreach (var (id, user) in _userLookup)
+            {
+                user.Ping = own < 0 || !serverPings.TryGetValue(id, out var ping) ? -1
+                    : id == localId ? own
+                    : own + ping;
+            }
+        }, DispatcherPriority.Background);
+    }
+
     public partial class UserItem : ObservableObject
     {
+        /// <summary>Задержка туда и обратно, мс; -1 — не измерена.</summary>
+        [ObservableProperty]
+        private int _ping = -1;
+
         [ObservableProperty]
         private string _username;
 

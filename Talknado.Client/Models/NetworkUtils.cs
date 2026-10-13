@@ -1,20 +1,32 @@
 ﻿using LiteNetLib;
 using LiteNetLib.Utils;
+using System.Buffers.Binary;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
+using Talknado.Client.Models.Helpers.Network;
 
 namespace Talknado.Client.Models;
 
 public interface INetworkUtils
 {
     void ConnectToUdp(byte[] udpKey, CancellationToken token);
-    Task SendAudioPacketAsync(byte[] packet);
-    Task<byte[]> ReceiveAudioPacketAsync(CancellationToken token);
-    Task SendScreenSharePacketAsync(byte[] packet);
-    Task<byte[]> ReceiveScreenSharePacketAsync(CancellationToken token);
-    Task WritePacketAsync(NetworkStream stream, byte[] data, CancellationToken token);
+    void SendAudioPacket(ReadOnlySpan<byte> packet);
+
+    /// <summary>Ждёт пакета. Буфер возвращает вызывающий.</summary>
+    PooledBuffer ReceiveAudioPacket(CancellationToken token);
+
+    void SendScreenSharePacket(ReadOnlySpan<byte> packet);
+
+    /// <summary>Ждёт пакета. Буфер возвращает вызывающий.</summary>
+    PooledBuffer ReceiveScreenSharePacket(CancellationToken token);
+
+    Task WritePacketAsync(NetworkStream stream, ReadOnlyMemory<byte> data, CancellationToken token);
     Task<byte[]> ReadPacketAsync(NetworkStream stream, CancellationToken token);
+
+    /// <summary>Тело пакета в буфере из пула. Буфер возвращает вызывающий.</summary>
+    ValueTask<PooledBuffer> ReadPooledPacketAsync(NetworkStream stream, CancellationToken token);
 }
 
 public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetEventListener, IDisposable
@@ -24,12 +36,17 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
     private NetManager? _netManager;
     private NetPeer? _serverPeer;
 
-    private readonly Queue<byte[]> _audioPackets = new();
-    private readonly Queue<byte[]> _screenSharePackets = new();
+    private readonly Queue<PooledBuffer> _audioPackets = new();
+    private readonly Queue<PooledBuffer> _screenSharePackets = new();
     private readonly SemaphoreSlim _audioSemaphore = new(0);
     private readonly SemaphoreSlim _screenShareSemaphore = new(0);
     private readonly object _audioLock = new();
     private readonly object _screenLock = new();
+
+    // Пишут в один поток из нескольких мест сразу: сообщения, команды,
+    // передача файлов. Префикс длины и тело уходят двумя записями, и без
+    // блокировки чужой пакет мог бы вклиниться между ними.
+    private readonly ConditionalWeakTable<NetworkStream, SemaphoreSlim> _writeLocks = new();
 
     private const byte AudioChannel = 0;
     private const byte ScreenShareChannel = 1;
@@ -79,113 +96,126 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
         }
     }
 
+    // Один таймер на весь цикл: Task.Delay заводил бы новый сто раз в секунду.
     private async Task PollLoop(CancellationToken token)
     {
-        while (_netManager != null && !token.IsCancellationRequested)
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(10));
+        do
         {
             _netManager?.PollEvents();
-            await Task.Delay(10, token);
         }
+        while (_netManager != null && await timer.WaitForNextTickAsync(token));
     }
 
-    public async Task SendAudioPacketAsync(byte[] packet)
+    public void SendAudioPacket(ReadOnlySpan<byte> packet) =>
+        Send(packet, AudioChannel, DeliveryMethod.ReliableSequenced);
+
+    public void SendScreenSharePacket(ReadOnlySpan<byte> packet) =>
+        Send(packet, ScreenShareChannel, DeliveryMethod.ReliableOrdered);
+
+    private void Send(ReadOnlySpan<byte> packet, byte channel, DeliveryMethod method)
     {
-        if (_serverPeer?.ConnectionState != ConnectionState.Connected)
+        var peer = _serverPeer;
+        if (peer?.ConnectionState != ConnectionState.Connected)
             return;
 
         try
         {
-            var writer = new NetDataWriter();
-            writer.Put(packet);
-            _serverPeer.Send(writer, AudioChannel, DeliveryMethod.ReliableSequenced);
+            peer.Send(packet, channel, method);
             _netManager?.PollEvents();
         }
         catch { /* ignore */ }
-
-        await Task.CompletedTask;
     }
 
-    public async Task<byte[]> ReceiveAudioPacketAsync(CancellationToken token)
-    {
-        await _audioSemaphore.WaitAsync(token);
+    public PooledBuffer ReceiveAudioPacket(CancellationToken token) =>
+        Dequeue(_audioSemaphore, _audioLock, _audioPackets, token);
 
-        lock (_audioLock)
+    public PooledBuffer ReceiveScreenSharePacket(CancellationToken token) =>
+        Dequeue(_screenShareSemaphore, _screenLock, _screenSharePackets, token);
+
+    private static PooledBuffer Dequeue(SemaphoreSlim signal, object gate, Queue<PooledBuffer> queue, CancellationToken token)
+    {
+        signal.Wait(token);
+
+        lock (gate)
         {
-            return _audioPackets.Dequeue();
+            return queue.Dequeue();
         }
     }
 
-    public async Task SendScreenSharePacketAsync(byte[] packet)
-    {
-        if (_serverPeer?.ConnectionState != ConnectionState.Connected)
-            return;
-
-        try
-        {
-            var writer = new NetDataWriter();
-            writer.Put(packet);
-            _serverPeer.Send(writer, ScreenShareChannel, DeliveryMethod.ReliableOrdered);
-            _netManager?.PollEvents();
-        }
-        catch { /* ignore */ }
-
-        await Task.CompletedTask;
-    }
-
-    public async Task<byte[]> ReceiveScreenSharePacketAsync(CancellationToken token)
-    {
-        await _screenShareSemaphore.WaitAsync(token);
-
-        lock (_screenLock)
-        {
-            return _screenSharePackets.Dequeue();
-        }
-    }
-
-    public async Task WritePacketAsync(NetworkStream stream, byte[] data, CancellationToken token)
+    // Длина и тело уходят одной записью из одного буфера.
+    public async Task WritePacketAsync(NetworkStream stream, ReadOnlyMemory<byte> data, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
         if (!stream.CanWrite)
             throw new IOException("Stream is not writable");
 
-        byte[] lengthPrefix = BitConverter.GetBytes(data.Length);
+        var packet = PooledBuffer.Rent(sizeof(int) + data.Length);
+        BinaryPrimitives.WriteInt32LittleEndian(packet.Array, data.Length);
+        data.Span.CopyTo(packet.Array.AsSpan(sizeof(int)));
 
-        await stream.WriteAsync(lengthPrefix, token).ConfigureAwait(false);
-        await stream.WriteAsync(data, token).ConfigureAwait(false);
+        var writeLock = _writeLocks.GetValue(stream, _ => new SemaphoreSlim(1, 1));
+
+        await writeLock.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            await stream.WriteAsync(packet.Memory, token).ConfigureAwait(false);
+        }
+        finally
+        {
+            writeLock.Release();
+            packet.Return();
+        }
     }
 
     public async Task<byte[]> ReadPacketAsync(NetworkStream stream, CancellationToken token)
+    {
+        var packet = await ReadPooledPacketAsync(stream, token).ConfigureAwait(false);
+        try
+        {
+            return packet.Span.ToArray();
+        }
+        finally
+        {
+            packet.Return();
+        }
+    }
+
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+    public async ValueTask<PooledBuffer> ReadPooledPacketAsync(NetworkStream stream, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
         if (!stream.CanRead)
             throw new IOException("Stream is not readable");
 
-        byte[] lengthBuffer = await ReadExactBytesAsync(stream, 4, token).ConfigureAwait(false);
-        int length = BitConverter.ToInt32(lengthBuffer, 0);
+        int length;
+        var lengthBuffer = PooledBuffer.Rent(sizeof(int));
+        try
+        {
+            await stream.ReadExactlyAsync(lengthBuffer.Memory, token).ConfigureAwait(false);
+            length = BinaryPrimitives.ReadInt32LittleEndian(lengthBuffer.Array);
+        }
+        finally
+        {
+            lengthBuffer.Return();
+        }
 
         if (length <= 0)
             throw new IOException("Connection closed");
 
-        return await ReadExactBytesAsync(stream, length, token).ConfigureAwait(false);
-    }
-
-    private static async Task<byte[]> ReadExactBytesAsync(NetworkStream stream, int length, CancellationToken receiveToken)
-    {
-        byte[] buffer = new byte[length];
-        int totalRead = 0;
-
-        while (totalRead < length)
+        var packet = PooledBuffer.Rent(length);
+        try
         {
-            int read = await stream.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), receiveToken).ConfigureAwait(false);
-            if (read == 0)
-                throw new IOException("Connection closed during receive");
-
-            totalRead += read;
+            await stream.ReadExactlyAsync(packet.Memory, token).ConfigureAwait(false);
+            return packet;
         }
-
-        return buffer;
+        catch
+        {
+            packet.Return();
+            throw;
+        }
     }
 
     public void OnPeerConnected(NetPeer peer)
@@ -202,7 +232,7 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        var data = reader.GetRemainingBytes();
+        var data = PooledBuffer.CopyOf(reader.GetRemainingBytesSegment().AsSpan());
 
         if (channelNumber == AudioChannel)
         {
@@ -219,6 +249,10 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
                 _screenSharePackets.Enqueue(data);
             }
             _screenShareSemaphore.Release();
+        }
+        else
+        {
+            data.Return();
         }
     }
 

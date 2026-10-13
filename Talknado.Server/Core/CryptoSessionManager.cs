@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+using System.Buffers;
+using System.Security.Cryptography;
 using System.Collections.Concurrent;
 
 namespace Talknado.Server.Core;
@@ -9,30 +10,53 @@ public interface ICryptoSessionManager
     byte[] GetServerPublicKey();
     void SetSharedSecret(ushort userId, byte[] userPublicKey);
     void TryRemoveSharedSecret(ushort userId);
+
+    /// <summary>Пишет IV и шифротекст в <paramref name="destination"/>, возвращает длину.</summary>
+    int Encrypt(ReadOnlySpan<byte> message, Span<byte> destination);
+
+    /// <summary>
+    /// <paramref name="destination"/> не короче <paramref name="encrypted"/> без IV;
+    /// возвращает длину открытого текста.
+    /// </summary>
+    int Decrypt(ReadOnlySpan<byte> encrypted, Span<byte> destination);
+
     byte[] EncryptMessage(byte[] message);
     byte[] DecryptMessage(byte[] encryptedMessage);
     byte[] DecryptPassword(ushort userId, byte[] encryptedMessage);
 }
 
+/// <summary>
+/// Пакет — IV 16 байт и шифротекст AES-256-CBC с PKCS7. У каждого потока свой
+/// экземпляр Aes с ключом сессии: экземпляр не потокобезопасен, а создавать
+/// его на каждый пакет дорого.
+/// </summary>
 public class CryptoSessionManager : ICryptoSessionManager
 {
-    private readonly ECDiffieHellman _serverECDH = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
-    private readonly ConcurrentDictionary<ushort, byte[]> _sharedSecrets =[];
+    public const int IvSize = 16;
 
-    private byte[] _sessionKey = new byte[32];
+    private readonly ECDiffieHellman _serverECDH = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+    private readonly ConcurrentDictionary<ushort, byte[]> _sharedSecrets = [];
+    private readonly byte[] _sessionKey;
+    private readonly ThreadLocal<Aes> _sessionAes;
 
     public CryptoSessionManager()
     {
-        GenerateSessionKey();
+        using (var aes = Aes.Create())
+        {
+            aes.KeySize = 256;
+            aes.GenerateKey();
+            _sessionKey = aes.Key;
+        }
+
+        _sessionAes = new(() =>
+        {
+            var aes = Aes.Create();
+            aes.Key = _sessionKey;
+            return aes;
+        });
     }
 
-    private void GenerateSessionKey()
-    {
-        using Aes aes = Aes.Create();
-        aes.KeySize = 256;
-        aes.GenerateKey();
-        _sessionKey = aes.Key;
-    }
+    public static int EncryptedLength(int messageLength) => IvSize + (messageLength / 16 + 1) * 16;
 
     public byte[] GetEncryptedSessionKey(ushort userId)
     {
@@ -65,74 +89,47 @@ public class CryptoSessionManager : ICryptoSessionManager
         _sharedSecrets.TryRemove(userId, out _);
     }
 
+    public int Encrypt(ReadOnlySpan<byte> message, Span<byte> destination)
+    {
+        var iv = destination[..IvSize];
+        RandomNumberGenerator.Fill(iv);
+        return IvSize + _sessionAes.Value!.EncryptCbc(message, iv, destination[IvSize..], PaddingMode.PKCS7);
+    }
+
+    public int Decrypt(ReadOnlySpan<byte> encrypted, Span<byte> destination) =>
+        Decrypt(_sessionAes.Value!, encrypted, destination);
+
+    private static int Decrypt(Aes aes, ReadOnlySpan<byte> encrypted, Span<byte> destination) =>
+        aes.DecryptCbc(encrypted[IvSize..], encrypted[..IvSize], destination, PaddingMode.PKCS7);
+
     public byte[] EncryptMessage(byte[] message)
     {
-        using var aes = Aes.Create();
-
-        aes.Key = _sessionKey;
-        aes.Padding = PaddingMode.PKCS7;
-
-        aes.GenerateIV();
-        byte[] iv = aes.IV;
-
-        using var encryptor = aes.CreateEncryptor();
-        using var memoryStream = new MemoryStream();
-
-        memoryStream.Write(iv, 0, iv.Length);
-
-        using var cryptoStream = new CryptoStream(memoryStream, encryptor, CryptoStreamMode.Write);
-
-        cryptoStream.Write(message, 0, message.Length);
-        cryptoStream.FlushFinalBlock();
-
-        return memoryStream.ToArray();
+        var result = new byte[EncryptedLength(message.Length)];
+        Encrypt(message, result);
+        return result;
     }
 
-    public byte[] DecryptMessage(byte[] encryptedMessage)
-    {
-        using var aes = Aes.Create();
-
-        aes.Key = _sessionKey;
-        aes.Padding = PaddingMode.PKCS7;
-
-        byte[] iv = new byte[16];
-        Buffer.BlockCopy(encryptedMessage, 0, iv, 0, iv.Length);
-        aes.IV = iv;
-
-        int encryptedDataLength = encryptedMessage.Length - iv.Length;
-        byte[] encryptedData = new byte[encryptedDataLength];
-        Buffer.BlockCopy(encryptedMessage, iv.Length, encryptedData, 0, encryptedDataLength);
-
-        using var decryptor = aes.CreateDecryptor();
-        using var memoryStream = new MemoryStream(encryptedData);
-        using var cryptoStream = new CryptoStream(memoryStream, decryptor, CryptoStreamMode.Read);
-        using var resultStream = new MemoryStream();
-
-        cryptoStream.CopyTo(resultStream);
-        return resultStream.ToArray();
-    }
+    public byte[] DecryptMessage(byte[] encryptedMessage) =>
+        DecryptToArray(_sessionAes.Value!, encryptedMessage);
 
     public byte[] DecryptPassword(ushort userId, byte[] encryptedMessage)
     {
         using var aes = Aes.Create();
-
         aes.Key = _sharedSecrets[userId];
-        aes.Padding = PaddingMode.PKCS7;
+        return DecryptToArray(aes, encryptedMessage);
+    }
 
-        byte[] iv = new byte[16];
-        Buffer.BlockCopy(encryptedMessage, 0, iv, 0, iv.Length);
-        aes.IV = iv;
-
-        int encryptedDataLength = encryptedMessage.Length - iv.Length;
-        byte[] encryptedData = new byte[encryptedDataLength];
-        Buffer.BlockCopy(encryptedMessage, iv.Length, encryptedData, 0, encryptedDataLength);
-
-        using var decryptor = aes.CreateDecryptor();
-        using var memoryStream = new MemoryStream(encryptedData);
-        using var cryptoStream = new CryptoStream(memoryStream, decryptor, CryptoStreamMode.Read);
-        using var resultStream = new MemoryStream();
-
-        cryptoStream.CopyTo(resultStream);
-        return resultStream.ToArray();
+    private static byte[] DecryptToArray(Aes aes, byte[] encryptedMessage)
+    {
+        var buffer = ArrayPool<byte>.Shared.Rent(encryptedMessage.Length);
+        try
+        {
+            int length = Decrypt(aes, encryptedMessage, buffer);
+            return buffer.AsSpan(0, length).ToArray();
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 }

@@ -1,18 +1,27 @@
 ﻿using LiteNetLib;
 using System.Collections.Concurrent;
+using System.Net;
 using System.Net.Sockets;
 
 namespace Talknado.Server.Core;
 
+/// <summary>Задержка -1 — пока не измерена.</summary>
+public readonly record struct SessionUser(ushort Id, string Username, string Address, int Ping);
+
+public readonly record struct PeerEntry(ushort UserId, NetPeer Peer);
+
 public interface IUsersInfo
 {
+    IReadOnlyList<SessionUser> GetSessionUsers();
+    string GetUserAddress(ushort userId);
     void AddUser(ushort userId, string username, TcpClient connection);
     void UpdateUserTcpClient(ushort userId, TcpClient tcpClient);
     void UpdateUserPeer(ushort userId, NetPeer screenShareEndPoint);
     void DisconnectUser(ushort userId, bool isInitial);
     (NetworkStream, CancellationToken) GetUserStreamAndToken(ushort userId);
     HashSet<(NetworkStream, ushort)> GetUserStreamsWithId(ushort currentUserId);
-    HashSet<NetPeer> GetNetPeers(ushort currentUserId);
+    /// <summary>Снимок участников с UDP-соединением; массив не изменять.</summary>
+    PeerEntry[] GetPeers();
     HashSet<(ushort, string)> GetUsersPublicInfo();
     ushort FindUserIdByNetPeer(NetPeer peer);
     bool CheckUserConnection(ushort userId);
@@ -23,6 +32,21 @@ public class UsersInfo : IUsersInfo, IDisposable
 {
     private readonly ConcurrentDictionary<ushort, UserItem> _clientsInfo = [];
 
+    // Пересылка голоса и кадров обходит участников на каждый пакет, а состав
+    // меняется редко — поэтому обход идёт по снимку, а не по словарю.
+    private volatile PeerEntry[] _peers = [];
+    private readonly object _peersLock = new();
+
+    private void UpdatePeers()
+    {
+        lock (_peersLock)
+        {
+            _peers = [.. _clientsInfo
+                .Where(kvp => kvp.Value.Peer != null)
+                .Select(kvp => new PeerEntry(kvp.Key, kvp.Value.Peer!))];
+        }
+    }
+
     public void AddUser(ushort userId, string username, TcpClient client)
     {
         if (_clientsInfo.TryGetValue(userId, out var existingUser))
@@ -31,6 +55,7 @@ public class UsersInfo : IUsersInfo, IDisposable
             existingUser.Username = username;
             existingUser.Client = client;
             existingUser.Peer = null;
+            UpdatePeers();
         }
         else
         {
@@ -58,6 +83,7 @@ public class UsersInfo : IUsersInfo, IDisposable
             existingUser.Peer = udpPeer;
             existingUser.RestartToken();
             existingUser.IsConnected = true;
+            UpdatePeers();
         }
     }
 
@@ -77,6 +103,8 @@ public class UsersInfo : IUsersInfo, IDisposable
                 userItem.Dispose();
             }
         }
+
+        UpdatePeers();
     }
 
     public (NetworkStream, CancellationToken) GetUserStreamAndToken(ushort userId)
@@ -94,11 +122,37 @@ public class UsersInfo : IUsersInfo, IDisposable
             .Select(kvp => (kvp.Value.Client.GetStream(), kvp.Key))];
     }
 
-    public HashSet<NetPeer> GetNetPeers(ushort currentUserId)
+    public PeerEntry[] GetPeers() => _peers;
+
+    public IReadOnlyList<SessionUser> GetSessionUsers()
     {
         return [.. _clientsInfo
-            .Where(kvp => kvp.Key != currentUserId && kvp.Value.Peer != null)
-            .Select(kvp => kvp.Value.Peer)];
+            .OrderBy(kvp => kvp.Key)
+            .Select(kvp => new SessionUser(
+                kvp.Key,
+                kvp.Value.Username,
+                GetAddress(kvp.Value),
+                kvp.Value.Peer?.Ping ?? -1))];
+    }
+
+    public string GetUserAddress(ushort userId)
+    {
+        return _clientsInfo.TryGetValue(userId, out var userItem) ? GetAddress(userItem) : string.Empty;
+    }
+
+    // Сокет уже может быть закрыт к моменту опроса.
+    private static string GetAddress(UserItem userItem)
+    {
+        try
+        {
+            return userItem.Client.Client.RemoteEndPoint is IPEndPoint endPoint
+                ? endPoint.Address.ToString()
+                : string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     public HashSet<(ushort, string)> GetUsersPublicInfo()
@@ -109,10 +163,10 @@ public class UsersInfo : IUsersInfo, IDisposable
 
     public ushort FindUserIdByNetPeer(NetPeer peer)
     {
-        foreach (var kvp in _clientsInfo)
+        foreach (var entry in _peers)
         {
-            if (peer.Equals(kvp.Value.Peer))
-                return kvp.Key;
+            if (peer.Equals(entry.Peer))
+                return entry.UserId;
         }
         return 0;
     }
@@ -148,6 +202,7 @@ public class UsersInfo : IUsersInfo, IDisposable
             user.Dispose();
         }
         _clientsInfo.Clear();
+        _peers = [];
 
         GC.SuppressFinalize(this);
     }

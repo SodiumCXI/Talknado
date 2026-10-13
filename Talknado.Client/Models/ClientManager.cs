@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Net;
+using System.Reflection;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Security.Cryptography;
@@ -27,7 +28,8 @@ public class ClientManager(IUsersInfo usersInfo,
     IScreenSharePlayer screenSharePlayer,
     ISettingsManager settingsManager,
     IAudioManager audioManager,
-    IScreenMonitorManager screenMonitorManager) : IClientManager, IDisposable
+    IScreenMonitorManager screenMonitorManager,
+    IFileTransferManager fileTransferManager) : IClientManager, IDisposable
 {
     private readonly IUsersInfo _usersInfo = usersInfo;
     private readonly INetworkUtils _networkUtils = networkUtils;
@@ -39,9 +41,17 @@ public class ClientManager(IUsersInfo usersInfo,
     private readonly ISettingsManager _settingsManager = settingsManager;
     private readonly IAudioManager _audioManager = audioManager;
     private readonly IScreenMonitorManager _screenMonitorManager = screenMonitorManager;
+    private readonly IFileTransferManager _fileTransferManager = fileTransferManager;
 
     private const string ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$&";
-    private readonly string _clientVersion = "v1.5.4";
+    private static readonly string ClientVersion =
+        $"v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)}";
+
+    /// <summary>
+    /// Самая старая версия сервера, с которой совместим протокол клиента.
+    /// Поднимается только при несовместимой правке протокола.
+    /// </summary>
+    private static readonly Version MinServerVersion = new(1, 2, 0);
 
     private TcpClient _tcpMainClient = null!;
 
@@ -99,6 +109,8 @@ public class ClientManager(IUsersInfo usersInfo,
             ReceiveClientsList(stream, token);
 
             _tcpMainClient.ReceiveTimeout = 0;
+
+            _fileTransferManager.Start(_connectionInfo.ServerIP, _connectionInfo.ServerPort, SendBroadcast);
 
             var receiveToken = _receiveCancellationTokenSource.Token;
             _receiveThread = new(() => ReceiveMessages(receiveToken))
@@ -208,12 +220,16 @@ public class ClientManager(IUsersInfo usersInfo,
 
     private void SendClientVersion(NetworkStream stream, CancellationToken token)
     {
-        var data = Encoding.UTF8.GetBytes(_clientVersion);
+        var data = Encoding.UTF8.GetBytes(ClientVersion);
         _networkUtils.WritePacketAsync(stream, data, token).GetAwaiter().GetResult();
 
-        var answer = _networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult();
-        if (Encoding.UTF8.GetString(answer).Equals("#PNO"))
-            throw new ArgumentException("Server does not support your client version");
+        var answer = Encoding.UTF8.GetString(_networkUtils.ReadPacketAsync(stream, token).GetAwaiter().GetResult());
+        if (answer.Equals("#PNO"))
+            throw new ArgumentException(Strings.ClientVersionUnsupportedText);
+
+        // Сервер до 1.2.0 отвечает голым #ZBS, без версии.
+        if (!Version.TryParse(answer.AsSpan(4), out var serverVersion) || serverVersion < MinServerVersion)
+            throw new ArgumentException(Strings.ServerVersionUnsupportedText);
     }
 
     private bool SendLocalUserId(NetworkStream stream, CancellationToken token)
@@ -320,9 +336,6 @@ public class ClientManager(IUsersInfo usersInfo,
 
     public void SendMessage(string message)
     {
-        var headerBytes = Encoding.UTF8.GetBytes("MSG");
-        var encryptedHeader = _cryptoSessionManager.EncryptMessage(headerBytes);
-
         var commandBytes = Encoding.UTF8.GetBytes("#MSG");
         var userIdBytes = BitConverter.GetBytes(_connectionInfo.LocalUserId);
         var messageBytes = Encoding.UTF8.GetBytes(message);
@@ -330,7 +343,19 @@ public class ClientManager(IUsersInfo usersInfo,
         Array.Copy(commandBytes, 0, result, 0, commandBytes.Length);
         Array.Copy(userIdBytes, 0, result, commandBytes.Length, userIdBytes.Length);
         Array.Copy(messageBytes, 0, result, commandBytes.Length + userIdBytes.Length, messageBytes.Length);
-        var encryptedMessage = _cryptoSessionManager.EncryptMessage(result);
+
+        SendBroadcast(result);
+    }
+
+    private void SendBroadcast(byte[] payload)
+    {
+        SendPacket("MSG"u8.ToArray(), payload);
+    }
+
+    private void SendPacket(byte[] header, byte[] body)
+    {
+        var encryptedHeader = _cryptoSessionManager.EncryptMessage(header);
+        var encryptedMessage = _cryptoSessionManager.EncryptMessage(body);
 
         var packet = new byte[encryptedHeader.Length + encryptedMessage.Length];
         Array.Copy(encryptedHeader, 0, packet, 0, encryptedHeader.Length);
@@ -430,6 +455,7 @@ public class ClientManager(IUsersInfo usersInfo,
             }
         }
 
+        _fileTransferManager.Stop();
         _connectionInfo.InvokeClientDisconnected();
     }
 
@@ -483,6 +509,12 @@ public class ClientManager(IUsersInfo usersInfo,
 
                 break;
 
+            case var _ when command.Equals("#PNG"):
+
+                _usersInfo.UpdatePings(body);
+
+                break;
+
             // Ping Check Command
             case var _ when command.Equals("#PCC"):
 
@@ -500,12 +532,25 @@ public class ClientManager(IUsersInfo usersInfo,
 
                 break;
 
+            // Kicked by host
+            case var _ when command.Equals("#KIK"):
+
+                // Без признака цикл приёма счёл бы обрыв случайным и полез бы
+                // переподключаться к тому, кто нас выгнал.
+                _disconnectInitiated = true;
+
+                Application.Current.Dispatcher.BeginInvoke(() =>
+                    MessageBox.Show(Strings.KickedFromSessionText, Strings.SessionNoticeTitle, MessageBoxButton.OK, MessageBoxImage.Information));
+
+                break;
+
             // Remove user
             case var _ when command.Equals("#REM"):
 
                 var userIdREM = BitConverter.ToUInt16(body);
 
                 _usersInfo.RemoveUser(userIdREM);
+                _fileTransferManager.HandleUserLeft(userIdREM);
 
                 break;
 
@@ -518,7 +563,10 @@ public class ClientManager(IUsersInfo usersInfo,
                 var adapterIndex = _screenMonitorManager.SelectedMonitor.AdapterIndex;
                 var outputIndex = _screenMonitorManager.SelectedMonitor.OutputIndex;
 
-                _screenShareManager.StartSharing(adapterIndex, outputIndex, _settingsManager.ShareScreenWithAudio);
+                // Пусто — сервер прежней сборки, значит прежнее поведение.
+                var qualityCeiling = body.Length > 0 ? body[0] : (byte)0;
+
+                _screenShareManager.StartSharing(adapterIndex, outputIndex, _settingsManager.ShareScreenWithAudio, qualityCeiling);
                 _ = StartMonitoringScreenShareErrors();
 
                 break;
@@ -549,12 +597,22 @@ public class ClientManager(IUsersInfo usersInfo,
 
                 var userIdCSS = BitConverter.ToUInt16(body);
 
+                // Демонстрацию может остановить и сервер, а не только нажавший.
+                if (_screenShareManager.IsSharing)
+                    _screenShareManager.StopSharing();
+
                 Application.Current.Dispatcher.Invoke(() =>
                     _screenSharePlayer.IsWindowVisible = false);
 
                 _screenSharePlayer.IsKeyFrameInitialized = false;
                 _screenSharePlayer.ClearLastKeyFrame();
                 _usersInfo.UpdateScreenSharingState(userIdCSS, false);
+
+                break;
+
+            case var _ when command.Equals("#FIL"):
+
+                _fileTransferManager.HandleAnnouncement(body);
 
                 break;
 

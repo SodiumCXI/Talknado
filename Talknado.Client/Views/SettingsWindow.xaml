@@ -1,69 +1,125 @@
 ﻿<local:TalknadoWindow x:Class="Talknado.Client.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:l="clr-namespace:Talknado.Client.Properties.Localization"
         xmlns:local="clr-namespace:Talknado.Client.Views"
+        xmlns:vm="clr-namespace:Talknado.Client.ViewModels"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Style="{StaticResource SettingsWindowStyle}" WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize">
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=vm:SettingsWindowViewModel}"
+        Style="{StaticResource AppWindowStyle}"
+        Title="{x:Static l:Strings.SettingsButton}"
+        Width="380" MinWidth="380"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen">
+
     <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome 
-        CaptionHeight="0" 
-        ResizeBorderThickness="6"
-        CornerRadius="0"
-        GlassFrameThickness="0"
-        UseAeroCaptionButtons="False"/>
+        <shell:WindowChrome CaptionHeight="28"
+                            ResizeBorderThickness="0"
+                            CornerRadius="0"
+                            GlassFrameThickness="0,0,0,1"
+                            UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
-    <Border x:Name="BorderAround" Style="{StaticResource BorderAround}">
-        <Grid Background="{DynamicResource SettingsBackgroundBrush}">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="25"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <Grid Grid.Row="0"
-                  x:Name="TitleBar"
-                  Background="{DynamicResource TitleBarBrush}"
-                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" 
-                           Text="{x:Static l:Strings.SettingsButton}"
-                           FontFamily="{StaticResource TitleBarFont}"
-                           FontSize="{StaticResource SecondaryFontSize}"
-                           FontWeight="DemiBold"
-                           Foreground="{DynamicResource TitleBarTextBrush}"
-                           VerticalAlignment="Center" 
-                           HorizontalAlignment="Left" 
-                           Margin="12,0,0,0"/>
-                <Button Grid.Column="1"
-                        x:Name="CloseButton"
-                        Style="{DynamicResource CloseButtonStyle}"
-                        Click="CloseButton_Click"/>
-            </Grid>
-            <Grid Grid.Row="1" Margin="20">
-                <StackPanel>
-                    <TextBlock Text="{x:Static l:Strings.InputDevicesLabel}"
-                               Style="{StaticResource LabelStyle}"/>
-                    <ComboBox ItemsSource="{Binding SettingsManager.InputDevices}"
-                              SelectedItem="{Binding SettingsManager.SelectedInputDevice}"
-                              Style="{StaticResource ComboStyle}"
-                              ItemContainerStyle="{StaticResource ComboItemStyle}"/>
-                    <TextBlock Text="{x:Static l:Strings.OutputDevicesLabel}"
-                               Style="{StaticResource LabelStyle}"/>
-                    <ComboBox ItemsSource="{Binding SettingsManager.OutputDevices}" 
-                              SelectedItem="{Binding SettingsManager.SelectedOutputDevice}"
-                              Style="{StaticResource ComboStyle}"
-                              ItemContainerStyle="{StaticResource ComboItemStyle}"/>
-                    <CheckBox Content="{x:Static l:Strings.ShareScreenWithAudioText}"
-                              IsChecked="{Binding SettingsManager.ShareScreenWithAudio}"
-                              Style="{StaticResource SettingsCheckBoxStyle}"/>
-                    <CheckBox Content="{x:Static l:Strings.AutoOpenScreenShareWindowText}"
-                              IsChecked="{Binding SettingsManager.AutoOpenScreenShareWindow}"
-                              Style="{StaticResource SettingsCheckBoxStyle}"/>
-                </StackPanel>
-            </Grid>
+
+    <local:TalknadoWindow.Resources>
+        <!--
+            Имена звуковых устройств длиннее ширины окна на любом языке
+            («Микрофон (Realtek High Definition Audio)»). Обрезаются
+            многоточием, полное имя — в подсказке.
+        -->
+        <DataTemplate x:Key="DeviceNameTemplate">
+            <TextBlock Text="{Binding}"
+                       TextTrimming="CharacterEllipsis"
+                       ToolTip="{Binding}"/>
+        </DataTemplate>
+    </local:TalknadoWindow.Resources>
+
+    <!--
+        Ритм отступов тот же, что в окне подключения: подпись отделена от
+        своего поля на GapRow, пара «подпись плюс поле» от следующей — на
+        GapBlock. Поля лежат в блоке формы: он задаёт им ширину и отделяет
+        их от фона окна. Высоту окна считает WPF.
+    -->
+
+    <Grid Background="{DynamicResource WindowBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Полоса заголовка. Свёртывания нет: окно вспомогательное
+             и закрывается само при уходе фокуса -->
+        <Grid Grid.Row="0" x:Name="TitleBar"
+              Height="{DynamicResource TitleBarHeight}"
+              Background="{DynamicResource ChromeBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Style="{DynamicResource MutedTextStyle}"
+                       Text="{x:Static l:Strings.SettingsButton}"
+                       Margin="{DynamicResource PadControl}"
+                       VerticalAlignment="Center"/>
+
+            <Button Grid.Column="1" x:Name="CloseButton"
+                    Style="{DynamicResource TitleBarCloseButtonStyle}"
+                    Click="CloseButton_Click">
+                <Path Style="{DynamicResource TitleBarIconStyle}" Data="{StaticResource IconWindowClose}"/>
+            </Button>
         </Grid>
-    </Border>
+
+        <StackPanel Grid.Row="1" Margin="{DynamicResource PadCard}">
+            <Border Style="{DynamicResource FormBlockStyle}">
+                <StackPanel>
+                    <TextBlock Style="{DynamicResource MutedTextStyle}"
+                               Text="{x:Static l:Strings.InputDevicesLabel}"
+                               Margin="{DynamicResource GapRow}"/>
+                    <ComboBox Style="{DynamicResource ComboBoxStyle}"
+                              ItemContainerStyle="{DynamicResource ComboBoxItemStyle}"
+                              ItemTemplate="{StaticResource DeviceNameTemplate}"
+                              ItemsSource="{Binding SettingsManager.InputDevices}"
+                              SelectedItem="{Binding SettingsManager.SelectedInputDevice}"
+                              Margin="{DynamicResource GapBlock}"
+                              Cursor="Hand"/>
+
+                    <TextBlock Style="{DynamicResource MutedTextStyle}"
+                               Text="{x:Static l:Strings.OutputDevicesLabel}"
+                               Margin="{DynamicResource GapRow}"/>
+                    <ComboBox Style="{DynamicResource ComboBoxStyle}"
+                              ItemContainerStyle="{DynamicResource ComboBoxItemStyle}"
+                              ItemTemplate="{StaticResource DeviceNameTemplate}"
+                              ItemsSource="{Binding SettingsManager.OutputDevices}"
+                              SelectedItem="{Binding SettingsManager.SelectedOutputDevice}"
+                              Margin="{DynamicResource GapBlock}"
+                              Cursor="Hand"/>
+
+                    <TextBlock Style="{DynamicResource MutedTextStyle}"
+                               Text="{x:Static l:Strings.NoiseSuppressionLabel}"
+                               Margin="{DynamicResource GapRow}"/>
+                    <ComboBox Style="{DynamicResource ComboBoxStyle}"
+                              ItemContainerStyle="{DynamicResource ComboBoxItemStyle}"
+                              ItemsSource="{Binding SettingsManager.NoiseSuppressionOptions}"
+                              SelectedValuePath="Model"
+                              SelectedValue="{Binding SettingsManager.NoiseSuppression}"
+                              ToolTip="{x:Static l:Strings.NoiseSuppressionTooltip}"
+                              Cursor="Hand"/>
+
+                    <CheckBox Style="{DynamicResource SettingsCheckBoxStyle}"
+                              Content="{x:Static l:Strings.ShareScreenWithAudioText}"
+                              IsChecked="{Binding SettingsManager.ShareScreenWithAudio}"
+                              Cursor="Hand"/>
+
+                    <CheckBox Style="{DynamicResource SettingsCheckBoxStyle}"
+                              Content="{x:Static l:Strings.AutoOpenScreenShareWindowText}"
+                              IsChecked="{Binding SettingsManager.AutoOpenScreenShareWindow}"
+                              Cursor="Hand"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
 </local:TalknadoWindow>

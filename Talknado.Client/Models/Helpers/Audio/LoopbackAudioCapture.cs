@@ -19,13 +19,18 @@ public partial class LoopbackAudioCapture
     [UnmanagedCallConv(CallConvs = new Type[] { typeof(System.Runtime.CompilerServices.CallConvStdcall) })]
     private static partial void StopCaptureAsync();
 
-    public static Action<byte[]> SendOpusData { get; set; } = null!;
+    public delegate void OpusSink(ReadOnlySpan<byte> opusData);
+
+    public static OpusSink SendOpusData { get; set; } = null!;
 
     private static Thread? _captureThread;
     private static bool _isInitialized;
     private static volatile bool _isEnabled;
 
     private static readonly OpusCodecEncoder _encoder = new(true);
+
+    private static byte[] _buffer = [];
+    private static readonly byte[] _opusBuffer = new byte[OpusCodecEncoder.MaxPacketSize];
 
     public static void InitializeAudio()
     {
@@ -57,10 +62,12 @@ public partial class LoopbackAudioCapture
 
         try
         {
-            var buffer = new byte[length];
-            Marshal.Copy(data, buffer, 0, length);
-            var opusData = _encoder.Encode(buffer);
-            SendOpusData?.Invoke(opusData);
+            if (_buffer.Length != length)
+                _buffer = new byte[length];
+
+            Marshal.Copy(data, _buffer, 0, length);
+            int opusLength = _encoder.Encode(_buffer, _opusBuffer);
+            SendOpusData?.Invoke(_opusBuffer.AsSpan(0, opusLength));
         }
         catch { }
     }

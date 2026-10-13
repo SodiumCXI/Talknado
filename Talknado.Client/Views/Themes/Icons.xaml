@@ -1,0 +1,81 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
+                    mc:Ignorable="po">
+
+    <!--
+        Один набор на всё приложение, линейный, сетка 24x24.
+
+        Каждая геометрия начинается с "M0 0M24 24": две пустые фигуры,
+        они ничего не рисуют, но задают всем значкам одну рамку. Одной рамки
+        мало — при Stretch=Uniform видимый размер задаёт то, сколько от рамки
+        занимает сам рисунок. Поэтому все глифы нарисованы в одном поле
+        2.5..21.5, то есть занимают одинаковую полезную площадь.
+
+        Цвет приходит от кнопки. Все геометрии заморожены.
+    -->
+
+    <!-- Звук -->
+    <PathGeometry x:Key="IconMic" Figures="M0 0M24 24 M12 2.5a3.4 3.4 0 0 1 3.4 3.4v6a3.4 3.4 0 0 1-6.8 0v-6A3.4 3.4 0 0 1 12 2.5z M4.6 11.4a7.4 7.4 0 0 0 14.8 0 M12 18.8v2.7 M7.6 21.5h8.8" po:Freeze="True"/>
+    <PathGeometry x:Key="IconMicOff" Figures="M0 0M24 24 M12 2.5a3.4 3.4 0 0 1 3.4 3.4v6a3.4 3.4 0 0 1-6.8 0v-6A3.4 3.4 0 0 1 12 2.5z M4.6 11.4a7.4 7.4 0 0 0 14.8 0 M12 18.8v2.7 M7.6 21.5h8.8 M3.4 2.6l17.2 18.8" po:Freeze="True"/>
+    <PathGeometry x:Key="IconSpeaker" Figures="M0 0M24 24 M2.5 8.4h4.3L13 3.2v17.6l-6.2-5.2H2.5z M16.6 8.6a4.8 4.8 0 0 1 0 6.8 M20 5.2a9.6 9.6 0 0 1 0 13.6" po:Freeze="True"/>
+    <PathGeometry x:Key="IconSpeakerMute" Figures="M0 0M24 24 M2.5 8.4h4.3L13 3.2v17.6l-6.2-5.2H2.5z M16.4 8.6l5.1 6.8 M21.5 8.6l-5.1 6.8" po:Freeze="True"/>
+
+    <!-- Ожидание: дуга в три четверти круга, её крутит стиль кнопки -->
+    <PathGeometry x:Key="IconSpinner" Figures="M0 0M24 24 M12 2.5a9.5 9.5 0 1 1-9.5 9.5" po:Freeze="True"/>
+
+    <!-- Демонстрация экрана -->
+    <PathGeometry x:Key="IconScreenShare" Figures="M0 0M24 24 M2.5 3.6h19v13.2h-19z M7.6 21.5h8.8 M12 16.8v4.7 M12 13.6V5.8 M9 8.8L12 5.8l3 3" po:Freeze="True"/>
+    <PathGeometry x:Key="IconScreenShareStop" Figures="M0 0M24 24 M2.5 3.6h19v13.2h-19z M7.6 21.5h8.8 M12 16.8v4.7 M8.9 6.9h6.2v6.2h-6.2z" po:Freeze="True"/>
+    <!-- Две диагональные стрелки наружу: значок «раскрыть» -->
+    <PathGeometry x:Key="IconExpand" Figures="M0 0M24 24 M14.5 2.5h7v7 M21.5 2.5l-8 8 M9.5 21.5h-7v-7 M2.5 21.5l8-8" po:Freeze="True"/>
+
+    <!-- Действия -->
+    <PathGeometry x:Key="IconDisconnect" Figures="M0 0M24 24 M9.6 2.5H4.7a2.2 2.2 0 0 0-2.2 2.2v14.6a2.2 2.2 0 0 0 2.2 2.2h4.9 M21.5 12H9.8 M17.2 7.7L21.5 12l-4.3 4.3" po:Freeze="True"/>
+    <PathGeometry x:Key="IconSettings" Figures="M0 0M24 24 M2.5 7.2h11.2 M19.7 7.2h1.8 M2.5 16.8h1.8 M10.3 16.8h11.2 M13.7 7.2a3 3 0 1 0 6 0 3 3 0 1 0-6 0 M4.3 16.8a3 3 0 1 0 6 0 3 3 0 1 0-6 0" po:Freeze="True"/>
+    <PathGeometry x:Key="IconAbout" Figures="M0 0M24 24 M12 2.5a9.5 9.5 0 1 0 0 19 9.5 9.5 0 0 0 0-19z M12 10.6v7.2 M12 6.3v.2" po:Freeze="True"/>
+    <!-- Вложения -->
+    <PathGeometry x:Key="IconAttach" Figures="M0 0M24 24 M20.6 11.3l-8.4 8.4a5.6 5.6 0 0 1-7.9-7.9l8.4-8.4a3.7 3.7 0 0 1 5.3 5.3l-8.4 8.4a1.9 1.9 0 0 1-2.6-2.6l7.8-7.8" po:Freeze="True"/>
+    <PathGeometry x:Key="IconPlay" Figures="M0 0M24 24 M6.5 3.5v17l14-8.5z" po:Freeze="True"/>
+    <PathGeometry x:Key="IconPause" Figures="M0 0M24 24 M7.5 3.5v17 M16.5 3.5v17" po:Freeze="True"/>
+    <PathGeometry x:Key="IconFile" Figures="M0 0M24 24 M14 2.5H6.2a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11.6a2 2 0 0 0 2-2V8z M14 2.5V8h5.8 M8.4 13h7.2 M8.4 17h4.6" po:Freeze="True"/>
+    <PathGeometry x:Key="IconDownload" Figures="M0 0M24 24 M12 2.5v13 M7 10.5l5 5 5-5 M2.5 16.5v3a2 2 0 0 0 2 2h15a2 2 0 0 0 2-2v-3" po:Freeze="True"/>
+    <PathGeometry x:Key="IconFolder" Figures="M0 0M24 24 M2.5 6.5a2 2 0 0 1 2-2h4.6l2.2 2.6h8.2a2 2 0 0 1 2 2v9.9a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2z" po:Freeze="True"/>
+
+    <PathGeometry x:Key="IconKey" Figures="M0 0M24 24 M7.2 7.2a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6z M12 12h9.5 M17.4 12v4 M21.5 12v3.2" po:Freeze="True"/>
+    <!-- Права хоста: щит -->
+    <PathGeometry x:Key="IconHostPanel" Figures="M0 0M24 24 M12 2.5l8.4 3.4v5.9c0 4.6-3.4 7.9-8.4 9.7-5-1.8-8.4-5.1-8.4-9.7V5.9z" po:Freeze="True"/>
+    <!-- Исключение из сессии: знак запрета — адрес участника попадает в запрет -->
+    <PathGeometry x:Key="IconKickUser" Figures="M0 0M24 24 M12 2.5a9.5 9.5 0 1 0 0 19 9.5 9.5 0 0 0 0-19z M5.3 5.3l13.4 13.4" po:Freeze="True"/>
+    <!-- Задержка связи в строке участника -->
+    <PathGeometry x:Key="IconSignal" Figures="M0 0M24 24 M4 21.5v-4 M9.3 21.5v-8 M14.7 21.5v-12 M20 21.5V3.5" po:Freeze="True"/>
+
+    <!--
+        Полоса заголовка. Отдельные геометрии, нарисованные во всю рамку:
+        общие значки в маленьком поле кнопки выглядят точками.
+    -->
+
+    <PathGeometry x:Key="IconWindowMinimize" Figures="M0 0M24 24 M2.5 12h19" po:Freeze="True"/>
+    <PathGeometry x:Key="IconWindowMaximize" Figures="M0 0M24 24 M2.5 2.5h19v19h-19z" po:Freeze="True"/>
+    <PathGeometry x:Key="IconWindowClose" Figures="M0 0M24 24 M2.5 2.5l19 19 M21.5 2.5l-19 19" po:Freeze="True"/>
+
+    <Style x:Key="IconStyle" TargetType="Path">
+        <Setter Property="Width" Value="{DynamicResource IconSize}"/>
+        <Setter Property="Height" Value="{DynamicResource IconSize}"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="StrokeThickness" Value="{DynamicResource IconStroke}"/>
+        <Setter Property="StrokeStartLineCap" Value="Round"/>
+        <Setter Property="StrokeEndLineCap" Value="Round"/>
+        <Setter Property="StrokeLineJoin" Value="Round"/>
+        <Setter Property="Stroke"
+                Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}"/>
+    </Style>
+
+    <!-- Значок на кнопке файла в карточке сообщения: стрелка загрузки и сам файл -->
+    <Style x:Key="FileGlyphStyle" TargetType="Path" BasedOn="{StaticResource IconStyle}">
+        <Setter Property="Width" Value="{DynamicResource FileGlyphSize}"/>
+        <Setter Property="Height" Value="{DynamicResource FileGlyphSize}"/>
+    </Style>
+
+</ResourceDictionary>
