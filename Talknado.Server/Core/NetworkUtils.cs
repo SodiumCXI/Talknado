@@ -1,4 +1,5 @@
 ﻿using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
@@ -54,11 +55,41 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
     private const byte FirstScreenShareChannel = 1;
 
     // Окно надёжного канала LiteNetLib — 64 пакета, одного канала на 1080p60 мало.
-    public const int ScreenShareChannels = 8;
+    public const int ScreenShareChannels = 16;
 
-    // Сверх этой очереди к адресату кадры ему не уходят до следующего опорного.
+    // Очередь к адресату выше порога дольше Patience — кадры ему не уходят до
+    // следующего опорного. Разовый всплеск от крупного опорного кадра не в счёт.
     private const int MaxScreenShareBacklog = 256;
-    private readonly HashSet<ushort> _screenShareSkipping = [];
+    private static readonly TimeSpan Patience = TimeSpan.FromMilliseconds(300);
+    private readonly Dictionary<ushort, ScreenShareViewer> _screenShareViewers = [];
+
+    // Решение «слать или пропустить» принимается на кадр целиком: его части
+    // приходят по разным каналам вперемешку с частями соседних кадров.
+    private sealed class ScreenShareViewer
+    {
+        private const int Remembered = 32;
+        private readonly uint[] _frames = new uint[Remembered];
+        private readonly byte[] _decisions = new byte[Remembered];
+
+        public bool Skipping { get; set; }
+        public long OverloadSince { get; set; }
+
+        public bool TryGet(uint frame, out byte decision)
+        {
+            decision = _decisions[frame % Remembered];
+            return decision != 0 && _frames[frame % Remembered] == frame;
+        }
+
+        public void Set(uint frame, byte decision)
+        {
+            _frames[frame % Remembered] = frame;
+            _decisions[frame % Remembered] = decision;
+        }
+    }
+
+    private const byte Drop = 1;
+    private const byte Forward = 2;
+    private const byte ForwardResync = 3;
 
     public NetworkUtils(IUsersInfo usersInfo, IServerInfo serverInfo, ICryptoSessionManager cryptoSessionManager)
     {
@@ -97,37 +128,48 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
     // Зовётся из одного потока пересылки демонстрации.
     public void BroadcastScreenSharePacket(ushort currentUserId, Span<byte> packet)
     {
-        if (!ScreenFrame.TryRead(packet, out var number, out var flags))
+        if (!ScreenFrame.TryRead(packet, out var number, out var flags, out var index))
             return;
 
         bool key = (flags & ScreenFrame.Key) != 0;
-        var channel = (byte)(FirstScreenShareChannel + number % ScreenShareChannels);
+        var channel = (byte)(FirstScreenShareChannel + (number + index) % ScreenShareChannels);
 
         foreach (var (userId, peer) in _usersInfo.GetPeers())
         {
             if (userId == currentUserId)
                 continue;
 
-            int backlog = 0;
-            for (int i = 0; i < ScreenShareChannels; i++)
-                backlog += peer.GetPacketsCountInReliableQueue((byte)(FirstScreenShareChannel + i), true);
+            if (!_screenShareViewers.TryGetValue(userId, out var viewer))
+                _screenShareViewers[userId] = viewer = new ScreenShareViewer();
 
-            var outgoing = flags;
-            if (_screenShareSkipping.Contains(userId))
+            if (!viewer.TryGet(number, out var decision))
             {
-                if (!key || backlog > MaxScreenShareBacklog / 2)
-                    continue;
+                int backlog = 0;
+                for (int i = 0; i < ScreenShareChannels; i++)
+                    backlog += peer.GetPacketsCountInReliableQueue((byte)(FirstScreenShareChannel + i), true);
 
-                _screenShareSkipping.Remove(userId);
-                outgoing |= ScreenFrame.Resync;
+                if (backlog <= MaxScreenShareBacklog)
+                    viewer.OverloadSince = 0;
+                else if (viewer.OverloadSince == 0)
+                    viewer.OverloadSince = Stopwatch.GetTimestamp();
+
+                if (viewer.Skipping)
+                {
+                    decision = key && backlog <= MaxScreenShareBacklog / 2 ? ForwardResync : Drop;
+                    viewer.Skipping = decision == Drop;
+                }
+                else
+                {
+                    viewer.Skipping = viewer.OverloadSince != 0 && Stopwatch.GetElapsedTime(viewer.OverloadSince) > Patience;
+                    decision = viewer.Skipping ? Drop : Forward;
+                }
+                viewer.Set(number, decision);
             }
-            else if (backlog > MaxScreenShareBacklog)
-            {
-                _screenShareSkipping.Add(userId);
+
+            if (decision == Drop)
                 continue;
-            }
 
-            ScreenFrame.SetFlags(packet, outgoing);
+            ScreenFrame.SetFlags(packet, decision == ForwardResync ? (byte)(flags | ScreenFrame.Resync) : flags);
             try
             {
                 peer.Send(packet, channel, DeliveryMethod.ReliableOrdered);

@@ -77,6 +77,13 @@ public partial class MonitorSelectionWindow : TalknadoWindow, IDisposable
 
     protected override void OnMaximizeButtonClick() { }
 
+    protected override void OnDeactivated(EventArgs e)
+    {
+        base.OnDeactivated(e);
+        if (DataContext is MonitorSelectionViewModel vm)
+            vm.ScreenMonitorManager.IsWindowVisible = false;
+    }
+
     public void Dispose()
     {
         UseCustomClose = false;

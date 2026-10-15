@@ -51,7 +51,7 @@ public class ClientManager(IUsersInfo usersInfo,
     /// Самая старая версия сервера, с которой совместим протокол клиента.
     /// Поднимается только при несовместимой правке протокола.
     /// </summary>
-    private static readonly Version MinServerVersion = new(1, 2, 1);
+    private static readonly Version MinServerVersion = new(1, 2, 2);
 
     private TcpClient _tcpMainClient = null!;
 

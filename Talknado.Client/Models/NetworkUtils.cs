@@ -54,7 +54,7 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
     private const byte FirstScreenShareChannel = 1;
 
     // Обязано совпадать с сервером.
-    private const int ScreenShareChannels = 8;
+    private const int ScreenShareChannels = 16;
 
     private CancellationTokenSource? _pollLoopTokenSourse = null!;
 
@@ -117,8 +117,8 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
 
     public void SendScreenSharePacket(ReadOnlySpan<byte> packet)
     {
-        if (ScreenFrame.TryRead(packet, out var number, out _))
-            Send(packet, (byte)(FirstScreenShareChannel + number % ScreenShareChannels), DeliveryMethod.ReliableOrdered);
+        if (ScreenFrame.TryRead(packet, out var header))
+            Send(packet, (byte)(FirstScreenShareChannel + (header.Number + header.Index) % ScreenShareChannels), DeliveryMethod.ReliableOrdered);
     }
 
     public int ScreenShareBacklog
