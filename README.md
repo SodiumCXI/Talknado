@@ -57,7 +57,7 @@ curl -fsSL https://raw.githubusercontent.com/SodiumCXI/Talknado/main/Talknado.Se
 
 The connection handshake runs in seven steps:
 
-1. **Version check** - the server rejects clients older than 2.0.0 before any key material is shared and replies with its own version; the client refuses servers older than 1.2.0
+1. **Version check** - the server rejects clients older than 2.0.1 before any key material is shared and replies with its own version; the client refuses servers older than 1.2.1
 2. **ECDH key exchange** - client and server exchange public keys; each independently derives the shared secret
 3. **Password verification** - SHA-256(password) encrypted with AES-256-CBC using the shared secret
 4. **Session key delivery** - server XORs the 32-byte session key with the client's unique shared secret; XOR is self-inverse, so no extra decryption step is needed
@@ -65,7 +65,7 @@ The connection handshake runs in seven steps:
 6. **UDP registration** - encrypted userId sent over LiteNetLib; server confirms with `#UCC`
 7. **State sync** - server delivers participant list and current screen-share state
 
-From step 4 onward all traffic - control, media and files - is encrypted with the session key (AES-256-CBC). The file connection opens with the user ID encrypted with the session key; file contents are encrypted by the sender and relayed as is.
+From step 4 onward all traffic - control, media and files - is encrypted with the session key (AES-256-CBC). The file connection opens with the user ID encrypted with the session key; file contents are encrypted by the sender and relayed as is. Screen-share frames carry a 5-byte open header - frame number and keyframe flag - so the server can spread them over channels and skip frames for a slow viewer without decrypting them; the image itself stays encrypted.
 
 ## How to Use Over the Internet
 

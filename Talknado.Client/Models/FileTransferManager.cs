@@ -40,9 +40,15 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
 {
     public const int ChunkSize = 32 * 1024;
     private const int WindowChunks = 16;
-    private const int MaxOutstandingChunks = 2 * WindowChunks;
+    // Сколько запрошено и ещё не пришло. Запрос идёт через сервер к владельцу,
+    // данные — обратно, цикл длится два пинга, и за цикл приходит не больше
+    // запрошенного. Скачивание: 4 МБ держат 100 Мбит/с до пинга 160 мс (с 1 МБ
+    // при пинге 100 мс выходило 40 Мбит/с). Просмотр видео: 1 МБ — после
+    // перемотки сначала доходит уже запрошенное, и большое окно задерживало
+    // бы её, особенно при пределе скорости на сервере.
+    private const int DownloadOutstandingChunks = 8 * WindowChunks;
+    private const int StreamingOutstandingChunks = 2 * WindowChunks;
     private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(10);
-    private const int MaxRetries = 3;
 
     private static readonly string CacheRoot = Path.Combine(Path.GetTempPath(), "Talknado");
 
@@ -56,6 +62,13 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
     private readonly ConcurrentDictionary<uint, string> _shared = new();
     private readonly ConcurrentDictionary<(ushort Owner, uint FileId), Attachment> _announced = new();
     private readonly ConcurrentDictionary<(ushort Owner, uint FileId), RemoteFile> _files = new();
+
+    // Прогресс поднимается в интерфейс таймером, а не каждым куском: куски
+    // приходят пачками, и значение последнего куска в пачке иначе ждало бы
+    // следующей пачки. Таймер работает, только пока идёт загрузка.
+    private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(50);
+    private DispatcherTimer? _progressTimer;
+    private int _progressTimerRunning;
     private readonly Channel<(ushort Requester, uint FileId, long Offset, int Length)> _requests =
         Channel.CreateUnbounded<(ushort, uint, long, int)>(new UnboundedChannelOptions { SingleReader = true });
 
@@ -347,7 +360,6 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
             file.Have[chunk] = true;
             file.HaveCount++;
             file.LastActivity = Stopwatch.GetTimestamp();
-            file.Retries = 0;
             Monitor.PulseAll(file);
 
             if (file.HaveCount == file.Have.Length)
@@ -356,7 +368,7 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
                 return;
             }
 
-            ReportProgress(file);
+            EnsureProgressTimer();
             RequestMore(file);
         }
     }
@@ -373,7 +385,8 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
         int total = file.Have.Length;
         int focus = (int)Math.Min(file.Focus / ChunkSize, total - 1);
 
-        while (file.Outstanding < MaxOutstandingChunks)
+        int maxOutstanding = file.Readers > 0 ? StreamingOutstandingChunks : DownloadOutstandingChunks;
+        while (file.Outstanding < maxOutstanding)
         {
             int start = FindMissing(file, focus, total);
             if (start < 0)
@@ -491,12 +504,9 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
                 if (Stopwatch.GetElapsedTime(file.LastActivity, now) < StallTimeout)
                     continue;
 
-                if (++file.Retries > MaxRetries)
-                {
-                    MarkUnavailable(key);
-                    continue;
-                }
-
+                // Простой — не повод объявлять файл недоступным: пока владелец в
+                // сессии, канал восстановится, и перезапрос дойдёт. Недоступным файл
+                // делают уход владельца и его ответ, что файла больше нет.
                 file.LastActivity = now;
                 Array.Clear(file.Requested);
                 file.Outstanding = 0;
@@ -505,16 +515,39 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
         }
     }
 
-    private static void ReportProgress(RemoteFile file)
+    private void EnsureProgressTimer()
     {
-        long now = Stopwatch.GetTimestamp();
-        if (Stopwatch.GetElapsedTime(file.LastProgressReport, now) < TimeSpan.FromMilliseconds(100))
+        if (Interlocked.Exchange(ref _progressTimerRunning, 1) == 1)
             return;
 
-        file.LastProgressReport = now;
-        var attachment = file.Attachment;
-        var progress = (double)file.HaveCount / file.Have.Length;
-        Application.Current?.Dispatcher.BeginInvoke(DispatcherPriority.Background, () => attachment.Progress = progress);
+        Dispatch(() =>
+        {
+            _progressTimer ??= new DispatcherTimer(ProgressInterval, DispatcherPriority.Background,
+                (_, _) => UpdateProgress(), Dispatcher.CurrentDispatcher);
+            _progressTimer.Start();
+        });
+    }
+
+    // Поток UI. Признак сбрасывается до обхода: кусок, пришедший во время
+    // обхода, снова запустит таймер, и его значение не потеряется.
+    private void UpdateProgress()
+    {
+        Volatile.Write(ref _progressTimerRunning, 0);
+
+        bool active = false;
+        foreach (var file in _files.Values)
+        {
+            if (file.Completed || file.Failed)
+                continue;
+
+            file.Attachment.Progress = (double)file.HaveCount / file.Have.Length;
+            active |= file.Outstanding > 0;
+        }
+
+        if (active)
+            Volatile.Write(ref _progressTimerRunning, 1);
+        else
+            _progressTimer?.Stop();
     }
 
     /// <summary>Вызывается под lock (file).</summary>
@@ -647,8 +680,6 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
         public bool Completed { get; set; }
         public bool Failed { get; set; }
         public long LastActivity { get; set; } = Stopwatch.GetTimestamp();
-        public long LastProgressReport { get; set; }
-        public int Retries { get; set; }
     }
 
     /// <summary>

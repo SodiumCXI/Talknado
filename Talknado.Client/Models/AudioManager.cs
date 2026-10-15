@@ -21,6 +21,14 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
     private readonly ICryptoSessionManager _cryptoSessionManager;
     private readonly IConnectionInfo _connectionInfo;
     private readonly IUsersAudioPlayer _usersAudioPlayer;
+
+    // Заголовок голосового пакета: номер участника и номер пакета в потоке.
+    // По номеру пакета получатель видит потерю и ставит PLC ровно на её место.
+    private const int HeaderSize = 2 * sizeof(ushort);
+
+    // Свой счёт у микрофона и у системного звука: это разные потоки у получателя.
+    private ushort _micSequence;
+    private ushort _systemSequence;
     private readonly ISettingsManager _settingsManager;
     private readonly IScreenSharePlayer _screenSharePlayer;
 
@@ -130,11 +138,11 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         }
     }
 
-    // Пакет: номер участника (2 байта) и Opus. Поток приёма один, поэтому
+    // Пакет: заголовок и Opus. Поток приёма один, поэтому
     // буфер под расшифровку общий на все пакеты.
     private void HandleReceiveAudio(CancellationToken token)
     {
-        var plain = new byte[CryptoSessionManager.EncryptedLength(sizeof(ushort) + OpusCodecEncoder.MaxPacketSize)];
+        var plain = new byte[CryptoSessionManager.EncryptedLength(HeaderSize + OpusCodecEncoder.MaxPacketSize)];
 
         while (!token.IsCancellationRequested)
         {
@@ -157,7 +165,11 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
                 if (userId == 0 && !_screenSharePlayer.IsWindowVisible)
                     continue;
 
-                _usersAudioPlayer.Play(userId, plain.AsSpan(sizeof(ushort), length - sizeof(ushort)));
+                if (length <= HeaderSize)
+                    continue;
+
+                ushort sequence = BinaryPrimitives.ReadUInt16LittleEndian(plain.AsSpan(sizeof(ushort)));
+                _usersAudioPlayer.Play(userId, sequence, plain.AsSpan(HeaderSize, length - HeaderSize));
             }
             catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex))
             {
@@ -172,6 +184,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         MMDeviceEnumerator? enumerator = null;
         MMDevice? device = null;
         WasapiCapture? capture = null;
+        var dataReady = new AutoResetEvent(false);
 
         try
         {
@@ -232,14 +245,26 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
             var opusData = new byte[OpusCodecEncoder.MaxPacketSize];
             int filled = 0;
 
+            // Обработчик захвата только складывает звук в буфер. Шумоподавление и
+            // кодирование идут в этом потоке: в обработчике они задерживали чтение
+            // устройства, а DPDFNet-8 — 5 мс на кадр, два кадра на блок 20 мс плюс
+            // пауза до следующего чтения — больше буфера захвата, и устройство
+            // теряло около 10 % звука.
             capture.DataAvailable += (s, e) =>
             {
-                if (token.IsCancellationRequested) return;
+                captureBuffer.AddSamples(e.Buffer, 0, e.BytesRecorded);
+                dataReady.Set();
+            };
 
+            NoiseSuppressor.Warmup();
+
+            capture.StartRecording();
+
+            var waitHandles = new[] { dataReady, token.WaitHandle };
+            while (WaitHandle.WaitAny(waitHandles) == 0)
+            {
                 try
                 {
-                    captureBuffer.AddSamples(e.Buffer, 0, e.BytesRecorded);
-
                     int read;
                     while ((read = provider.Read(frameSamples, filled, FrameSamples - filled)) > 0)
                     {
@@ -267,12 +292,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
                     System.Diagnostics.Debug.WriteLine($"Audio error: {ex.Message}");
                     System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");
                 }
-            };
-
-            NoiseSuppressor.Warmup();
-
-            capture.StartRecording();
-            token.WaitHandle.WaitOne();
+            }
         }
         catch (Exception ex)
         {
@@ -284,6 +304,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         {
             capture?.StopRecording();
             capture?.Dispose();
+            dataReady.Dispose();
             device?.Dispose();
             enumerator?.Dispose();
         }
@@ -298,12 +319,15 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
     // поэтому буферы — на стеке вызова, а не общие.
     private void SendOpusPacket(ReadOnlySpan<byte> opusData, ushort userId)
     {
-        Span<byte> packet = stackalloc byte[sizeof(ushort) + OpusCodecEncoder.MaxPacketSize];
-        BinaryPrimitives.WriteUInt16LittleEndian(packet, userId);
-        opusData.CopyTo(packet[sizeof(ushort)..]);
-        packet = packet[..(sizeof(ushort) + opusData.Length)];
+        ushort sequence = userId == 0 ? _systemSequence++ : _micSequence++;
 
-        Span<byte> encrypted = stackalloc byte[CryptoSessionManager.EncryptedLength(sizeof(ushort) + OpusCodecEncoder.MaxPacketSize)];
+        Span<byte> packet = stackalloc byte[HeaderSize + OpusCodecEncoder.MaxPacketSize];
+        BinaryPrimitives.WriteUInt16LittleEndian(packet, userId);
+        BinaryPrimitives.WriteUInt16LittleEndian(packet[sizeof(ushort)..], sequence);
+        opusData.CopyTo(packet[HeaderSize..]);
+        packet = packet[..(HeaderSize + opusData.Length)];
+
+        Span<byte> encrypted = stackalloc byte[CryptoSessionManager.EncryptedLength(HeaderSize + OpusCodecEncoder.MaxPacketSize)];
         int length = _cryptoSessionManager.Encrypt(packet, encrypted);
 
         try
@@ -314,7 +338,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
 
         if (userId != 0)
         {
-            _usersAudioPlayer.Play(userId, opusData);
+            _usersAudioPlayer.Play(userId, sequence, opusData);
         }
     }
 

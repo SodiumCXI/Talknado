@@ -288,9 +288,6 @@
   <data name="NoiseSuppressionLabel" xml:space="preserve">
     <value>Noise Suppression:</value>
   </data>
-  <data name="NoiseSuppressionTooltip" xml:space="preserve">
-    <value>Medium: low delay and load. Strong and Maximum suppress keyboard and background noise better, but add 30 ms of delay, use about 25% and 45% of one CPU core and can cut whispering.</value>
-  </data>
   <data name="NoiseSuppressionNone" xml:space="preserve">
     <value>None</value>
   </data>

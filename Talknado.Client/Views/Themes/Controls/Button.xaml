@@ -277,14 +277,23 @@
             </Setter.Value>
         </Setter>
         <Style.Triggers>
-            <EventTrigger RoutedEvent="Loaded">
-                <BeginStoryboard>
-                    <Storyboard RepeatBehavior="Forever">
-                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                                         From="0" To="360" Duration="0:0:0.8"/>
-                    </Storyboard>
-                </BeginStoryboard>
-            </EventTrigger>
+            <!-- Крутится, только пока виден. Loaded приходит и скрытому элементу:
+                 спиннер в строке участника крутился всё время работы окна,
+                 отрисовка шла на 60 кадрах в секунду, а фоновые операции
+                 интерфейса (прогресс загрузки, пинг) ждали по нескольку секунд -->
+            <Trigger Property="IsVisible" Value="True">
+                <Trigger.EnterActions>
+                    <BeginStoryboard x:Name="Spin">
+                        <Storyboard RepeatBehavior="Forever">
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                             From="0" To="360" Duration="0:0:0.8"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <StopStoryboard BeginStoryboardName="Spin"/>
+                </Trigger.ExitActions>
+            </Trigger>
         </Style.Triggers>
     </Style>
 

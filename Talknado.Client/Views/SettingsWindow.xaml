@@ -106,7 +106,6 @@
                               ItemsSource="{Binding SettingsManager.NoiseSuppressionOptions}"
                               SelectedValuePath="Model"
                               SelectedValue="{Binding SettingsManager.NoiseSuppression}"
-                              ToolTip="{x:Static l:Strings.NoiseSuppressionTooltip}"
                               Cursor="Hand"/>
 
                     <CheckBox Style="{DynamicResource SettingsCheckBoxStyle}"

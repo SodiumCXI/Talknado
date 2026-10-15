@@ -95,13 +95,14 @@
                                    Visibility="Hidden"/>
                         </Border>
 
-                        <!-- Обводка наведения тем же приёмом, что кольцо «говорит»
-                             у строки участника: отдельный слой поверх плитки,
-                             иначе картинка съезжала бы внутрь при её появлении -->
+                        <!-- Обводка наведения — отдельный слой, иначе картинка съезжала бы
+                             внутрь при её появлении. Лежит снаружи превью: по краю она
+                             закрывала его кромку и выглядела меньше самой картинки -->
                         <Border x:Name="HoverRing"
+                                Margin="{DynamicResource MonitorRingOutset}"
                                 BorderBrush="{DynamicResource AccentBrush}"
                                 BorderThickness="{DynamicResource FocusBorderThickness}"
-                                CornerRadius="{DynamicResource RadiusCard}"
+                                CornerRadius="{DynamicResource MonitorRingRadius}"
                                 IsHitTestVisible="False"
                                 Visibility="Collapsed"/>
 

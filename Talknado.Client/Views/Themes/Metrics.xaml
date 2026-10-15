@@ -21,6 +21,7 @@
         размер значка ............................ IconSize
         размер аватара ........................... AvatarSize
         размер превью монитора ................... MonitorPreviewHeight
+        обводка превью монитора .................. MonitorRing*
         расстояние между плитками мониторов ...... GapTile
         скругление ............................... RadiusCard / RadiusControl
         полоса заголовка окна .................... TitleBar*
@@ -72,6 +73,11 @@
     <sys:Double x:Key="MonitorPreviewHeight">176</sys:Double>
     <!-- плашка с номером: квадрат, чтобы цифра не растягивала её по ширине -->
     <sys:Double x:Key="MonitorBadgeSize">56</sys:Double>
+    <!-- обводка наведения идёт снаружи превью, а не по его краю: выступ — минус
+         толщина кольца (FocusBorderThickness), скругление больше RadiusCard на
+         столько же, чтобы дуга шла вровень с углом превью -->
+    <Thickness x:Key="MonitorRingOutset">-2</Thickness>
+    <CornerRadius x:Key="MonitorRingRadius">10</CornerRadius>
 
     <!-- ВЛОЖЕНИЯ -->
     <!-- круглая кнопка воспроизведения поверх превью видео -->

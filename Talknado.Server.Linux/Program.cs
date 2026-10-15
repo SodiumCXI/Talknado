@@ -6,10 +6,11 @@ using Talknado.Server.Core;
 namespace Talknado.Server.Linux;
 
 /// <summary>
-/// serve --control PATH [--quality N] [--bandwidth MBIT]
-///     Запускает сервер. Первая строка вывода — ключ подключения. Пароль берётся
-///     из переменной TALKNADO_PASSWORD: аргументы командной строки любой
-///     пользователь машины видит в ps.
+/// serve [--control PATH] [--quality N] [--bandwidth MBIT]
+///     Запускает сервер. Пароль берётся из переменной TALKNADO_PASSWORD: аргументы
+///     командной строки любой пользователь машины видит в ps. С сокетом управления
+///     ключ отдаёт команда key, а в вывод он не пишется: вывод службы уходит
+///     в журнал, а ключ содержит пароль. Без сокета ключ — первая строка вывода.
 /// ctl PATH COMMAND [ARG]
 ///     Передаёт команду работающему серверу через его сокет управления.
 /// version
@@ -51,12 +52,13 @@ static class Program
 
         // Сокет занимается до запуска: ключ на выходе должен означать, что
         // сервер поднялся целиком.
+        var commands = new SessionCommands(host);
         ControlSocket? control = null;
         if (controlPath != null)
         {
             try
             {
-                control = new ControlSocket(controlPath, new SessionCommands(host));
+                control = new ControlSocket(controlPath, commands);
             }
             catch (Exception ex) when (ex is SocketException or ArgumentException or IOException or UnauthorizedAccessException)
             {
@@ -72,7 +74,8 @@ static class Program
             Console.Error.WriteLine(result);
             return 1;
         }
-        Console.WriteLine(result);
+        commands.Key = result;
+        Console.WriteLine(control != null ? $"Talknado Server started on port {host.Port}" : result);
 
         // Без своих обработчиков SIGTERM завершил бы процесс, не закрыв
         // соединения, и клиенты узнали бы об остановке только по таймауту.
@@ -118,8 +121,8 @@ static class Program
 
     static int Usage()
     {
-        Console.Error.WriteLine("Usage: talknado-server-bin serve --control PATH [--quality 720p30|1080p30|1080p60] [--bandwidth MBIT]");
-        Console.Error.WriteLine("       talknado-server-bin ctl PATH status|users|kick ID|quality [VALUE]|bandwidth [MBIT]");
+        Console.Error.WriteLine("Usage: talknado-server-bin serve [--control PATH] [--quality 720p30|1080p30|1080p60] [--bandwidth MBIT]");
+        Console.Error.WriteLine("       talknado-server-bin ctl PATH key|status|users|kick ID|quality [VALUE]|bandwidth [MBIT]");
         Console.Error.WriteLine("       talknado-server-bin version");
         return 1;
     }

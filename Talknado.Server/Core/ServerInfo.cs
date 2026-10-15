@@ -23,7 +23,7 @@ public class ServerInfo : IServerInfo
     /// Поднимается только при несовместимой правке протокола; новые версии
     /// клиента вписывать не нужно — проходит всё, что не старше этой.
     /// </summary>
-    public static readonly Version MinClientVersion = new(2, 0, 0);
+    public static readonly Version MinClientVersion = new(2, 0, 1);
     private byte[]? _passwordHash = null;
 
     private readonly HashSet<string> _bannedAddresses = [];

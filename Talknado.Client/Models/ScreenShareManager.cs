@@ -31,6 +31,27 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
     private readonly Thread _screenShareReceiveThread;
     private Thread? _screenShareSendThread;
 
+    // Очередь к серверу, после которой кадры перестают уходить до следующего
+    // опорного: на медленном канале она иначе растёт без предела, и картинка
+    // у зрителей отстаёт на десятки секунд. 256 пакетов — около 350 КБ.
+    private const int MaxBacklog = 256;
+
+    // Номер не сбрасывается между показами: начало показа помечено Resync,
+    // по нему зритель и отличает новый показ от старого.
+    private uint _frameNumber;
+    private bool _startOfShare;
+    private bool _skipping;
+
+    // Кадры идут по нескольким каналам и приходят не по порядку. Недостающий
+    // ждём не дольше HoleTimeout: надёжный канал досылает потерю за несколько
+    // пингов, а дольше ждать можно лишь кадр, которого уже не будет.
+    private static readonly TimeSpan HoleTimeout = TimeSpan.FromSeconds(1);
+    private const int MaxPendingFrames = 240;
+    private readonly SortedDictionary<uint, PooledBuffer> _pending = [];
+    private uint _nextFrame;
+    private bool _hasNextFrame;
+    private long _waitingSince;
+
     [ObservableProperty]
     private bool _isSharing = false;
     public Exception? ThreadException { get; set; }
@@ -57,6 +78,8 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
         if (IsSharing) return;
 
         _profile = ShareQuality.Resolve(qualityCeiling);
+        _startOfShare = true;
+        _skipping = false;
 
         IsSharing = true;
 
@@ -142,15 +165,36 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
 
     private void SendFramePacket(ReadOnlySpan<byte> frameData)
     {
-        var encrypted = PooledBuffer.Rent(CryptoSessionManager.EncryptedLength(frameData.Length));
+        bool key = frameData[0] == 1;
+
+        int backlog = _networkUtils.ScreenShareBacklog;
+        if (_skipping)
+        {
+            if (!key || backlog > MaxBacklog / 2)
+                return;
+            _skipping = false;
+        }
+        else if (backlog > MaxBacklog)
+        {
+            _skipping = true;
+            return;
+        }
+
+        byte flags = key ? ScreenFrame.Key : (byte)0;
+        if (_startOfShare)
+            flags |= ScreenFrame.Resync;
+
+        var packet = PooledBuffer.Rent(ScreenFrame.HeaderSize + CryptoSessionManager.EncryptedLength(frameData.Length));
         try
         {
-            int length = _cryptoSessionManager.Encrypt(frameData, encrypted.Array);
-            _networkUtils.SendScreenSharePacket(encrypted.Array.AsSpan(0, length));
+            ScreenFrame.Write(packet.Array, _frameNumber++, flags);
+            int length = _cryptoSessionManager.Encrypt(frameData, packet.Array.AsSpan(ScreenFrame.HeaderSize));
+            _networkUtils.SendScreenSharePacket(packet.Array.AsSpan(0, ScreenFrame.HeaderSize + length));
+            _startOfShare = false;
         }
         finally
         {
-            encrypted.Return();
+            packet.Return();
         }
     }
 
@@ -160,30 +204,104 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
         {
             try
             {
-                var encrypted = _networkUtils.ReceiveScreenSharePacket(token);
-                var plain = PooledBuffer.Rent(encrypted.Length);
-                try
-                {
-                    int length = _cryptoSessionManager.Decrypt(encrypted.Span, plain.Array);
-                    var h264Data = plain.Array.AsSpan(0, length);
-
-                    if (_screenSharePlayer.IsWindowVisible)
-                    {
-                        ProcessFrame(h264Data, token);
-                    }
-                    _screenSharePlayer.SaveLastKeyFrame(h264Data);
-                }
-                finally
-                {
-                    plain.Return();
-                    encrypted.Return();
-                }
+                Reorder(_networkUtils.ReceiveScreenSharePacket(token), token);
             }
             catch (Exception ex) when (NetworkExceptionHelper.IsNetworkException(ex))
             {
                 return;
             }
             catch { /* ignore */ }
+        }
+    }
+
+    // Поток приёма один, очередь кадров — только его.
+    private void Reorder(PooledBuffer packet, CancellationToken token)
+    {
+        if (!ScreenFrame.TryRead(packet.Span, out var number, out var flags))
+        {
+            packet.Return();
+            return;
+        }
+
+        if ((flags & ScreenFrame.Resync) != 0 || !_hasNextFrame)
+        {
+            // Старое и кадры прошлого показа по порядку уже не придут.
+            foreach (var stale in _pending.Keys.Where(k => k < number || k - number > MaxPendingFrames).ToList())
+                Drop(stale);
+            _nextFrame = number;
+            _hasNextFrame = true;
+        }
+        else if ((int)(number - _nextFrame) < 0)
+        {
+            packet.Return();
+            return;
+        }
+
+        Drop(number);
+        _pending[number] = packet;
+
+        Deliver(token);
+
+        if (_pending.Count == 0)
+            return;
+
+        if (_waitingSince == 0)
+            _waitingSince = Stopwatch.GetTimestamp();
+
+        if (_pending.Count > MaxPendingFrames || Stopwatch.GetElapsedTime(_waitingSince) > HoleTimeout)
+        {
+            // Пропавший кадр не дождаться. С опорного картинка восстановится
+            // чисто, поэтому продолжаем с него, если он уже здесь.
+            uint resume = _pending.Keys.First();
+            foreach (var (k, p) in _pending)
+            {
+                if (ScreenFrame.TryRead(p.Span, out _, out var f) && (f & ScreenFrame.Key) != 0)
+                {
+                    resume = k;
+                    break;
+                }
+            }
+
+            foreach (var skipped in _pending.Keys.Where(k => k < resume).ToList())
+                Drop(skipped);
+            _nextFrame = resume;
+            Deliver(token);
+            if (_pending.Count > 0)
+                _waitingSince = Stopwatch.GetTimestamp();
+        }
+    }
+
+    private void Drop(uint number)
+    {
+        if (_pending.Remove(number, out var packet))
+            packet.Return();
+    }
+
+    private void Deliver(CancellationToken token)
+    {
+        while (_pending.Remove(_nextFrame, out var packet))
+        {
+            _nextFrame++;
+            _waitingSince = 0;
+
+            var plain = PooledBuffer.Rent(packet.Length);
+            try
+            {
+                int length = _cryptoSessionManager.Decrypt(packet.Span[ScreenFrame.HeaderSize..], plain.Array);
+                var h264Data = plain.Array.AsSpan(0, length);
+
+                if (_screenSharePlayer.IsWindowVisible)
+                {
+                    ProcessFrame(h264Data, token);
+                }
+                _screenSharePlayer.SaveLastKeyFrame(h264Data);
+            }
+            catch (Exception ex) when (!NetworkExceptionHelper.IsNetworkException(ex) && ex is not OperationCanceledException) { /* повреждённый кадр пропускается */ }
+            finally
+            {
+                plain.Return();
+                packet.Return();
+            }
         }
     }
 

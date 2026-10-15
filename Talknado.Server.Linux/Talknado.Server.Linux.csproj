@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="talknado;install.sh;README.md" />
+    <None Include="talknado;talknado.service;install.sh;README.md" />
   </ItemGroup>
 
   <!--
@@ -40,8 +40,8 @@
       <TarTool Condition="'$(OS)' == 'Windows_NT'">"$(SystemRoot)\System32\tar.exe"</TarTool>
       <TarTool Condition="'$(OS)' != 'Windows_NT'">tar</TarTool>
     </PropertyGroup>
-    <Copy SourceFiles="talknado" DestinationFolder="$(PublishFullDir)" />
-    <Exec Command="$(TarTool) -czf &quot;$(ServerPackage)&quot; -C &quot;$(PublishFullDir)&quot; talknado-server-bin talknado" />
+    <Copy SourceFiles="talknado;talknado.service" DestinationFolder="$(PublishFullDir)" />
+    <Exec Command="$(TarTool) -czf &quot;$(ServerPackage)&quot; -C &quot;$(PublishFullDir)&quot; talknado-server-bin talknado talknado.service" />
     <Message Importance="high" Text="Server release: $(ServerPackage)" />
   </Target>
 

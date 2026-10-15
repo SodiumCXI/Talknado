@@ -7,3 +7,4 @@
 *.resx text eol=crlf
 *.sh text eol=lf
 Talknado.Server.Linux/talknado text eol=lf
+Talknado.Server.Linux/talknado.service text eol=lf

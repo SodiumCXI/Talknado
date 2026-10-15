@@ -288,9 +288,6 @@
   <data name="NoiseSuppressionLabel" xml:space="preserve">
     <value>降噪：</value>
   </data>
-  <data name="NoiseSuppressionTooltip" xml:space="preserve">
-    <value>中等：延迟和负载低。强和最强能更好地抑制键盘声和背景噪声，但会增加 30 毫秒延迟，分别占用约 25% 和 45% 的单个处理器核心，并可能削弱耳语。</value>
-  </data>
   <data name="NoiseSuppressionNone" xml:space="preserve">
     <value>无</value>
   </data>

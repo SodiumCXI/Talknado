@@ -15,7 +15,11 @@ public interface INetworkUtils
     /// <summary>Пакет из пула: вызывающий возвращает его.</summary>
     (PooledBuffer Packet, ushort UserId) ReceiveAudioPacket(CancellationToken token);
 
-    void BroadcastScreenSharePacket(ushort currentUserId, ReadOnlySpan<byte> data);
+    /// <summary>
+    /// Кадр демонстрации: открытый заголовок <see cref="ScreenFrame"/> и зашифрованный кадр.
+    /// Заголовок меняется на месте — признак <see cref="ScreenFrame.Resync"/> у каждого адресата свой.
+    /// </summary>
+    void BroadcastScreenSharePacket(ushort currentUserId, Span<byte> packet);
 
     /// <summary>Пакет из пула: вызывающий возвращает его.</summary>
     (PooledBuffer Packet, ushort UserId) ReceiveScreenSharePacket(CancellationToken token);
@@ -50,7 +54,19 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
     private readonly ConditionalWeakTable<NetworkStream, SemaphoreSlim> _writeLocks = new();
 
     private const byte AudioChannel = 0;
-    private const byte ScreenShareChannel = 1;
+    private const byte FirstScreenShareChannel = 1;
+
+    // Окно надёжного канала LiteNetLib — 64 пакета, это константа библиотеки.
+    // В одном канале кадры 1080p60 упирались в него: при пинге 50 мс проходило
+    // 7 Мбит/с, с потерями — 3–4. У каждого канала своё окно, поэтому кадр
+    // идёт в канал по своему номеру, а порядок получатель восстанавливает сам.
+    public const int ScreenShareChannels = 8;
+
+    // Очередь к адресату, после которой кадры ему перестают слать до следующего
+    // опорного: иначе на медленном канале она растёт без предела, и картинка
+    // отстаёт на десятки секунд. 256 пакетов — около 350 КБ.
+    private const int MaxScreenShareBacklog = 256;
+    private readonly HashSet<ushort> _screenShareSkipping = [];
 
     public NetworkUtils(IUsersInfo usersInfo, IServerInfo serverInfo, ICryptoSessionManager cryptoSessionManager)
     {
@@ -61,7 +77,7 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
         _netManager = new NetManager(this)
         {
             AutoRecycle = true,
-            ChannelsCount = 2
+            ChannelsCount = 1 + ScreenShareChannels
         };
     }
 
@@ -86,8 +102,47 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
     public void BroadcastAudioPacket(ushort currentUserId, ReadOnlySpan<byte> data) =>
         Broadcast(currentUserId, data, AudioChannel, DeliveryMethod.ReliableSequenced);
 
-    public void BroadcastScreenSharePacket(ushort currentUserId, ReadOnlySpan<byte> data) =>
-        Broadcast(currentUserId, data, ScreenShareChannel, DeliveryMethod.ReliableOrdered);
+    // Зовётся из одного потока пересылки демонстрации.
+    public void BroadcastScreenSharePacket(ushort currentUserId, Span<byte> packet)
+    {
+        if (!ScreenFrame.TryRead(packet, out var number, out var flags))
+            return;
+
+        bool key = (flags & ScreenFrame.Key) != 0;
+        var channel = (byte)(FirstScreenShareChannel + number % ScreenShareChannels);
+
+        foreach (var (userId, peer) in _usersInfo.GetPeers())
+        {
+            if (userId == currentUserId)
+                continue;
+
+            int backlog = 0;
+            for (int i = 0; i < ScreenShareChannels; i++)
+                backlog += peer.GetPacketsCountInReliableQueue((byte)(FirstScreenShareChannel + i), true);
+
+            var outgoing = flags;
+            if (_screenShareSkipping.Contains(userId))
+            {
+                if (!key || backlog > MaxScreenShareBacklog / 2)
+                    continue;
+
+                _screenShareSkipping.Remove(userId);
+                outgoing |= ScreenFrame.Resync;
+            }
+            else if (backlog > MaxScreenShareBacklog)
+            {
+                _screenShareSkipping.Add(userId);
+                continue;
+            }
+
+            ScreenFrame.SetFlags(packet, outgoing);
+            try
+            {
+                peer.Send(packet, channel, DeliveryMethod.ReliableOrdered);
+            }
+            catch { /* ignore */ }
+        }
+    }
 
     private void Broadcast(ushort currentUserId, ReadOnlySpan<byte> data, byte channel, DeliveryMethod method)
     {
@@ -238,7 +293,7 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        if (channelNumber != AudioChannel && channelNumber != ScreenShareChannel)
+        if (channelNumber > ScreenShareChannels)
             return;
 
         var userId = _usersInfo.FindUserIdByNetPeer(peer);
@@ -269,8 +324,13 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
     {
     }
 
+    // NetPeer.Ping не годится: потерянный ответ LiteNetLib считает замером
+    // в целую секунду и усредняет его с остальными, пинг скачет на сотни мс.
+    // Это событие приходит только на дошедший ответ, latency — половина его
+    // времени туда и обратно.
     public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
     {
+        _usersInfo.AddPingSample(peer, latency * 2);
     }
 
     public void OnConnectionRequest(ConnectionRequest request)

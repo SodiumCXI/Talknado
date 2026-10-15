@@ -78,8 +78,8 @@ jobs:
           $bin version
           TALKNADO_PASSWORD=ci $bin serve --control $sock --quality 1080p60 --bandwidth 10 > /tmp/server.log 2>&1 &
           pid=$!
-          for i in $(seq 100); do [ -s /tmp/server.log ] && break; sleep 0.1; done
-          echo "Key: $(head -n 1 /tmp/server.log)"
+          for i in $(seq 100); do $bin ctl $sock key > /dev/null 2>&1 && break; sleep 0.1; done
+          echo "Key: $($bin ctl $sock key)"
           $bin ctl $sock status
           $bin ctl $sock users
           $bin ctl $sock quality 720p30
@@ -93,9 +93,58 @@ jobs:
           wait $pid
           echo "Server stopped"
 
+      # Установка и управление службой systemd так, как это делает пользователь:
+      # переход с запуска версий до 1.2.1, перезапуск, подъём после падения,
+      # повторная установка с прежними настройками, удаление.
+      - name: Service test
+        run: |
+          set -x
+          bin=$PWD/Talknado.Server.Linux/bin/Release/net8.0/linux-x64/publish/talknado-server-bin
+          archive=$(ls Talknado.Server.Linux/bin/Release/net8.0/linux-x64/talknado-server-v*-linux-x64.tar.gz)
+
+          sudo mkdir -p /root/.talknado
+          echo legacy | sudo tee /root/.talknado/password > /dev/null
+          echo quality=1080p30 | sudo tee /root/.talknado/settings > /dev/null
+          sudo bash -c "TALKNADO_PASSWORD=legacy $bin serve --control /root/.talknado/control.sock > /dev/null 2>&1 & echo \$! > /root/.talknado/talknado.pid"
+          sleep 2
+
+          sudo bash Talknado.Server.Linux/install.sh --archive "$archive"
+          systemctl is-active talknado
+          sudo talknado status | tee /tmp/status.txt
+          grep -q "1080p30" /tmp/status.txt
+          if pgrep -f "control /root/.talknado/control.sock"; then exit 1; fi
+
+          sudo talknado set-password ci
+          sudo talknado restart
+          sudo talknado quality 1080p60
+          sudo talknado bandwidth 25
+          sudo talknado users
+          sudo talknado key
+
+          sudo systemctl kill -s KILL talknado
+          for i in $(seq 30); do sudo talknado key && break; sleep 1; done
+          sudo talknado key
+
+          sudo talknado stop
+          sudo talknado status | grep -q "Stopped"
+          if systemctl is-enabled talknado; then exit 1; fi
+
+          sudo talknado start
+          sudo bash Talknado.Server.Linux/install.sh --archive "$archive"
+          sudo talknado status | tee /tmp/status.txt
+          grep -q "1080p60" /tmp/status.txt
+          grep -q "25 Mbit/s" /tmp/status.txt
+
+          sudo talknado logs
+          sudo talknado uninstall
+          if systemctl cat talknado; then exit 1; fi
+          [ ! -e /usr/local/bin/talknado ]
+
       - name: Server log
         if: failure()
-        run: cat /tmp/server.log
+        run: |
+          cat /tmp/server.log || true
+          sudo journalctl -u talknado --no-pager || true
 
       - uses: actions/upload-artifact@v7
         with:

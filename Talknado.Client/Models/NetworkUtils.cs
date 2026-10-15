@@ -17,7 +17,11 @@ public interface INetworkUtils
     /// <summary>Ждёт пакета. Буфер возвращает вызывающий.</summary>
     PooledBuffer ReceiveAudioPacket(CancellationToken token);
 
+    /// <summary>Кадр с заголовком <see cref="ScreenFrame"/>; канал выбирается по номеру кадра.</summary>
     void SendScreenSharePacket(ReadOnlySpan<byte> packet);
+
+    /// <summary>Пакетов демонстрации, ждущих отправки на сервер.</summary>
+    int ScreenShareBacklog { get; }
 
     /// <summary>Ждёт пакета. Буфер возвращает вызывающий.</summary>
     PooledBuffer ReceiveScreenSharePacket(CancellationToken token);
@@ -49,7 +53,11 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
     private readonly ConditionalWeakTable<NetworkStream, SemaphoreSlim> _writeLocks = new();
 
     private const byte AudioChannel = 0;
-    private const byte ScreenShareChannel = 1;
+    private const byte FirstScreenShareChannel = 1;
+
+    // Окно надёжного канала LiteNetLib — 64 пакета, у каждого канала своё.
+    // Число каналов обязано совпадать с сервером.
+    private const int ScreenShareChannels = 8;
 
     private CancellationTokenSource? _pollLoopTokenSourse = null!;
 
@@ -67,7 +75,7 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
         _netManager = new NetManager(this)
         {
             AutoRecycle = true,
-            ChannelsCount = 2,
+            ChannelsCount = 1 + ScreenShareChannels,
         };
         _netManager.Start(_connectionInfo.Port);
 
@@ -110,8 +118,26 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
     public void SendAudioPacket(ReadOnlySpan<byte> packet) =>
         Send(packet, AudioChannel, DeliveryMethod.ReliableSequenced);
 
-    public void SendScreenSharePacket(ReadOnlySpan<byte> packet) =>
-        Send(packet, ScreenShareChannel, DeliveryMethod.ReliableOrdered);
+    public void SendScreenSharePacket(ReadOnlySpan<byte> packet)
+    {
+        if (ScreenFrame.TryRead(packet, out var number, out _))
+            Send(packet, (byte)(FirstScreenShareChannel + number % ScreenShareChannels), DeliveryMethod.ReliableOrdered);
+    }
+
+    public int ScreenShareBacklog
+    {
+        get
+        {
+            var peer = _serverPeer;
+            if (peer == null)
+                return 0;
+
+            int backlog = 0;
+            for (int i = 0; i < ScreenShareChannels; i++)
+                backlog += peer.GetPacketsCountInReliableQueue((byte)(FirstScreenShareChannel + i), true);
+            return backlog;
+        }
+    }
 
     private void Send(ReadOnlySpan<byte> packet, byte channel, DeliveryMethod method)
     {
@@ -242,7 +268,7 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
             }
             _audioSemaphore.Release();
         }
-        else if (channelNumber == ScreenShareChannel)
+        else if (channelNumber <= ScreenShareChannels)
         {
             lock (_screenLock)
             {

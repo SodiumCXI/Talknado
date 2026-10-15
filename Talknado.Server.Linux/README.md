@@ -11,7 +11,8 @@ Dedicated server with the same session handling and media relay as the server em
 | v1.1.4         | v1.3.5, v1.3.6, v1.4.0, v1.4.1 |
 | v1.1.5         | v1.5.0                         |
 | v1.1.6         | v1.5.1, v1.5.2, v1.5.3, v1.5.4 |
-| v1.2.0         | v2.0.0 and newer               |
+| v1.2.0         | v2.0.0                         |
+| v1.2.1         | v2.0.1 and newer               |
 
 ## Installation
 
@@ -31,16 +32,18 @@ curl -fsSL https://raw.githubusercontent.com/SodiumCXI/Talknado/main/Talknado.Se
 
 ## Usage
 
+The server runs as the systemd service `talknado`: it starts again after a reboot or a crash until you stop it. All commands require root.
+
 ```bash
 talknado set-password 'password'   # required before the first start
-talknado start                     # prints the connection key
+talknado start                     # starts the server, turns on autostart and prints the connection key
 talknado status
-talknado stop
+talknado stop                      # stops the server and turns off autostart
 ```
 
 ### Session settings
 
-The same settings as the host panel in the desktop app. Quality and bandwidth are saved in `~/.talknado/settings` and apply right away if the server is running.
+The same settings as the host panel in the desktop app. Quality and bandwidth are saved in `/etc/talknado/talknado.conf` and apply right away if the server is running.
 
 ```bash
 talknado users                 # connected users: ID, ping, address, name
@@ -49,7 +52,21 @@ talknado quality 1080p60       # screen share quality cap: 720p30, 1080p30, 1080
 talknado bandwidth 25          # file transfer limit in Mbit/s, 0 = unlimited
 ```
 
-Server output goes to `~/.talknado/server.log`.
+### Logs
+
+```bash
+talknado logs                  # last 100 lines
+talknado logs -f               # follow the log
+```
+
+### Update
+
+```bash
+talknado update                # to the latest version
+talknado update vX.X.X         # to a specific version
+```
+
+The running server is restarted with the new version; the password and settings are kept. Servers before v1.2.1 have no `update` command: run the install command once - it moves the password and settings from `~/.talknado` and starts the server as a service.
 
 ## Releasing
 

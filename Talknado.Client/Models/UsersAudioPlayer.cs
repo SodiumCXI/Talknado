@@ -9,7 +9,8 @@ namespace Talknado.Client.Models;
 
 public interface IUsersAudioPlayer
 {
-    void Play(ushort userId, ReadOnlySpan<byte> opusData);
+    /// <param name="sequence">Номер пакета в потоке отправителя: по нему видна потеря.</param>
+    void Play(ushort userId, ushort sequence, ReadOnlySpan<byte> opusData);
 }
 
 public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
@@ -40,7 +41,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         UserRemoved += userId => _usersInfo.UpdateMicrophoneState(userId, false);
     }
 
-    public void Play(ushort userId, ReadOnlySpan<byte> opusData)
+    public void Play(ushort userId, ushort sequence, ReadOnlySpan<byte> opusData)
     {
         if (_usersInfo.GetUsernameByUserId(userId) == string.Empty)
             return;
@@ -54,7 +55,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             UserAdded?.Invoke(userId);
         }
 
-        value.AddPacket(opusData);
+        value.AddPacket(sequence, opusData);
     }
 
     private void RemoveUserStream(ushort userId)
@@ -143,10 +144,21 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
 
         private readonly ushort _userId;
         private readonly OpusCodecDecoder _decoder = new();
-        private readonly Queue<PooledBuffer> _packetQueue = new();
         private readonly byte[] _pcm = new byte[OpusCodecDecoder.FrameBytes];
+        private readonly byte[] _silence = new byte[OpusCodecDecoder.FrameBytes];
         private readonly object _queueLock = new();
         private readonly EnergyVad _energyVad = new();
+
+        // Пакеты лежат по номерам: ячейка — номер по модулю SlotCount. Ждём
+        // пакет _next; дальше SlotCount вперёд не храним. Канал отдаёт пакеты
+        // только по возрастанию номера: если за недостающим уже лежат следующие,
+        // он потерян; если не лежит ничего — он ещё в пути.
+        private const int SlotCount = 64;
+        private readonly PooledBuffer[] _slots = new PooledBuffer[SlotCount];
+        private readonly bool[] _filled = new bool[SlotCount];
+        private int _queued;
+        private ushort _next;
+        private bool _started;
 
         // Запас обязан быть больше порции, которой WasapiOut забирает звук, — всей
         // его задержки, иначе устройство голодает. Здесь вдвое больше: 20 мс против 40.
@@ -155,10 +167,18 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         private const int MAX_BUFFER_FRAMES = 20;
         private const int FRAME_BYTES = 960;
 
-        private int _targetBufferFrames = 5;
+        // Ниже этого запаса устройство вот-вот опустеет: если пакета нет,
+        // вставляется PLC, а пакет, когда придёт, играет следом.
+        private const int LOW_WATER_FRAMES = 2;
 
-        private int _underflowCounter = 0;
-        private int _playbackCounter = 0;
+        // Дальше PLC тянет гул; после стольких кадров подряд — тишина.
+        private const int MAX_CONCEALED_FRAMES = 10;
+
+        private int _targetBufferFrames = 5;
+        private int _concealed;
+        private int _underruns;
+        private int _quietSeconds;
+        private int _playbackCounter;
         private bool _hasPlayed;
 
 
@@ -205,21 +225,74 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             }
         }
 
-        public void AddPacket(ReadOnlySpan<byte> opusData)
+        public void AddPacket(ushort sequence, ReadOnlySpan<byte> opusData)
         {
-            var packet = PooledBuffer.CopyOf(opusData);
-
             lock (_queueLock)
             {
-                _packetQueue.Enqueue(packet);
-
-                int dropThreshold = Math.Max(_targetBufferFrames * 3, 10);
-
-                while (_packetQueue.Count > dropThreshold)
+                if (!_started)
                 {
-                    _packetQueue.Dequeue().Return();
+                    _next = sequence;
+                    _started = true;
+                }
+
+                int ahead = (short)(sequence - _next);
+
+                // Отправитель начал счёт заново или долго молчал: прежнего не ждём.
+                if (ahead < -1000 || ahead >= SlotCount)
+                {
+                    Clear();
+                    _next = sequence;
+                    ahead = 0;
+                }
+
+                // Старше уже сыгранного: канал таких не отдаёт, повтор не нужен.
+                if (ahead < 0)
+                    return;
+
+                int slot = sequence % SlotCount;
+                if (_filled[slot])
+                    return;
+
+                _slots[slot] = PooledBuffer.CopyOf(opusData);
+                _filled[slot] = true;
+                _queued++;
+
+                // Накопилось сверх меры — старое пропускается, задержка не растёт.
+                int dropThreshold = Math.Max(_targetBufferFrames * 3, 10);
+                while (_queued > dropThreshold)
+                {
+                    if (TakeNext(out var dropped))
+                        dropped.Return();
                 }
             }
+        }
+
+        /// <summary>Вызывается под _queueLock. Сдвигает ожидаемый номер; false — пакета на месте нет.</summary>
+        private bool TakeNext(out PooledBuffer packet)
+        {
+            int slot = _next % SlotCount;
+            _next++;
+
+            packet = _slots[slot];
+            if (!_filled[slot])
+                return false;
+
+            _filled[slot] = false;
+            _slots[slot] = default;
+            _queued--;
+            return true;
+        }
+
+        private void Clear()
+        {
+            for (int i = 0; i < SlotCount; i++)
+            {
+                if (_filled[i])
+                    _slots[i].Return();
+                _filled[i] = false;
+                _slots[i] = default;
+            }
+            _queued = 0;
         }
 
         /// <summary>
@@ -230,35 +303,50 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         {
             var userVolumeMultiplier = _usersInfo.GetVolumeByUserId(_userId) / 50f;
 
-            bool queueEmpty;
+            bool empty;
             lock (_queueLock)
-                queueEmpty = _packetQueue.Count == 0;
+                empty = _queued == 0;
 
             // Счёт ведётся по приходу пакетов, а не по факту выдачи: при полном
             // буфере тик ничего не берёт из очереди, и это не потеря.
-            if (queueEmpty)
+            if (empty)
                 ConsecutiveLosses++;
             else
                 ConsecutiveLosses = 0;
 
-            _playbackCounter++;
-
-            if (_playbackCounter >= 100)
+            if (++_playbackCounter >= 100)
             {
                 AdaptBufferSize();
                 _playbackCounter = 0;
-                _underflowCounter = 0;
             }
 
             while (WaveProvider.BufferedBytes / FRAME_BYTES < _targetBufferFrames)
             {
-                bool dequeued;
-                PooledBuffer packet;
+                bool present;
+                PooledBuffer packet = default;
 
                 lock (_queueLock)
-                    dequeued = _packetQueue.TryDequeue(out packet);
+                {
+                    present = _filled[_next % SlotCount];
 
-                if (dequeued)
+                    if (present || _queued > 0)
+                    {
+                        // Есть пакет — играет; нет, но лежат следующие — потерян,
+                        // его место занимает PLC.
+                        TakeNext(out packet);
+                    }
+                    else
+                    {
+                        // Не пришло ничего: ждём, пока устройству хватает; дальше —
+                        // PLC сверх очереди, номер не сдвигается, и пакет сыграет,
+                        // когда придёт. Задержка растёт на кадр, запас — тоже.
+                        if (WaveProvider.BufferedBytes / FRAME_BYTES >= LOW_WATER_FRAMES)
+                            break;
+                        _underruns++;
+                    }
+                }
+
+                if (present)
                 {
                     try
                     {
@@ -274,36 +362,46 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                     VolumeController.AdjustVolume(_pcm, userVolumeMultiplier);
                     WaveProvider.AddSamples(_pcm, 0, _pcm.Length);
                     _hasPlayed = true;
+                    _concealed = 0;
                     continue;
                 }
 
-                _underflowCounter++;
-                _usersInfo.UpdateSpeakingState(_userId, false);
-
-                // Целевой запас не набивается выдуманным звуком: один кадр PLC
-                // на тик и только там, где поток уже шёл и обрыв недолгий.
-                if (_hasPlayed && ConsecutiveLosses <= 10)
+                // PLC, пока обрыв короткий, дальше тишина. Признак «говорит» PLC
+                // не трогает: потеря посреди речи не должна гасить индикатор.
+                if (_hasPlayed && _concealed++ < MAX_CONCEALED_FRAMES)
                 {
                     _decoder.DecodePLC(_pcm);
                     VolumeController.AdjustVolume(_pcm, userVolumeMultiplier);
                     WaveProvider.AddSamples(_pcm, 0, _pcm.Length);
                 }
-
-                break;
+                else
+                {
+                    _usersInfo.UpdateSpeakingState(_userId, false);
+                    WaveProvider.AddSamples(_silence, 0, _silence.Length);
+                }
             }
         }
 
+        // Опустевшее устройство — признак, что запас меньше разброса сети: запас
+        // растёт сразу. Уменьшается осторожно, после десяти секунд без этого.
         private void AdaptBufferSize()
         {
-            double underflowRate = _underflowCounter / 100.0;
+            int underruns;
+            lock (_queueLock)
+            {
+                underruns = _underruns;
+                _underruns = 0;
+            }
 
-            if (underflowRate > 0.10)
+            if (underruns >= 2)
             {
                 _targetBufferFrames = Math.Min(_targetBufferFrames + 1, MAX_BUFFER_FRAMES);
+                _quietSeconds = 0;
             }
-            else if (underflowRate == 0 && _targetBufferFrames > MIN_BUFFER_FRAMES)
+            else if (underruns == 0 && ++_quietSeconds >= 10)
             {
                 _targetBufferFrames = Math.Max(_targetBufferFrames - 1, MIN_BUFFER_FRAMES);
+                _quietSeconds = 0;
             }
         }
 
@@ -315,10 +413,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             _decoder?.Dispose();
 
             lock (_queueLock)
-            {
-                while (_packetQueue.TryDequeue(out var packet))
-                    packet.Return();
-            }
+                Clear();
 
             GC.SuppressFinalize(this);
         }

@@ -288,9 +288,6 @@
   <data name="NoiseSuppressionLabel" xml:space="preserve">
     <value>Шумоподавление:</value>
   </data>
-  <data name="NoiseSuppressionTooltip" xml:space="preserve">
-    <value>Среднее: малая задержка и нагрузка. Сильное и максимальное лучше давят клавиатуру и фон, но добавляют 30 мс задержки, занимают около 25 % и 45 % одного ядра процессора и могут срезать шёпот.</value>
-  </data>
   <data name="NoiseSuppressionNone" xml:space="preserve">
     <value>Нет</value>
   </data>

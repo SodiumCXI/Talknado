@@ -575,15 +575,6 @@ namespace Talknado.Client.Properties.Localization {
         }
 
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Medium: low delay and load. Strong and Maximum suppress keyboard and background noise better....
-        /// </summary>
-        public static string NoiseSuppressionTooltip {
-            get {
-                return ResourceManager.GetString("NoiseSuppressionTooltip", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Ищет локализованную строку, похожую на None.
         /// </summary>
         public static string NoiseSuppressionNone {

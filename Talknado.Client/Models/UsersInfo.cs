@@ -120,7 +120,8 @@ public partial class UsersInfo(IConnectionInfo connectionInfo) : ObservableObjec
             if (user.IsSpeaking == isSpeaking)
                 return;
 
-            Application.Current?.Dispatcher.Invoke(() =>
+            // Зовётся из звукового потока: Invoke держал бы его, пока интерфейс занят.
+            Application.Current?.Dispatcher.BeginInvoke(() =>
             {
                 user.IsSpeaking = isSpeaking;
             });

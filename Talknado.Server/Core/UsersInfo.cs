@@ -5,7 +5,7 @@ using System.Net.Sockets;
 
 namespace Talknado.Server.Core;
 
-/// <summary>Задержка -1 — пока не измерена.</summary>
+/// <summary>Ping — задержка до сервера туда и обратно, мс; -1 — пока не измерена.</summary>
 public readonly record struct SessionUser(ushort Id, string Username, string Address, int Ping);
 
 public readonly record struct PeerEntry(ushort UserId, NetPeer Peer);
@@ -24,6 +24,7 @@ public interface IUsersInfo
     PeerEntry[] GetPeers();
     HashSet<(ushort, string)> GetUsersPublicInfo();
     ushort FindUserIdByNetPeer(NetPeer peer);
+    void AddPingSample(NetPeer peer, int roundTripMs);
     bool CheckUserConnection(ushort userId);
     bool HasClient(ushort id);
 }
@@ -81,6 +82,7 @@ public class UsersInfo : IUsersInfo, IDisposable
                 return;
 
             existingUser.Peer = udpPeer;
+            existingUser.ResetPing();
             existingUser.RestartToken();
             existingUser.IsConnected = true;
             UpdatePeers();
@@ -132,7 +134,7 @@ public class UsersInfo : IUsersInfo, IDisposable
                 kvp.Key,
                 kvp.Value.Username,
                 GetAddress(kvp.Value),
-                kvp.Value.Peer?.Ping ?? -1))];
+                kvp.Value.Peer != null ? kvp.Value.Ping : -1))];
     }
 
     public string GetUserAddress(ushort userId)
@@ -169,6 +171,13 @@ public class UsersInfo : IUsersInfo, IDisposable
                 return entry.UserId;
         }
         return 0;
+    }
+
+    public void AddPingSample(NetPeer peer, int roundTripMs)
+    {
+        var userId = FindUserIdByNetPeer(peer);
+        if (userId != 0 && _clientsInfo.TryGetValue(userId, out var userItem))
+            userItem.AddPing(roundTripMs);
     }
 
     public TcpClient GetTcpClientById(ushort userId)
@@ -228,6 +237,48 @@ public class UsersInfo : IUsersInfo, IDisposable
         }
         public string Username { get; set; } = username;
         public NetPeer? Peer { get; set; }
+
+        // Задержка — медиана трёх последних замеров: одиночный выброс
+        // отсекается, а настоящее изменение видно через замер-два.
+        private readonly int[] _pings = new int[3];
+        private int _pingCount;
+        private int _pingNext;
+
+        public int Ping
+        {
+            get
+            {
+                lock (_pings)
+                {
+                    if (_pingCount == 0)
+                        return -1;
+
+                    Span<int> sorted = stackalloc int[_pingCount];
+                    _pings.AsSpan(0, _pingCount).CopyTo(sorted);
+                    sorted.Sort();
+                    return sorted[(_pingCount - 1) / 2];
+                }
+            }
+        }
+
+        public void AddPing(int roundTripMs)
+        {
+            lock (_pings)
+            {
+                _pings[_pingNext] = roundTripMs;
+                _pingNext = (_pingNext + 1) % _pings.Length;
+                _pingCount = Math.Min(_pingCount + 1, _pings.Length);
+            }
+        }
+
+        public void ResetPing()
+        {
+            lock (_pings)
+            {
+                _pingCount = 0;
+                _pingNext = 0;
+            }
+        }
 
         public void RestartToken()
         {

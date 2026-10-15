@@ -236,7 +236,7 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
                     continue;
 
                 ms.Write(BitConverter.GetBytes(user.Id));
-                ms.Write(BitConverter.GetBytes((ushort)Math.Min(user.Ping * 2, ushort.MaxValue)));
+                ms.Write(BitConverter.GetBytes((ushort)Math.Min(user.Ping, ushort.MaxValue)));
             }
 
             var message = _cryptoSessionManager.EncryptMessage(ms.ToArray());

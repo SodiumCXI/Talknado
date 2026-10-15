@@ -7,6 +7,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
              xmlns:m="clr-namespace:Talknado.Client.Models"
+             xmlns:ctl="clr-namespace:Talknado.Client.Views.Controls"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}">
 
@@ -133,7 +134,7 @@
 
                     <!-- Только у картинки: видео качается по мере просмотра,
                          и полоса под превью ничего бы не говорила -->
-                    <ProgressBar Value="{Binding Progress, Mode=OneWay}"
+                    <ProgressBar ctl:SmoothProgress.Value="{Binding Progress, Mode=OneWay}"
                                  VerticalAlignment="Bottom"
                                  Margin="{DynamicResource PadFeed}">
                         <ProgressBar.Style>
@@ -212,7 +213,7 @@
                     <TextBlock Style="{DynamicResource MutedTextStyle}" Text="{Binding SizeText}"/>
                     <TextBlock Style="{StaticResource AttachmentFailedStyle}"/>
                     <ProgressBar Style="{StaticResource AttachmentProgressStyle}"
-                                 Value="{Binding Progress, Mode=OneWay}"
+                                 ctl:SmoothProgress.Value="{Binding Progress, Mode=OneWay}"
                                  Margin="{DynamicResource GapRowTop}"/>
                 </StackPanel>
             </Grid>

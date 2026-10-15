@@ -17,6 +17,9 @@ public sealed class SessionCommands(ServerHost host)
     private readonly ServerHost _host = host;
     private readonly ServerAdmin _admin = host.Admin;
 
+    /// <summary>Ключ подключения; до конца запуска сервера — null.</summary>
+    public string? Key { get; set; }
+
     public static bool TryParseQuality(string? value, out byte quality)
     {
         int index = Array.IndexOf(QualityNames, value?.ToLowerInvariant());
@@ -34,6 +37,7 @@ public sealed class SessionCommands(ServerHost host)
 
         return parts.FirstOrDefault()?.ToLowerInvariant() switch
         {
+            "key" => Key ?? $"{ErrorPrefix} Server is starting",
             "status" => Status(),
             "users" => Users(),
             "kick" => Kick(argument),
