@@ -9,7 +9,6 @@ namespace Talknado.Client.Models;
 
 public interface IUsersAudioPlayer
 {
-    /// <param name="sequence">Номер пакета в потоке отправителя: по нему видна потеря.</param>
     void Play(ushort userId, ushort sequence, ReadOnlySpan<byte> opusData);
 }
 
@@ -149,10 +148,8 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         private readonly object _queueLock = new();
         private readonly EnergyVad _energyVad = new();
 
-        // Пакеты лежат по номерам: ячейка — номер по модулю SlotCount. Ждём
-        // пакет _next; дальше SlotCount вперёд не храним. Канал отдаёт пакеты
-        // только по возрастанию номера: если за недостающим уже лежат следующие,
-        // он потерян; если не лежит ничего — он ещё в пути.
+        // Канал отдаёт пакеты только по возрастанию номера: если за недостающим
+        // уже лежат следующие, он потерян, иначе — ещё в пути.
         private const int SlotCount = 64;
         private readonly PooledBuffer[] _slots = new PooledBuffer[SlotCount];
         private readonly bool[] _filled = new bool[SlotCount];
@@ -167,11 +164,9 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         private const int MAX_BUFFER_FRAMES = 20;
         private const int FRAME_BYTES = 960;
 
-        // Ниже этого запаса устройство вот-вот опустеет: если пакета нет,
-        // вставляется PLC, а пакет, когда придёт, играет следом.
         private const int LOW_WATER_FRAMES = 2;
 
-        // Дальше PLC тянет гул; после стольких кадров подряд — тишина.
+        // Дальше PLC тянет гул.
         private const int MAX_CONCEALED_FRAMES = 10;
 
         private int _targetBufferFrames = 5;
@@ -237,7 +232,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
 
                 int ahead = (short)(sequence - _next);
 
-                // Отправитель начал счёт заново или долго молчал: прежнего не ждём.
                 if (ahead < -1000 || ahead >= SlotCount)
                 {
                     Clear();
@@ -245,7 +239,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                     ahead = 0;
                 }
 
-                // Старше уже сыгранного: канал таких не отдаёт, повтор не нужен.
                 if (ahead < 0)
                     return;
 
@@ -257,7 +250,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                 _filled[slot] = true;
                 _queued++;
 
-                // Накопилось сверх меры — старое пропускается, задержка не растёт.
                 int dropThreshold = Math.Max(_targetBufferFrames * 3, 10);
                 while (_queued > dropThreshold)
                 {
@@ -267,7 +259,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             }
         }
 
-        /// <summary>Вызывается под _queueLock. Сдвигает ожидаемый номер; false — пакета на месте нет.</summary>
+        /// <summary>Под _queueLock. false — пакета на месте нет.</summary>
         private bool TakeNext(out PooledBuffer packet)
         {
             int slot = _next % SlotCount;
@@ -331,15 +323,11 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
 
                     if (present || _queued > 0)
                     {
-                        // Есть пакет — играет; нет, но лежат следующие — потерян,
-                        // его место занимает PLC.
                         TakeNext(out packet);
                     }
                     else
                     {
-                        // Не пришло ничего: ждём, пока устройству хватает; дальше —
-                        // PLC сверх очереди, номер не сдвигается, и пакет сыграет,
-                        // когда придёт. Задержка растёт на кадр, запас — тоже.
+                        // Пакет в пути: PLC сверх очереди, номер не сдвигается.
                         if (WaveProvider.BufferedBytes / FRAME_BYTES >= LOW_WATER_FRAMES)
                             break;
                         _underruns++;
@@ -366,8 +354,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                     continue;
                 }
 
-                // PLC, пока обрыв короткий, дальше тишина. Признак «говорит» PLC
-                // не трогает: потеря посреди речи не должна гасить индикатор.
+                // Потеря посреди речи не гасит индикатор.
                 if (_hasPlayed && _concealed++ < MAX_CONCEALED_FRAMES)
                 {
                     _decoder.DecodePLC(_pcm);
@@ -382,8 +369,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             }
         }
 
-        // Опустевшее устройство — признак, что запас меньше разброса сети: запас
-        // растёт сразу. Уменьшается осторожно, после десяти секунд без этого.
         private void AdaptBufferSize()
         {
             int underruns;

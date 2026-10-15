@@ -3,18 +3,16 @@ using System.Buffers.Binary;
 namespace Talknado.Server.Core.Helpers;
 
 /// <summary>
-/// Открытый заголовок кадра демонстрации перед зашифрованным кадром: номер (4 байта)
-/// и признаки (1 байт). Открыт, чтобы сервер мог выбрать канал и пропускать кадры
-/// до опорного, не расшифровывая их; содержимое кадра остаётся зашифрованным.
+/// Открытый заголовок перед зашифрованным кадром демонстрации: по нему сервер
+/// выбирает канал и пропускает кадры, не расшифровывая их.
 /// </summary>
 public static class ScreenFrame
 {
     public const int HeaderSize = 5;
 
-    /// <summary>Опорный кадр: с него можно начать показ.</summary>
     public const byte Key = 1;
 
-    /// <summary>Кадры до этого могли не дойти: получатель не ждёт их и начинает отсюда.</summary>
+    /// <summary>Прежние кадры могли не дойти: получатель их не ждёт.</summary>
     public const byte Resync = 2;
 
     public static bool TryRead(ReadOnlySpan<byte> packet, out uint number, out byte flags)

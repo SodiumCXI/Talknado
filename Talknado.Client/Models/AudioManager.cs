@@ -22,11 +22,8 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
     private readonly IConnectionInfo _connectionInfo;
     private readonly IUsersAudioPlayer _usersAudioPlayer;
 
-    // Заголовок голосового пакета: номер участника и номер пакета в потоке.
-    // По номеру пакета получатель видит потерю и ставит PLC ровно на её место.
     private const int HeaderSize = 2 * sizeof(ushort);
 
-    // Свой счёт у микрофона и у системного звука: это разные потоки у получателя.
     private ushort _micSequence;
     private ushort _systemSequence;
     private readonly ISettingsManager _settingsManager;
@@ -138,7 +135,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         }
     }
 
-    // Пакет: заголовок и Opus. Поток приёма один, поэтому
+    // Пакет: номер участника, номер пакета и Opus. Поток приёма один, поэтому
     // буфер под расшифровку общий на все пакеты.
     private void HandleReceiveAudio(CancellationToken token)
     {
@@ -245,11 +242,8 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
             var opusData = new byte[OpusCodecEncoder.MaxPacketSize];
             int filled = 0;
 
-            // Обработчик захвата только складывает звук в буфер. Шумоподавление и
-            // кодирование идут в этом потоке: в обработчике они задерживали чтение
-            // устройства, а DPDFNet-8 — 5 мс на кадр, два кадра на блок 20 мс плюс
-            // пауза до следующего чтения — больше буфера захвата, и устройство
-            // теряло около 10 % звука.
+            // Обработка — не в обработчике захвата: там она задерживает чтение
+            // устройства, и буфер захвата переполняется.
             capture.DataAvailable += (s, e) =>
             {
                 captureBuffer.AddSamples(e.Buffer, 0, e.BytesRecorded);

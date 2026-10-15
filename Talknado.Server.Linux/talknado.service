@@ -1,11 +1,9 @@
-# Служба сервера Talknado. Ставится install.sh, управляется командой talknado.
-# Настройки и пароль — /etc/talknado/talknado.conf, читает их systemd до
-# понижения прав, поэтому файл доступен только root.
+# Файл настроек читает systemd до понижения прав, поэтому он доступен только root.
 
 [Unit]
 Description=Talknado Server
 Documentation=https://github.com/SodiumCXI/Talknado
-# Ключ подключения несёт внешний адрес машины, а он узнаётся при запуске по сети
+# Внешний адрес для ключа узнаётся при запуске по сети
 Wants=network-online.target
 After=network-online.target
 
@@ -18,7 +16,6 @@ Restart=on-failure
 RestartSec=3
 TimeoutStopSec=10
 
-# Отдельный пользователь без прав, systemd создаёт его на время работы
 DynamicUser=yes
 RuntimeDirectory=talknado
 NoNewPrivileges=yes

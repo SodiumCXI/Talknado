@@ -31,20 +31,16 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
     private readonly Thread _screenShareReceiveThread;
     private Thread? _screenShareSendThread;
 
-    // Очередь к серверу, после которой кадры перестают уходить до следующего
-    // опорного: на медленном канале она иначе растёт без предела, и картинка
-    // у зрителей отстаёт на десятки секунд. 256 пакетов — около 350 КБ.
+    // Сверх этой очереди кадры не уходят до следующего опорного, иначе на
+    // медленном канале картинка отстаёт всё больше.
     private const int MaxBacklog = 256;
 
-    // Номер не сбрасывается между показами: начало показа помечено Resync,
-    // по нему зритель и отличает новый показ от старого.
+    // Не сбрасывается между показами: начало показа помечено Resync.
     private uint _frameNumber;
     private bool _startOfShare;
     private bool _skipping;
 
-    // Кадры идут по нескольким каналам и приходят не по порядку. Недостающий
-    // ждём не дольше HoleTimeout: надёжный канал досылает потерю за несколько
-    // пингов, а дольше ждать можно лишь кадр, которого уже не будет.
+    // Кадры по разным каналам приходят не по порядку.
     private static readonly TimeSpan HoleTimeout = TimeSpan.FromSeconds(1);
     private const int MaxPendingFrames = 240;
     private readonly SortedDictionary<uint, PooledBuffer> _pending = [];
@@ -214,7 +210,6 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
         }
     }
 
-    // Поток приёма один, очередь кадров — только его.
     private void Reorder(PooledBuffer packet, CancellationToken token)
     {
         if (!ScreenFrame.TryRead(packet.Span, out var number, out var flags))
@@ -225,7 +220,6 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
 
         if ((flags & ScreenFrame.Resync) != 0 || !_hasNextFrame)
         {
-            // Старое и кадры прошлого показа по порядку уже не придут.
             foreach (var stale in _pending.Keys.Where(k => k < number || k - number > MaxPendingFrames).ToList())
                 Drop(stale);
             _nextFrame = number;
@@ -250,8 +244,7 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
 
         if (_pending.Count > MaxPendingFrames || Stopwatch.GetElapsedTime(_waitingSince) > HoleTimeout)
         {
-            // Пропавший кадр не дождаться. С опорного картинка восстановится
-            // чисто, поэтому продолжаем с него, если он уже здесь.
+            // С опорного картинка восстанавливается чисто.
             uint resume = _pending.Keys.First();
             foreach (var (k, p) in _pending)
             {

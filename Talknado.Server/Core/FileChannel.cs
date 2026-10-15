@@ -67,11 +67,9 @@ public sealed class FileChannel(INetworkUtils networkUtils, ICryptoSessionManage
     public void Accept(TcpClient client, ushort userId)
     {
         client.ReceiveTimeout = 0;
-        // Без Нейгла: хвост каждой порции иначе ждёт отложенного подтверждения
-        // получателя, на Windows до 200 мс.
+        // Без Нейгла хвост каждой порции ждёт отложенного подтверждения.
         client.NoDelay = true;
-        // Простаивающий канал за NAT умирает молча; проба раз в 15 с держит его,
-        // а мёртвый закрывается через 30 с, и место освобождается под новый.
+        // Простаивающее соединение за NAT иначе умирает молча.
         client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
         client.Client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, 15);
         client.Client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 5);

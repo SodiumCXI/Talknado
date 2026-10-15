@@ -17,10 +17,8 @@ public interface INetworkUtils
     /// <summary>Ждёт пакета. Буфер возвращает вызывающий.</summary>
     PooledBuffer ReceiveAudioPacket(CancellationToken token);
 
-    /// <summary>Кадр с заголовком <see cref="ScreenFrame"/>; канал выбирается по номеру кадра.</summary>
     void SendScreenSharePacket(ReadOnlySpan<byte> packet);
 
-    /// <summary>Пакетов демонстрации, ждущих отправки на сервер.</summary>
     int ScreenShareBacklog { get; }
 
     /// <summary>Ждёт пакета. Буфер возвращает вызывающий.</summary>
@@ -55,8 +53,7 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
     private const byte AudioChannel = 0;
     private const byte FirstScreenShareChannel = 1;
 
-    // Окно надёжного канала LiteNetLib — 64 пакета, у каждого канала своё.
-    // Число каналов обязано совпадать с сервером.
+    // Обязано совпадать с сервером.
     private const int ScreenShareChannels = 8;
 
     private CancellationTokenSource? _pollLoopTokenSourse = null!;

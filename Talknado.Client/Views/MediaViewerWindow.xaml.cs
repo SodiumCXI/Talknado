@@ -81,11 +81,8 @@ public partial class MediaViewerWindow : TalknadoWindow
         double maxHeight = workArea.Height * InitialScreenShare;
         double width = maxWidth, height = maxHeight;
 
-        // Счёт в пикселях экрана. Высота подбирается так, чтобы ширина по
-        // пропорции вышла целым числом пикселей (у 16:9 — высота, кратная 9):
-        // при любом дробном остатке разметка округляет картинку, и сверху или
-        // сбоку остаётся пиксель фона. Нет такой высоты в пределах 64 пикселей —
-        // берётся исходная.
+        // Высота подбирается так, чтобы ширина по пропорции вышла целым числом
+        // пикселей экрана: иначе округление оставляет у края пиксель фона.
         if (attachment is { PixelWidth: > 0, PixelHeight: > 0 })
         {
             var dpi = VisualTreeHelper.GetDpi(this);

@@ -5,10 +5,8 @@ using System.Windows.Media.Animation;
 namespace Talknado.Client.Views.Controls;
 
 /// <summary>
-/// Полоса плавно доезжает до нового значения, а не перескакивает к нему.
-/// Значение приходит раз в 50 мс, а ход длится 150 мс — заполнение едет без
-/// остановок. Назад полоса не едет: уменьшение значит новую загрузку или
-/// другое вложение в переиспользованной строке списка.
+/// Полоса доезжает до нового значения, а не перескакивает. Назад не едет:
+/// уменьшение — другое вложение в переиспользованной строке списка.
 /// </summary>
 public static class SmoothProgress
 {
@@ -21,8 +19,6 @@ public static class SmoothProgress
 
     public static void SetValue(DependencyObject element, double value) => element.SetValue(ValueProperty, value);
 
-    // Вложение, к которому относится текущий ход: строка списка переиспользуется
-    // для другого вложения, и ехать от чужого значения нельзя.
     private static readonly DependencyProperty ItemProperty = DependencyProperty.RegisterAttached(
         "Item", typeof(object), typeof(SmoothProgress));
 

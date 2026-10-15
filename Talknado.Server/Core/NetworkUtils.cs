@@ -15,10 +15,7 @@ public interface INetworkUtils
     /// <summary>Пакет из пула: вызывающий возвращает его.</summary>
     (PooledBuffer Packet, ushort UserId) ReceiveAudioPacket(CancellationToken token);
 
-    /// <summary>
-    /// Кадр демонстрации: открытый заголовок <see cref="ScreenFrame"/> и зашифрованный кадр.
-    /// Заголовок меняется на месте — признак <see cref="ScreenFrame.Resync"/> у каждого адресата свой.
-    /// </summary>
+    /// <summary>Заголовок меняется на месте: признак Resync у каждого адресата свой.</summary>
     void BroadcastScreenSharePacket(ushort currentUserId, Span<byte> packet);
 
     /// <summary>Пакет из пула: вызывающий возвращает его.</summary>
@@ -56,15 +53,10 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
     private const byte AudioChannel = 0;
     private const byte FirstScreenShareChannel = 1;
 
-    // Окно надёжного канала LiteNetLib — 64 пакета, это константа библиотеки.
-    // В одном канале кадры 1080p60 упирались в него: при пинге 50 мс проходило
-    // 7 Мбит/с, с потерями — 3–4. У каждого канала своё окно, поэтому кадр
-    // идёт в канал по своему номеру, а порядок получатель восстанавливает сам.
+    // Окно надёжного канала LiteNetLib — 64 пакета, одного канала на 1080p60 мало.
     public const int ScreenShareChannels = 8;
 
-    // Очередь к адресату, после которой кадры ему перестают слать до следующего
-    // опорного: иначе на медленном канале она растёт без предела, и картинка
-    // отстаёт на десятки секунд. 256 пакетов — около 350 КБ.
+    // Сверх этой очереди к адресату кадры ему не уходят до следующего опорного.
     private const int MaxScreenShareBacklog = 256;
     private readonly HashSet<ushort> _screenShareSkipping = [];
 
@@ -324,10 +316,8 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
     {
     }
 
-    // NetPeer.Ping не годится: потерянный ответ LiteNetLib считает замером
-    // в целую секунду и усредняет его с остальными, пинг скачет на сотни мс.
-    // Это событие приходит только на дошедший ответ, latency — половина его
-    // времени туда и обратно.
+    // NetPeer.Ping не годится: потерянный ответ LiteNetLib усредняет как замер
+    // в секунду. latency — половина времени туда и обратно.
     public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
     {
         _usersInfo.AddPingSample(peer, latency * 2);

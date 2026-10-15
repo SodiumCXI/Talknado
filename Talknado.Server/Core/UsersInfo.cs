@@ -238,8 +238,7 @@ public class UsersInfo : IUsersInfo, IDisposable
         public string Username { get; set; } = username;
         public NetPeer? Peer { get; set; }
 
-        // Задержка — медиана трёх последних замеров: одиночный выброс
-        // отсекается, а настоящее изменение видно через замер-два.
+        // Медиана трёх замеров отсекает одиночный выброс.
         private readonly int[] _pings = new int[3];
         private int _pingCount;
         private int _pingNext;

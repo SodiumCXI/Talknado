@@ -45,11 +45,8 @@ public partial class StartWindow : TalknadoWindow, IDisposable
         };
     }
 
-    // Щелчком TabItem фокусирует себя и, если фокус был не на соседней
-    // вкладке, передаёт его первому полю — нику; TabControl при смене вкладки
-    // тоже переносит фокус, если он был внутри неё. Поэтому вкладка выбирается
-    // здесь, без её собственной обработки щелчка, а фокус снимается до смены —
-    // в поля он не попадает ни на миг. С клавиатуры вкладки работают как обычно.
+    // TabItem и TabControl по щелчку переносят фокус в первое поле вкладки,
+    // поэтому вкладка выбирается здесь, а фокус снимается до смены.
     private void ModeTabs_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is not DependencyObject source

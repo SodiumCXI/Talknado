@@ -40,12 +40,8 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
 {
     public const int ChunkSize = 32 * 1024;
     private const int WindowChunks = 16;
-    // Сколько запрошено и ещё не пришло. Запрос идёт через сервер к владельцу,
-    // данные — обратно, цикл длится два пинга, и за цикл приходит не больше
-    // запрошенного. Скачивание: 4 МБ держат 100 Мбит/с до пинга 160 мс (с 1 МБ
-    // при пинге 100 мс выходило 40 Мбит/с). Просмотр видео: 1 МБ — после
-    // перемотки сначала доходит уже запрошенное, и большое окно задерживало
-    // бы её, особенно при пределе скорости на сервере.
+    // За два пинга приходит не больше запрошенного. При просмотре окно меньше:
+    // после перемотки сначала доходит уже запрошенное.
     private const int DownloadOutstandingChunks = 8 * WindowChunks;
     private const int StreamingOutstandingChunks = 2 * WindowChunks;
     private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(10);
@@ -63,9 +59,6 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
     private readonly ConcurrentDictionary<(ushort Owner, uint FileId), Attachment> _announced = new();
     private readonly ConcurrentDictionary<(ushort Owner, uint FileId), RemoteFile> _files = new();
 
-    // Прогресс поднимается в интерфейс таймером, а не каждым куском: куски
-    // приходят пачками, и значение последнего куска в пачке иначе ждало бы
-    // следующей пачки. Таймер работает, только пока идёт загрузка.
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(50);
     private DispatcherTimer? _progressTimer;
     private int _progressTimerRunning;
@@ -504,9 +497,7 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
                 if (Stopwatch.GetElapsedTime(file.LastActivity, now) < StallTimeout)
                     continue;
 
-                // Простой — не повод объявлять файл недоступным: пока владелец в
-                // сессии, канал восстановится, и перезапрос дойдёт. Недоступным файл
-                // делают уход владельца и его ответ, что файла больше нет.
+                // Пока владелец в сессии, простой не делает файл недоступным.
                 file.LastActivity = now;
                 Array.Clear(file.Requested);
                 file.Outstanding = 0;
@@ -528,8 +519,7 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
         });
     }
 
-    // Поток UI. Признак сбрасывается до обхода: кусок, пришедший во время
-    // обхода, снова запустит таймер, и его значение не потеряется.
+    // Признак сбрасывается до обхода: кусок, пришедший во время обхода, снова запустит таймер.
     private void UpdateProgress()
     {
         Volatile.Write(ref _progressTimerRunning, 0);

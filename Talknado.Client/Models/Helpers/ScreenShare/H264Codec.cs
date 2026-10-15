@@ -18,11 +18,8 @@ public static unsafe class H264Encoder
     private static bool _initialized = false;
     private static readonly bool _hasDiscreteGPU;
 
-    // Перевод BGRA в YUV на процессоре — самая дорогая часть кадра: около 7 мс
-    // на 1080p в одном потоке. Без масштабирования строки кадра независимы,
-    // поэтому кадр режется на полосы по чётному числу строк, и полосы считаются
-    // параллельно. При масштабировании полоса одна: фильтр на стыке полос
-    // не видел бы соседних строк, и стык был бы заметен.
+    // Перевод BGRA в YUV считается полосами параллельно. При масштабировании
+    // полоса одна: фильтр на стыке полос не видел бы соседних строк.
     private static ConvertBand[] _bands = [];
     private static byte* _bgra;
     private static readonly Action<int> _convertBand = ConvertBandAt;

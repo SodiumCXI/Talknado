@@ -95,9 +95,7 @@
                                    Visibility="Hidden"/>
                         </Border>
 
-                        <!-- Обводка наведения — отдельный слой, иначе картинка съезжала бы
-                             внутрь при её появлении. Лежит снаружи превью: по краю она
-                             закрывала его кромку и выглядела меньше самой картинки -->
+                        <!-- Обводка — отдельный слой снаружи превью, чтобы не сдвигать и не закрывать его -->
                         <Border x:Name="HoverRing"
                                 Margin="{DynamicResource MonitorRingOutset}"
                                 BorderBrush="{DynamicResource AccentBrush}"

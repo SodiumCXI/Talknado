@@ -17,7 +17,6 @@ public sealed class SessionCommands(ServerHost host)
     private readonly ServerHost _host = host;
     private readonly ServerAdmin _admin = host.Admin;
 
-    /// <summary>Ключ подключения; до конца запуска сервера — null.</summary>
     public string? Key { get; set; }
 
     public static bool TryParseQuality(string? value, out byte quality)

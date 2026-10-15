@@ -78,13 +78,9 @@ public sealed class FileChannel(INetworkUtils networkUtils, ICryptoSessionManage
     {
         while (!token.IsCancellationRequested)
         {
-            // Без Нейгла: иначе хвост каждой порции ждёт подтверждения, а Windows
-            // подтверждает с задержкой до 200 мс — на каждые 512 КБ простой.
+            // Без Нейгла хвост каждой порции ждёт отложенного подтверждения.
             var client = new TcpClient { NoDelay = true };
-            // Без проверки живости простаивающий канал молча умирает за NAT или
-            // межсетевым экраном: обе стороны считают его открытым, и запросы
-            // файлов уходят в никуда. Проба раз в 15 с не даёт забыть соединение,
-            // а три пропущенных ответа подряд рвут его — канал пересоздаётся.
+            // Простаивающее соединение за NAT иначе умирает молча.
             client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
             client.Client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, 15);
             client.Client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 5);
