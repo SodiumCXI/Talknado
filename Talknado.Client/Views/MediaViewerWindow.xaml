@@ -254,12 +254,13 @@
                       Margin="{DynamicResource GapInline}"
                       VerticalAlignment="Center"/>
 
+                <!-- 1 — исходная громкость, выше — усиление -->
                 <Slider Grid.Column="4"
                         Style="{DynamicResource VolumeSliderStyle}"
                         Width="{DynamicResource ViewerVolumeWidth}"
                         Minimum="0"
-                        Maximum="1"
-                        SmallChange="0.05" LargeChange="0.2"
+                        Maximum="2"
+                        SmallChange="0.1" LargeChange="0.4"
                         Value="{Binding Volume}"
                         VerticalAlignment="Center"
                         ToolTip="{x:Static l:Strings.VolumeTooltip}"/>

@@ -12,7 +12,7 @@
         d:DataContext="{d:DesignInstance Type=vm:HostPanelViewModel}"
         Style="{StaticResource AppWindowStyle}"
         Title="{x:Static l:Strings.HostPanelButton}"
-        Width="350" MinWidth="350"
+        Width="377" MinWidth="377"
         SizeToContent="Height"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen">
@@ -93,7 +93,8 @@
                     <ListBox Style="{DynamicResource PlainListBoxStyle}"
                              ItemContainerStyle="{DynamicResource PlainListBoxItemStyle}"
                              ItemsSource="{Binding HostPanelManager.Users}"
-                             MaxHeight="{DynamicResource SessionListMaxHeight}">
+                             MaxHeight="{DynamicResource SessionListMaxHeight}"
+                             Grid.IsSharedSizeScope="True">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <!-- Отрицательный отступ снимает промежуток у последней строки -->
@@ -106,25 +107,33 @@
                                 <Border Style="{DynamicResource SessionRowStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="UserId"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
                                         <TextBlock Grid.Column="0"
+                                                   Style="{DynamicResource MutedTextStyle}"
+                                                   Text="{Binding Id}"
+                                                   TextAlignment="Right"
+                                                   Margin="{DynamicResource GapInline}"
+                                                   VerticalAlignment="Center"/>
+
+                                        <TextBlock Grid.Column="1"
                                                    Style="{DynamicResource UserNameStyle}"
                                                    Text="{Binding Username}"
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTip="{Binding Username}"/>
 
-                                        <TextBlock Grid.Column="1"
+                                        <TextBlock Grid.Column="2"
                                                    Style="{DynamicResource MutedTextStyle}"
                                                    Text="{Binding Address}"
                                                    Margin="{DynamicResource GapInline}"
                                                    VerticalAlignment="Center"/>
 
                                         <!-- Слот держит ширину и у своей строки, иначе ряд разъезжается -->
-                                        <Grid Grid.Column="2" Width="{DynamicResource ControlHeight}">
+                                        <Grid Grid.Column="3" Width="{DynamicResource ControlHeight}">
                                             <Button Style="{DynamicResource DangerIconButtonStyle}"
                                                     Command="{Binding DataContext.KickCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                                     CommandParameter="{Binding}"
