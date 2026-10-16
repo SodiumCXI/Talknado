@@ -16,6 +16,7 @@ public static unsafe class H264Encoder
     private static int _height;
     private static int _frameCount = 0;
     private static bool _initialized = false;
+    private static volatile bool _keyFrameRequested;
     private static readonly bool _hasDiscreteGPU;
 
     // Перевод BGRA в YUV считается полосами параллельно. При масштабировании
@@ -85,9 +86,8 @@ public static unsafe class H264Encoder
             _codecContext->time_base = new AVRational { num = 1, den = fps };
             _codecContext->framerate = new AVRational { num = fps, den = 1 };
             _codecContext->pix_fmt = AVPixelFormat.AV_PIX_FMT_YUV420P;
-            // Опорный кадр раз в секунду при любой частоте: иначе на 60 кадрах
-            // опоздавший зритель ждал бы картинку вдвое дольше.
-            _codecContext->gop_size = fps;
+            // Остальные опорные кадры — по запросу зрителей.
+            _codecContext->gop_size = fps * 5;
             _codecContext->max_b_frames = 0;
 
             if (codecName.Contains("nvenc"))
@@ -96,6 +96,7 @@ public static unsafe class H264Encoder
                 ffmpeg.av_opt_set(_codecContext->priv_data, "tune", "hq", 0);
                 ffmpeg.av_opt_set(_codecContext->priv_data, "rc", "cqp", 0);
                 ffmpeg.av_opt_set(_codecContext->priv_data, "cq", "30", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "forced-idr", "1", 0);
             }
             else if (codecName.Contains("amf"))
             {
@@ -114,6 +115,7 @@ public static unsafe class H264Encoder
                 ffmpeg.av_opt_set(_codecContext->priv_data, "tune", "zerolatency", 0);
                 ffmpeg.av_opt_set(_codecContext->priv_data, "crf", "32", 0);
                 ffmpeg.av_opt_set(_codecContext->priv_data, "x264-params", "nal-hrd=cbr:force-cfr=1:aq-mode=0:ref=1", 0);
+                ffmpeg.av_opt_set(_codecContext->priv_data, "forced-idr", "1", 0);
             }
 
             var ret = ffmpeg.avcodec_open2(_codecContext, _codec, null);
@@ -247,6 +249,8 @@ public static unsafe class H264Encoder
         }
 
         _frame->pts = _frameCount++;
+        _frame->pict_type = _keyFrameRequested ? AVPictureType.AV_PICTURE_TYPE_I : AVPictureType.AV_PICTURE_TYPE_NONE;
+        _keyFrameRequested = false;
 
         ffmpeg.avcodec_send_frame(_codecContext, _frame);
 
@@ -269,6 +273,8 @@ public static unsafe class H264Encoder
         ffmpeg.av_packet_unref(_packet);
         return _output.AsSpan(0, length);
     }
+
+    public static void RequestKeyFrame() => _keyFrameRequested = true;
 
     public static void Resize(int width, int height)
     {
@@ -313,6 +319,9 @@ public unsafe class H264Decoder
     private AVCodec* _codec;
     private AVCodecContext* _codecContext;
     private AVFrame* _frame;
+    private AVBufferRef* _hwDevice;
+    private AVFrame* _cpuFrame;
+    private AVFrame* _source;
     private AVPacket* _packet;
     private SwsContext* _swsContext;
     private int _width;
@@ -342,11 +351,19 @@ public unsafe class H264Decoder
         if (_codecContext == null)
             throw new Exception("Failed to create decoder context");
 
+        AVBufferRef* hwDevice = null;
+        if (ffmpeg.av_hwdevice_ctx_create(&hwDevice, AVHWDeviceType.AV_HWDEVICE_TYPE_D3D11VA, null, null, 0) >= 0)
+        {
+            _hwDevice = hwDevice;
+            _codecContext->hw_device_ctx = ffmpeg.av_buffer_ref(hwDevice);
+        }
+
         int ret = ffmpeg.avcodec_open2(_codecContext, _codec, null);
         if (ret < 0)
             throw new Exception($"Failed to open decoder: {ret}");
 
         _frame = ffmpeg.av_frame_alloc();
+        _cpuFrame = ffmpeg.av_frame_alloc();
         _packet = ffmpeg.av_packet_alloc();
 
         _initialized = true;
@@ -391,16 +408,21 @@ public unsafe class H264Decoder
         if (ret < 0)
             throw new Exception($"Decoding error: {ret}");
 
-        if (_width != _frame->width || _height != _frame->height)
+        _source = _frame;
+        if (_frame->hw_frames_ctx != null)
         {
-            _width = _frame->width;
-            _height = _frame->height;
+            ffmpeg.av_frame_unref(_cpuFrame);
+            if (ffmpeg.av_hwframe_transfer_data(_cpuFrame, _frame, 0) < 0)
+                return false;
+            _source = _cpuFrame;
+        }
 
-            _swsContext = ffmpeg.sws_getCachedContext(_swsContext,
-            _width, _height, (AVPixelFormat)_frame->format,
+        _width = _source->width;
+        _height = _source->height;
+        _swsContext = ffmpeg.sws_getCachedContext(_swsContext,
+            _width, _height, (AVPixelFormat)_source->format,
             _width, _height, AVPixelFormat.AV_PIX_FMT_BGRA,
             ffmpeg.SWS_FAST_BILINEAR, null, null, null);
-        }
 
         return true;
     }
@@ -410,8 +432,8 @@ public unsafe class H264Decoder
     {
         for (uint i = 0; i < 4; i++)
         {
-            _srcData[i] = _frame->data[i];
-            _srcLinesize[i] = _frame->linesize[i];
+            _srcData[i] = _source->data[i];
+            _srcLinesize[i] = _source->linesize[i];
         }
 
         fixed (byte* pBgra = bgra)
@@ -451,11 +473,26 @@ public unsafe class H264Decoder
             _frame = null;
         }
 
+        if (_cpuFrame != null)
+        {
+            fixed (AVFrame** ptr = &_cpuFrame)
+                ffmpeg.av_frame_free(ptr);
+            _cpuFrame = null;
+        }
+        _source = null;
+
         if (_codecContext != null)
         {
             fixed (AVCodecContext** ptr = &_codecContext)
                 ffmpeg.avcodec_free_context(ptr);
             _codecContext = null;
+        }
+
+        if (_hwDevice != null)
+        {
+            fixed (AVBufferRef** ptr = &_hwDevice)
+                ffmpeg.av_buffer_unref(ptr);
+            _hwDevice = null;
         }
 
         _initialized = false;

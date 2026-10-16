@@ -17,6 +17,10 @@ public interface IScreenSharePlayer
     void UpdateSavedKeyFrame();
     void UpdateFrame(ReadOnlySpan<byte> h264Data, CancellationToken token);
     void Clear();
+
+    /// <summary>После пропуска кадров разброс задержки считается заново.</summary>
+    void ResetTimeline();
+
     ImageSource DisplayImage { get; }
     int FramesPerSecond { get; }
     bool IsWindowVisible { get; set; }
@@ -44,6 +48,8 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     private byte[] _frontPixels = [];
     private int _frontWidth;
     private int _frontHeight;
+    private int _backWidth;
+    private int _backHeight;
     private readonly object _frontLock = new();
     private int _renderPending;
     private readonly Action _renderAction;
@@ -64,14 +70,33 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     private readonly Task _playbackTask;
     private readonly SemaphoreSlim _frameSignal = new(0);
 
-    private const int MIN_BUFFER_FRAMES = 1;
-    private const int MAX_BUFFER_FRAMES = 30;
-    private readonly object _jitterLock = new();
-    private long _lastArrivalTimestamp = 0;
-    private double _jitterEma = 0;
-    private int _lastDeltaMs = 33;
-    private volatile int _targetBufferFrames = MIN_BUFFER_FRAMES;
-    private long _lastShownTicks;
+    // Кадр показывается в «время отправителя + задержка показа». Задержка —
+    // 99-й процентиль запаздывания последних кадров, но не меньше запаздывания
+    // последних опорных с их декодированием: они редкие и в процентиль не попадают.
+    // Меняется не быстрее 5 % скорости показа; кадр декодируется заранее.
+    private const int TimelineWindow = 512;
+    private const double TimelinePercentile = 0.99;
+    private const double MaxRateChange = 0.05;
+    private const double LateToleranceMs = 2;
+    private const double MaxDelayMs = 1000;
+    private const double DecodeLeadMs = 12;
+    private const double DecodeMarginMs = 4;
+    private const int KeyFrameWindow = 3;
+    private readonly double[] _keyOffsets = new double[KeyFrameWindow];
+    private int _keyOffsetCount;
+    private int _keyOffsetNext;
+    private double _keyDecodeMs = DecodeLeadMs;
+    // Первое декодирование после сброса готовит декодер и в оценку не идёт.
+    private volatile bool _decoderCold = true;
+    private readonly double[] _offsets = new double[TimelineWindow];
+    private readonly double[] _sortedOffsets = new double[TimelineWindow];
+    private int _offsetCount;
+    private int _offsetNext;
+    private int _sinceEstimate;
+    private long _senderMs;
+    private double _targetOffsetMs = double.NaN;
+    private double _playOffsetMs;
+    private volatile bool _reanchor = true;
 
     [ObservableProperty]
     private bool _isWindowVisible = false;
@@ -149,92 +174,142 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
             {
                 StoreKeyFrame(h264Data);
                 _decoder.FlushBuffers();
+                _decoderCold = true;
                 IsKeyFrameInitialized = true;
             }
         }
 
-        var frame = new EncodedFrame(
-            BinaryPrimitives.ReadInt32LittleEndian(h264Data[1..]),
-            h264Data.Length > 5 ? PooledBuffer.CopyOf(h264Data[5..]) : default);
+        int deltaMs = BinaryPrimitives.ReadInt32LittleEndian(h264Data[1..]);
+        var data = h264Data.Length > 5 ? PooledBuffer.CopyOf(h264Data[5..]) : default;
+        double arrivalMs = NowMs;
 
         lock (_queueLock)
         {
-            _frameQueue.Enqueue(frame);
-        }
-
-        lock (_jitterLock)
-        {
-            long now = Stopwatch.GetTimestamp();
-
-            if (_lastArrivalTimestamp != 0)
-            {
-                double arrivalIntervalMs = (now - _lastArrivalTimestamp) * 1000.0 / Stopwatch.Frequency;
-                double jitter = Math.Abs(arrivalIntervalMs - frame.DeltaMs);
-                if (jitter > frame.DeltaMs * 5) jitter = _jitterEma;
-
-                double alpha = jitter > _jitterEma ? 0.5 : 0.005;
-                _jitterEma = alpha * jitter + (1 - alpha) * _jitterEma;
-                if (frame.DeltaMs > 0) _lastDeltaMs = frame.DeltaMs;
-                _targetBufferFrames = Math.Clamp((int)Math.Ceiling(_jitterEma / _lastDeltaMs), MIN_BUFFER_FRAMES, MAX_BUFFER_FRAMES);
-            }
-
-            _lastArrivalTimestamp = now;
+            _senderMs += deltaMs;
+            _frameQueue.Enqueue(new EncodedFrame(deltaMs, data, _senderMs, arrivalMs, isKeyFrame));
+            AddOffset(arrivalMs - _senderMs, isKeyFrame);
         }
 
         _frameSignal.Release();
+    }
+
+    private static double NowMs => Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency;
+
+    /// <summary>Под _queueLock.</summary>
+    private void AddOffset(double offsetMs, bool isKeyFrame)
+    {
+        _offsets[_offsetNext] = offsetMs;
+        _offsetNext = (_offsetNext + 1) % TimelineWindow;
+        _offsetCount = Math.Min(_offsetCount + 1, TimelineWindow);
+
+        if (isKeyFrame)
+        {
+            _keyOffsets[_keyOffsetNext] = offsetMs;
+            _keyOffsetNext = (_keyOffsetNext + 1) % KeyFrameWindow;
+            _keyOffsetCount = Math.Min(_keyOffsetCount + 1, KeyFrameWindow);
+        }
+        else if (++_sinceEstimate < 8 && !double.IsNaN(_targetOffsetMs))
+        {
+            return;
+        }
+
+        _sinceEstimate = 0;
+        Array.Copy(_offsets, _sortedOffsets, _offsetCount);
+        Array.Sort(_sortedOffsets, 0, _offsetCount);
+        double fastest = _sortedOffsets[0];
+        double target = _sortedOffsets[(int)((_offsetCount - 1) * TimelinePercentile)];
+        for (int i = 0; i < _keyOffsetCount; i++)
+            target = Math.Max(target, _keyOffsets[i] + _keyDecodeMs + DecodeMarginMs);
+        _targetOffsetMs = Math.Min(target, fastest + MaxDelayMs);
+    }
+
+    public void ResetTimeline()
+    {
+        lock (_queueLock)
+        {
+            _offsetCount = 0;
+            _offsetNext = 0;
+            _keyOffsetCount = 0;
+            _keyOffsetNext = 0;
+            _targetOffsetMs = double.NaN;
+        }
     }
 
     private async Task PlaybackLoop(CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
-            EncodedFrame? item = null;
-            int queueSize;
+            EncodedFrame frame;
+            double targetOffsetMs;
+            bool hasFrame;
 
             lock (_queueLock)
             {
-                queueSize = _frameQueue.Count;
-                if (queueSize > 0)
-                    item = _frameQueue.Dequeue();
+                hasFrame = _frameQueue.TryPeek(out frame);
+                targetOffsetMs = _targetOffsetMs;
             }
 
-            if (item is null)
+            if (!hasFrame)
             {
                 await _frameSignal.WaitAsync(token);
                 continue;
             }
 
-            if (item.Value.Data.Length == 0)
+            double arrivalOffsetMs = frame.ArrivalMs - frame.SenderMs;
+            if (_reanchor || _playOffsetMs - arrivalOffsetMs > MaxDelayMs)
+            {
+                _playOffsetMs = arrivalOffsetMs;
+                _reanchor = false;
+            }
+
+            // Опоздавший кадр показывается сразу, и дальше отсчёт идёт от него:
+            // пришедшие следом кадры не проматываются, а идут своим шагом.
+            if (arrivalOffsetMs > _playOffsetMs + LateToleranceMs)
+                _playOffsetMs = arrivalOffsetMs;
+
+            double dueMs = frame.SenderMs + _playOffsetMs;
+            double leadMs = frame.IsKeyFrame ? Math.Max(DecodeLeadMs, _keyDecodeMs + DecodeMarginMs) : DecodeLeadMs;
+            double waitMs = dueMs - leadMs - NowMs;
+            if (waitMs >= 1)
+                await Task.Delay(TimeSpan.FromMilliseconds(waitMs), token);
+
+            lock (_queueLock)
+                _frameQueue.TryDequeue(out _);
+
+            if (!double.IsNaN(targetOffsetMs))
+            {
+                double step = frame.DeltaMs * MaxRateChange;
+                _playOffsetMs = _playOffsetMs > targetOffsetMs
+                    ? Math.Max(targetOffsetMs, _playOffsetMs - step)
+                    : Math.Min(targetOffsetMs, _playOffsetMs + step);
+            }
+
+            if (frame.Data.Length == 0)
                 continue;
 
-            float catchUpFactor = queueSize <= _targetBufferFrames
-                ? 1.0f
-                : queueSize >= (MAX_BUFFER_FRAMES + _targetBufferFrames)
-                    ? 0.0f
-                    : 1.0f - ((float)(queueSize - _targetBufferFrames) / MAX_BUFFER_FRAMES);
-
-            // Пауза отсчитывается от показа прошлого кадра, а не от конца его
-            // декодирования: иначе время декодирования прибавлялось к интервалу,
-            // и очередь стояла на двадцати кадрах — столько же задержки картинки.
-            long now = Stopwatch.GetTimestamp();
-            long due = _lastShownTicks + (long)(item.Value.DeltaMs * catchUpFactor * Stopwatch.Frequency / 1000);
-            _lastShownTicks = Math.Max(due, now);
-            int delay = (int)((due - now) * 1000 / Stopwatch.Frequency);
-            if (delay > 0)
-                await Task.Delay(delay, token);
-
+            bool ready;
             try
             {
-                DecodeAndRender(item.Value, token);
+                ready = Decode(frame);
             }
             finally
             {
-                item.Value.Data.Return();
+                frame.Data.Return();
             }
+
+            if (!ready)
+                continue;
+
+            waitMs = dueMs - NowMs;
+            if (waitMs >= 1)
+                await Task.Delay(TimeSpan.FromMilliseconds(waitMs), token);
+
+            Publish(token);
         }
     }
 
-    private void DecodeAndRender(EncodedFrame frame, CancellationToken token)
+    /// <summary>Кадр BGRA в _backPixels; false — показывать нечего.</summary>
+    private bool Decode(EncodedFrame frame)
     {
         if (!IsWindowVisible)
         {
@@ -243,14 +318,16 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
                 while (_frameQueue.TryDequeue(out var stale))
                     stale.Data.Return();
             }
+            _reanchor = true;
 
-            return;
+            return false;
         }
 
         try
         {
+            long started = Stopwatch.GetTimestamp();
             if (!_decoder.Decode(frame.Data.Span))
-                return;
+                return false;
 
             int width = _decoder.Width;
             int height = _decoder.Height;
@@ -262,29 +339,47 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
                 _backPixels = new byte[width * height * 4];
 
             _decoder.ConvertTo(_backPixels);
+            _backWidth = width;
+            _backHeight = height;
 
-            lock (_frontLock)
+            if (_decoderCold)
             {
-                (_backPixels, _frontPixels) = (_frontPixels, _backPixels);
-                _frontWidth = width;
-                _frontHeight = height;
+                _decoderCold = false;
             }
-
-            _frameCount++;
-
-            if (token.IsCancellationRequested)
-                return;
-
-            var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.HasShutdownStarted &&
-                Interlocked.Exchange(ref _renderPending, 1) == 0)
+            else if (frame.IsKeyFrame)
             {
-                dispatcher.BeginInvoke(_renderAction, DispatcherPriority.Render);
+                double decodeMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+                lock (_queueLock)
+                    _keyDecodeMs = Math.Max(decodeMs, (_keyDecodeMs + decodeMs) / 2);
             }
+            return true;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"Frame update failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    private void Publish(CancellationToken token)
+    {
+        lock (_frontLock)
+        {
+            (_backPixels, _frontPixels) = (_frontPixels, _backPixels);
+            _frontWidth = _backWidth;
+            _frontHeight = _backHeight;
+        }
+
+        _frameCount++;
+
+        if (token.IsCancellationRequested)
+            return;
+
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.HasShutdownStarted &&
+            Interlocked.Exchange(ref _renderPending, 1) == 0)
+        {
+            dispatcher.BeginInvoke(_renderAction, DispatcherPriority.Render);
         }
     }
 
@@ -384,5 +479,5 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     }
 
     /// <summary>Данные H.264 из пула; возвращает тот, кто вынул кадр из очереди.</summary>
-    public readonly record struct EncodedFrame(int DeltaMs, PooledBuffer Data);
+    public readonly record struct EncodedFrame(int DeltaMs, PooledBuffer Data, long SenderMs, double ArrivalMs, bool IsKeyFrame);
 }

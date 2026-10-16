@@ -51,7 +51,7 @@ public class ClientManager(IUsersInfo usersInfo,
     /// Самая старая версия сервера, с которой совместим протокол клиента.
     /// Поднимается только при несовместимой правке протокола.
     /// </summary>
-    private static readonly Version MinServerVersion = new(1, 2, 2);
+    private static readonly Version MinServerVersion = new(1, 2, 3);
 
     private TcpClient _tcpMainClient = null!;
 
@@ -111,6 +111,7 @@ public class ClientManager(IUsersInfo usersInfo,
             _tcpMainClient.ReceiveTimeout = 0;
 
             _fileTransferManager.Start(_connectionInfo.ServerIP, _connectionInfo.ServerPort, SendBroadcast);
+            _screenShareManager.KeyFrameNeeded = () => SendCommand("#KFR");
 
             var receiveToken = _receiveCancellationTokenSource.Token;
             _receiveThread = new(() => ReceiveMessages(receiveToken))
@@ -607,6 +608,13 @@ public class ClientManager(IUsersInfo usersInfo,
                 _screenSharePlayer.IsKeyFrameInitialized = false;
                 _screenSharePlayer.ClearLastKeyFrame();
                 _usersInfo.UpdateScreenSharingState(userIdCSS, false);
+
+                break;
+
+            // Зрителю нужен опорный кадр
+            case var _ when command.Equals("#KFR"):
+
+                _screenShareManager.RequestKeyFrame();
 
                 break;
 

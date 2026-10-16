@@ -11,6 +11,12 @@ public interface IScreenShareManager
     void StartSharing(int adapterIndex, int outputIndex, bool withAudio, byte qualityCeiling);
     void StopSharing();
     bool IsSharing { get; }
+
+    /// <summary>Зрителю нечего показать: просит у демонстрирующего опорный кадр.</summary>
+    Action? KeyFrameNeeded { get; set; }
+
+    /// <summary>Опорный кадр как можно скорее; частые просьбы схлопываются.</summary>
+    void RequestKeyFrame();
     Exception? ThreadException { get; set; }
 }
 
@@ -41,6 +47,13 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
     private uint _frameNumber;
     private bool _startOfShare;
     private bool _skipping;
+
+    private static readonly TimeSpan KeyFrameInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan KeyFrameRetry = TimeSpan.FromSeconds(1);
+    private long _lastKeyFrameForced;
+    private long _lastKeyFrameAsked;
+
+    public Action? KeyFrameNeeded { get; set; }
 
     // Кадры по разным каналам приходят не по порядку.
     private static readonly TimeSpan HoleTimeout = TimeSpan.FromSeconds(1);
@@ -127,25 +140,32 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
             }
             H264Encoder.Initialize(w, h, _profile);
 
-            long lastCaptureTimestamp = Stopwatch.GetTimestamp();
+            // Разность округлённых отметок, а не округлённый интервал: ошибка округления не копится.
+            long lastFrameMs = Stopwatch.GetTimestamp() * 1000 / Stopwatch.Frequency;
 
             while (!token.IsCancellationRequested)
             {
                 var sw = Stopwatch.StartNew();
-                long now = Stopwatch.GetTimestamp();
-                int deltaMs = (int)((now - lastCaptureTimestamp) * 1000 / Stopwatch.Frequency);
-                lastCaptureTimestamp = now;
 
                 var screenFrame = ScreenGrabber.CaptureFrame(out _, out _);
+                long frameMs = Math.Max(lastFrameMs, ScreenGrabber.FrameTimestamp * 1000 / Stopwatch.Frequency);
                 ReadOnlySpan<byte> encodedFrame = screenFrame != null
-                    ? H264Encoder.Encode(screenFrame, deltaMs)
+                    ? H264Encoder.Encode(screenFrame, (int)(frameMs - lastFrameMs))
                     : KeepAlive;
+
+                // У пустого кадра интервал нулевой: время до него уходит со следующим.
+                if (screenFrame != null && !encodedFrame.IsEmpty)
+                    lastFrameMs = frameMs;
 
                 if (!encodedFrame.IsEmpty)
                 {
                     SendFramePacket(encodedFrame);
                     if (_screenSharePlayer.IsWindowVisible)
+                    {
                         ProcessFrame(encodedFrame, token);
+                        if (!_screenSharePlayer.IsKeyFrameInitialized)
+                            RequestKeyFrame();
+                    }
                     _screenSharePlayer.SaveLastKeyFrame(encodedFrame);
                 }
 
@@ -172,11 +192,18 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
         else if (_overloadSince == 0)
             _overloadSince = Stopwatch.GetTimestamp();
 
+        bool resumed = false;
         if (_skipping)
         {
-            if (!key || backlog > MaxBacklog / 2)
+            if (backlog > MaxBacklog / 2)
                 return;
+            if (!key)
+            {
+                RequestKeyFrame();
+                return;
+            }
             _skipping = false;
+            resumed = true;
         }
         else if (_overloadSince != 0 && Stopwatch.GetElapsedTime(_overloadSince) > Patience)
         {
@@ -185,7 +212,7 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
         }
 
         byte flags = key ? ScreenFrame.Key : (byte)0;
-        if (_startOfShare)
+        if (_startOfShare || resumed)
             flags |= ScreenFrame.Resync;
 
         var encrypted = PooledBuffer.Rent(CryptoSessionManager.EncryptedLength(frameData.Length));
@@ -211,6 +238,29 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
             encrypted.Return();
             packet.Return();
         }
+    }
+
+    public void RequestKeyFrame()
+    {
+        if (!IsSharing || Stopwatch.GetElapsedTime(_lastKeyFrameForced) < KeyFrameInterval)
+            return;
+
+        _lastKeyFrameForced = Stopwatch.GetTimestamp();
+        H264Encoder.RequestKeyFrame();
+        ScreenGrabber.ForceFrame();
+    }
+
+    private void AskForKeyFrame()
+    {
+        if (Stopwatch.GetElapsedTime(_lastKeyFrameAsked) < KeyFrameRetry)
+            return;
+
+        _lastKeyFrameAsked = Stopwatch.GetTimestamp();
+        try
+        {
+            KeyFrameNeeded?.Invoke();
+        }
+        catch { /* соединение переподключается: следующий кадр спросит снова */ }
     }
 
     private void HandleReceiveScreenShare(CancellationToken token)
@@ -279,6 +329,7 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
                 Drop(stale);
             _nextFrame = number;
             _hasNextFrame = true;
+            _screenSharePlayer.ResetTimeline();
         }
         else if ((int)(number - _nextFrame) < 0)
         {
@@ -311,6 +362,8 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
 
                 foreach (var skipped in _pending.Keys.Where(k => k < resume).ToList())
                     Drop(skipped);
+                if ((_pending[resume].Flags & ScreenFrame.Key) == 0)
+                    _screenSharePlayer.IsKeyFrameInitialized = false;
                 _nextFrame = resume;
                 Deliver(token);
                 if (_pending.Count > 0)
@@ -349,6 +402,9 @@ public partial class ScreenShareManager : ObservableObject, IScreenShareManager,
                     ProcessFrame(h264Data, token);
                 }
                 _screenSharePlayer.SaveLastKeyFrame(h264Data);
+
+                if (_screenSharePlayer.IsWindowVisible && !_screenSharePlayer.IsKeyFrameInitialized)
+                    AskForKeyFrame();
             }
             catch (Exception ex) when (!NetworkExceptionHelper.IsNetworkException(ex) && ex is not OperationCanceledException) { /* повреждённый кадр пропускается */ }
             finally

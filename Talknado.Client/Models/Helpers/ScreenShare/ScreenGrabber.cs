@@ -36,11 +36,17 @@ public static class ScreenGrabber
     private static long _lastFrameTimestamp = 0;
     private static readonly long _forceFrameInterval = Stopwatch.Frequency; // 1 сек
 
+    /// <summary>Когда содержимое последнего кадра появилось на экране, в тиках <see cref="Stopwatch"/>.</summary>
+    public static long FrameTimestamp { get; private set; }
+
     static ScreenGrabber()
     {
         _factory = new Factory1();
         InitializeCapture();
     }
+
+    /// <summary>Следующий захват отдаёт кадр, даже если экран не менялся.</summary>
+    public static void ForceFrame() => _lastFrameTimestamp = 0;
 
     public static void SelectMonitor(int adapterIndex, int outputIndex)
     {
@@ -148,7 +154,11 @@ public static class ScreenGrabber
 
                         bool cursorMoved = frameInfo.LastMouseUpdateTime != 0;
                         if (cursorMoved && _hasFrame)
-                            return BuildForcedFrame(out width, out height);
+                        {
+                            var cursorFrame = BuildForcedFrame(out width, out height);
+                            FrameTimestamp = frameInfo.LastMouseUpdateTime;
+                            return cursorFrame;
+                        }
 
                         return null;
                     }
@@ -207,7 +217,9 @@ public static class ScreenGrabber
                         _lastHeight = height;
                         _hasFrame = true;
                         _underW = 0;
-                        return BuildForcedFrame(out width, out height);
+                        var screenFrame = BuildForcedFrame(out width, out height);
+                        FrameTimestamp = frameInfo.LastPresentTime;
+                        return screenFrame;
                     }
                     finally
                     {
@@ -262,6 +274,7 @@ public static class ScreenGrabber
         }
 
         _lastFrameTimestamp = Stopwatch.GetTimestamp();
+        FrameTimestamp = _lastFrameTimestamp;
         return frame;
     }
 

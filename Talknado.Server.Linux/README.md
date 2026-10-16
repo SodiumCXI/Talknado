@@ -13,7 +13,8 @@ Dedicated server with the same session handling and media relay as the server em
 | v1.1.6         | v1.5.1, v1.5.2, v1.5.3, v1.5.4 |
 | v1.2.0         | v2.0.0                         |
 | v1.2.1         | v2.0.1                         |
-| v1.2.2         | v2.0.2 and newer               |
+| v1.2.2         | v2.0.2                         |
+| v1.2.3         | v2.0.3 and newer               |
 
 ## Installation
 

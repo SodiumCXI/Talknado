@@ -57,7 +57,7 @@ curl -fsSL https://raw.githubusercontent.com/SodiumCXI/Talknado/main/Talknado.Se
 
 The connection handshake runs in seven steps:
 
-1. **Version check** - the server rejects clients older than 2.0.2 before any key material is shared and replies with its own version; the client refuses servers older than 1.2.2
+1. **Version check** - the server rejects clients older than 2.0.3 before any key material is shared and replies with its own version; the client refuses servers older than 1.2.3
 2. **ECDH key exchange** - client and server exchange public keys; each independently derives the shared secret
 3. **Password verification** - SHA-256(password) encrypted with AES-256-CBC using the shared secret
 4. **Session key delivery** - server XORs the 32-byte session key with the client's unique shared secret; XOR is self-inverse, so no extra decryption step is needed

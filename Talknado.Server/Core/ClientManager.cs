@@ -23,6 +23,11 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
     private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(1);
     private Timer? _pingTimer;
 
+    // Опорный кадр дорогой: просьбы зрителей к демонстрирующему схлопываются.
+    private static readonly TimeSpan KeyFrameRequestInterval = TimeSpan.FromMilliseconds(500);
+    private readonly object _keyFrameLock = new();
+    private long _lastKeyFrameRequest;
+
     // Участники, закончившие вход. Пока идёт рукопожатие, клиент ждёт от
     // сервера строго определённых ответов, и рассылка задержек, попавшая
     // между ними, сорвала бы вход.
@@ -59,6 +64,7 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
 
             BroadcastAddNewUser(userId, username, token);
             StartPingBroadcast();
+            _networkUtils.KeyFrameNeeded ??= RequestKeyFrame;
 
             SendClientsList(stream, token);
             _readyIds[userId] = 0;
@@ -442,10 +448,35 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
 
                 break;
 
+            case var _ when command.Equals("#KFR"):
+
+                var sharerId = _screenShareManager.ScreenSharerId;
+                if (sharerId != 0 && sharerId != userId)
+                    RequestKeyFrame(sharerId);
+
+                break;
+
             default:
 
                 break;
         }
+    }
+
+    private void RequestKeyFrame(ushort sharerId)
+    {
+        lock (_keyFrameLock)
+        {
+            if (Stopwatch.GetElapsedTime(_lastKeyFrameRequest) < KeyFrameRequestInterval)
+                return;
+            _lastKeyFrameRequest = Stopwatch.GetTimestamp();
+        }
+
+        try
+        {
+            var (stream, token) = _usersInfo.GetUserStreamAndToken(sharerId);
+            _ = _networkUtils.WritePacketAsync(stream, _cryptoSessionManager.EncryptMessage("#KFR"u8.ToArray()), token);
+        }
+        catch { /* демонстрирующий уходит или переподключается */ }
     }
 
     private static void WriteLog(string message)

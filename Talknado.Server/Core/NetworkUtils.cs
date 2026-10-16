@@ -19,6 +19,9 @@ public interface INetworkUtils
     /// <summary>Заголовок меняется на месте: признак Resync у каждого адресата свой.</summary>
     void BroadcastScreenSharePacket(ushort currentUserId, Span<byte> packet);
 
+    /// <summary>Зрителю, догнавшему очередь после пропуска, нужен опорный кадр от демонстрирующего.</summary>
+    Action<ushort>? KeyFrameNeeded { get; set; }
+
     /// <summary>Пакет из пула: вызывающий возвращает его.</summary>
     (PooledBuffer Packet, ushort UserId) ReceiveScreenSharePacket(CancellationToken token);
 
@@ -125,6 +128,8 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
     public void BroadcastAudioPacket(ushort currentUserId, ReadOnlySpan<byte> data) =>
         Broadcast(currentUserId, data, AudioChannel, DeliveryMethod.ReliableSequenced);
 
+    public Action<ushort>? KeyFrameNeeded { get; set; }
+
     // Зовётся из одного потока пересылки демонстрации.
     public void BroadcastScreenSharePacket(ushort currentUserId, Span<byte> packet)
     {
@@ -155,8 +160,11 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
 
                 if (viewer.Skipping)
                 {
-                    decision = key && backlog <= MaxScreenShareBacklog / 2 ? ForwardResync : Drop;
+                    bool drained = backlog <= MaxScreenShareBacklog / 2;
+                    decision = key && drained ? ForwardResync : Drop;
                     viewer.Skipping = decision == Drop;
+                    if (drained && !key)
+                        KeyFrameNeeded?.Invoke(currentUserId);
                 }
                 else
                 {
