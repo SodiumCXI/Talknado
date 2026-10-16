@@ -1,7 +1,6 @@
 ﻿using FFmpeg.AutoGen;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
@@ -61,7 +60,7 @@ public sealed unsafe class VideoPlayer : IDisposable
     private SwrContext* _swr;
 
     private readonly BufferedWaveProvider? _audioBuffer;
-    private readonly VolumeSampleProvider? _volume;
+    private readonly DeclickSampleProvider? _declick;
     private readonly WasapiOut? _output;
     private int _bytesPerSecond = SampleRate * 2 * 4;
     private byte[] _audioScratch = [];
@@ -78,9 +77,11 @@ public sealed unsafe class VideoPlayer : IDisposable
     private double _seekTarget;
     private double _clockBase;
     private long _positionAtBase;
+    private long _silentAtBase;
     private readonly Stopwatch _wallClock = new();
     private bool _isPaused = true;
     private double _pausedClock;
+    private double _shownTime = double.NaN;
 
     // Поколение перемотки: кадр или звук, декодированные до перемотки,
     // в очередь уже не попадают.
@@ -155,14 +156,15 @@ public sealed unsafe class VideoPlayer : IDisposable
                         DiscardOnBufferOverflow = true,
                         ReadFully = true
                     };
-                    _volume = new VolumeSampleProvider(_audioBuffer.ToSampleProvider());
+                    _declick = new DeclickSampleProvider(_audioBuffer);
 
                     using var enumerator = new MMDeviceEnumerator();
                     var device = string.IsNullOrEmpty(outputDeviceId)
                         ? enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia)
                         : enumerator.GetDevice(outputDeviceId);
                     _output = new WasapiOut(device, AudioClientShareMode.Shared, true, 100);
-                    _output.Init(_volume);
+                    _output.Init(_declick);
+                    _declick.Output = _output;
                     _bytesPerSecond = _output.OutputWaveFormat.AverageBytesPerSecond;
                 }
                 catch
@@ -171,6 +173,7 @@ public sealed unsafe class VideoPlayer : IDisposable
                     _output?.Dispose();
                     _output = null;
                     _audioBuffer = null;
+                    _declick = null;
                 }
             }
 
@@ -256,8 +259,8 @@ public sealed unsafe class VideoPlayer : IDisposable
 
     public float Volume
     {
-        get => _volume?.Volume ?? 0;
-        set { if (_volume != null) _volume.Volume = value; }
+        get => _declick?.Volume ?? 0;
+        set { if (_declick != null) _declick.Volume = value; }
     }
 
     private int ReadPacket(void* opaque, byte* buffer, int size)
@@ -306,21 +309,23 @@ public sealed unsafe class VideoPlayer : IDisposable
 
             _stalled = false;
             _isPaused = false;
+            _declick?.Release();
             _output?.Play();
             _wallClock.Start();
         }
         _wake.Set();
     }
 
-    // Часы встают в момент нажатия. Устройство ещё доигрывает то, что успело
-    // взять, и по его позиции кадры ползли бы вперёд и после паузы.
+    // Часы встают на показанном кадре: по позиции звука в момент нажатия уже мог
+    // быть положен следующий, и на паузе он выскочил бы с опозданием. Устройство
+    // ещё доигрывает отданное ему и затухание, по нему кадры ползли бы и после паузы.
     public void Pause()
     {
         lock (_seekLock)
         {
-            _pausedClock = ClockLocked();
+            _pausedClock = double.IsNaN(_shownTime) ? ClockLocked() : Math.Min(ClockLocked(), _shownTime);
             _isPaused = true;
-            _output?.Pause();
+            _declick?.Hold();
             _wallClock.Stop();
         }
     }
@@ -339,10 +344,12 @@ public sealed unsafe class VideoPlayer : IDisposable
         _pendingSeek = seconds;
         _seekTarget = seconds;
         _pausedClock = seconds;
+        _shownTime = double.NaN;
         _endOfStream = false;
-        _audioBuffer?.ClearBuffer();
+        _declick?.Cut();
         _clockBase = seconds;
         _positionAtBase = _output != null ? _output.GetPosition() : 0;
+        _silentAtBase = _declick?.SilentFrames ?? 0;
         _wallClock.Reset();
         if (!_isPaused)
             _wallClock.Start();
@@ -364,7 +371,8 @@ public sealed unsafe class VideoPlayer : IDisposable
     {
         if (_output != null)
         {
-            var played = (_output.GetPosition() - _positionAtBase) / (double)_bytesPerSecond;
+            var played = (_output.GetPosition() - _positionAtBase) / (double)_bytesPerSecond
+                - (_declick!.SilentFrames - _silentAtBase) / (double)SampleRate;
             return _clockBase + Math.Max(0, played);
         }
 
@@ -385,6 +393,7 @@ public sealed unsafe class VideoPlayer : IDisposable
             if (due is { } previous)
                 _pool.Add(previous.Pixels);
             due = frame;
+            _shownTime = frame.Time;
         }
 
         _wake.Set();
