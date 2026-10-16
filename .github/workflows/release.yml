@@ -76,13 +76,13 @@ jobs:
           bin=Talknado.Server.Linux/bin/Release/net8.0/linux-x64/publish/talknado-server-bin
           sock=/tmp/talknado.sock
           $bin version
-          TALKNADO_PASSWORD=ci $bin serve --control $sock --quality 1080p60 --bandwidth 10 > /tmp/server.log 2>&1 &
+          TALKNADO_PASSWORD=ci $bin serve --control $sock --max-quality 1080p60 --bandwidth 10 > /tmp/server.log 2>&1 &
           pid=$!
           for i in $(seq 100); do $bin ctl $sock key > /dev/null 2>&1 && break; sleep 0.1; done
           echo "Key: $($bin ctl $sock key)"
           $bin ctl $sock status
           $bin ctl $sock users
-          $bin ctl $sock quality 720p30
+          $bin ctl $sock max-quality 720p30
           kill $pid
           for i in $(seq 100); do kill -0 $pid 2>/dev/null || break; sleep 0.1; done
           if kill -0 $pid 2>/dev/null; then
@@ -114,7 +114,7 @@ jobs:
 
           sudo talknado set-password ci
           sudo talknado restart
-          sudo talknado quality 1080p60
+          sudo talknado max-quality 1080p60
           sudo talknado bandwidth 25
           sudo talknado users
           sudo talknado key
