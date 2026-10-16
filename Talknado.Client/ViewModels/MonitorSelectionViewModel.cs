@@ -13,7 +13,11 @@ public partial class MonitorSelectionViewModel : ObservableObject
     public IScreenMonitorManager ScreenMonitorManager => _screenMonitorManager;
     public ISettingsManager SettingsManager { get; }
 
-    public record QualityOption(string Text, bool IsAvailable);
+    // Поле выбора в шаблоне темы показывает ToString, а не DisplayMemberPath.
+    public record QualityOption(string Text, bool IsAvailable)
+    {
+        public override string ToString() => Text;
+    }
 
     public MonitorSelectionViewModel(IClientManager clientManager, IScreenMonitorManager screenMonitorManager, ISettingsManager settingsManager)
     {

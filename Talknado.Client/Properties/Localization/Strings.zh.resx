@@ -279,9 +279,6 @@
   <data name="PushToTalkKeyTooltip" xml:space="preserve">
     <value>点击后按下一个键或鼠标中键、侧键。Esc 取消</value>
   </data>
-  <data name="ShareQualitySelectLabel" xml:space="preserve">
-    <value>屏幕共享画质</value>
-  </data>
   <data name="ShareQualityLowText" xml:space="preserve">
     <value>720p，30 FPS</value>
   </data>

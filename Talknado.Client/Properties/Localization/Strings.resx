@@ -279,9 +279,6 @@
   <data name="PushToTalkKeyTooltip" xml:space="preserve">
     <value>Click, then press a key or the middle or side mouse button. Esc cancels</value>
   </data>
-  <data name="ShareQualitySelectLabel" xml:space="preserve">
-    <value>Screen share quality</value>
-  </data>
   <data name="ShareQualityLowText" xml:space="preserve">
     <value>720p, 30 FPS</value>
   </data>

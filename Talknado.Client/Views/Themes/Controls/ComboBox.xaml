@@ -83,8 +83,9 @@
                                 </ControlTemplate>
                             </ToggleButton.Template>
                         </ToggleButton>
+                        <!-- Справа место под стрелку: иначе узкий список кладёт текст под неё -->
                         <ContentPresenter x:Name="Selected"
-                                          Margin="{TemplateBinding Padding}"
+                                          Margin="{DynamicResource PadComboBoxSelection}"
                                           Content="{TemplateBinding SelectionBoxItem}"
                                           VerticalAlignment="Center"
                                           IsHitTestVisible="False"

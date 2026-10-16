@@ -548,15 +548,6 @@ namespace Talknado.Client.Properties.Localization {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Screen share quality.
-        /// </summary>
-        public static string ShareQualitySelectLabel {
-            get {
-                return ResourceManager.GetString("ShareQualitySelectLabel", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Ищет локализованную строку, похожую на 720p, 30 FPS.
         /// </summary>
         public static string ShareQualityLowText {

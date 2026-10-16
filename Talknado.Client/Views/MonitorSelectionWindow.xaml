@@ -126,20 +126,25 @@
         </ItemsControl>
 
         <!--
-            Ширина — по плиткам: окно подгоняется под содержимое, и длинная
-            подпись иначе расширила бы его и растянула превью.
+            Не шире плиток: окно подгоняется под содержимое, и длинная подпись
+            иначе расширила бы его и растянула превью. Флажок и список — каждый
+            по своему содержимому и по центру.
         -->
         <StackPanel Grid.Row="2"
                     Width="{Binding ActualWidth, ElementName=MonitorList}"
                     HorizontalAlignment="Center">
             <StackPanel Margin="{DynamicResource PadMonitorOptions}">
-                <TextBlock Style="{DynamicResource MutedTextStyle}"
-                           Text="{x:Static l:Strings.ShareQualitySelectLabel}"
-                           Margin="{DynamicResource GapRow}"/>
+                <CheckBox Style="{DynamicResource CheckBoxStyle}"
+                          Content="{x:Static l:Strings.ShareScreenWithAudioText}"
+                          IsChecked="{Binding SettingsManager.ShareScreenWithAudio}"
+                          HorizontalAlignment="Center"
+                          Cursor="Hand"/>
+
                 <ComboBox Style="{DynamicResource ComboBoxStyle}"
                           ItemsSource="{Binding QualityOptions}"
-                          DisplayMemberPath="Text"
                           SelectedIndex="{Binding SelectedQuality}"
+                          HorizontalAlignment="Center"
+                          Margin="{DynamicResource GapBlockTop}"
                           Cursor="Hand">
                     <ComboBox.ItemContainerStyle>
                         <Style TargetType="ComboBoxItem" BasedOn="{StaticResource ComboBoxItemStyle}">
@@ -147,11 +152,6 @@
                         </Style>
                     </ComboBox.ItemContainerStyle>
                 </ComboBox>
-
-                <CheckBox Style="{DynamicResource SettingsCheckBoxStyle}"
-                          Content="{x:Static l:Strings.ShareScreenWithAudioText}"
-                          IsChecked="{Binding SettingsManager.ShareScreenWithAudio}"
-                          Cursor="Hand"/>
             </StackPanel>
         </StackPanel>
     </Grid>
