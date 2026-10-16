@@ -321,6 +321,9 @@
   <data name="DownloadText" xml:space="preserve">
     <value>下载</value>
   </data>
+  <data name="CancelDownloadTooltip" xml:space="preserve">
+    <value>取消下载</value>
+  </data>
   <data name="ShowInFolderText" xml:space="preserve">
     <value>在文件夹中显示</value>
   </data>

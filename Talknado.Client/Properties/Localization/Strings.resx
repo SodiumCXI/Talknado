@@ -321,6 +321,9 @@
   <data name="DownloadText" xml:space="preserve">
     <value>Download</value>
   </data>
+  <data name="CancelDownloadTooltip" xml:space="preserve">
+    <value>Cancel download</value>
+  </data>
   <data name="ShowInFolderText" xml:space="preserve">
     <value>Show in folder</value>
   </data>

@@ -321,6 +321,9 @@
   <data name="DownloadText" xml:space="preserve">
     <value>Скачать</value>
   </data>
+  <data name="CancelDownloadTooltip" xml:space="preserve">
+    <value>Отменить загрузку</value>
+  </data>
   <data name="ShowInFolderText" xml:space="preserve">
     <value>Показать в папке</value>
   </data>

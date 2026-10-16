@@ -22,6 +22,7 @@ public interface IFileTransferManager
     void HandleUserLeft(ushort userId);
     void Download(Attachment attachment);
     void SaveToDownloads(Attachment attachment);
+    void CancelDownload(Attachment attachment);
     IMediaReader OpenReader(Attachment attachment);
 }
 
@@ -242,6 +243,26 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
         }
     }
 
+    public void CancelDownload(Attachment attachment)
+    {
+        if (!_files.TryRemove((attachment.OwnerId, attachment.FileId), out var file))
+            return;
+
+        lock (file)
+        {
+            file.Failed = true;
+            file.Handle.Dispose();
+            Monitor.PulseAll(file);
+            try { File.Delete(file.Path); } catch { }
+        }
+
+        Dispatch(() =>
+        {
+            attachment.Progress = 0;
+            attachment.State = AttachmentState.Remote;
+        });
+    }
+
     public IMediaReader OpenReader(Attachment attachment)
     {
         if (attachment.State == AttachmentState.Ready && attachment.LocalPath is { } path)
@@ -327,7 +348,7 @@ public sealed class FileTransferManager(IMessagesManager messagesManager, IConne
 
         lock (file)
         {
-            if (offset % ChunkSize != 0 || offset + data.Length > file.Attachment.Size)
+            if (file.Completed || file.Failed || offset % ChunkSize != 0 || offset + data.Length > file.Attachment.Size)
                 return;
 
             int chunk = (int)(offset / ChunkSize);

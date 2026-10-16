@@ -154,7 +154,8 @@
 
         <!--
             Файл: одна кнопка — сам значок. До загрузки на нём стрелка, щелчок качает
-            файл в «Загрузки». После — значок типа файла, как в проводнике, и щелчок
+            файл в «Загрузки». Во время загрузки — крестик, щелчок её отменяет.
+            После — значок типа файла, как в проводнике, и щелчок
             открывает файл программой по умолчанию.
         -->
         <DataTemplate x:Key="FileAttachmentTemplate" DataType="{x:Type m:Attachment}">
@@ -177,7 +178,7 @@
                                     <Setter Property="ToolTip" Value="{x:Static l:Strings.OpenFileTooltip}"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Downloading}">
-                                    <Setter Property="IsEnabled" Value="False"/>
+                                    <Setter Property="ToolTip" Value="{x:Static l:Strings.CancelDownloadTooltip}"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Failed}">
                                     <Setter Property="IsEnabled" Value="False"/>
@@ -194,6 +195,9 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Ready}">
                                             <Setter Property="Data" Value="{StaticResource IconFile}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Downloading}">
+                                            <Setter Property="Data" Value="{StaticResource IconWindowClose}"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding State}" Value="{x:Static m:AttachmentState.Failed}">
                                             <Setter Property="Data" Value="{StaticResource IconFile}"/>

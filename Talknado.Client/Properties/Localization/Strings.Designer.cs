@@ -674,6 +674,15 @@ namespace Talknado.Client.Properties.Localization {
         }
         
         /// <summary>
+        ///   Ищет локализованную строку, похожую на Cancel download.
+        /// </summary>
+        public static string CancelDownloadTooltip {
+            get {
+                return ResourceManager.GetString("CancelDownloadTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Ищет локализованную строку, похожую на Show in folder.
         /// </summary>
         public static string ShowInFolderText {

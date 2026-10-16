@@ -111,6 +111,8 @@ public partial class MainWindowViewModel(IClientManager clientManager,
             _dialogService.OpenFile(attachment.LocalPath);
         else if (attachment.State == AttachmentState.Remote)
             _fileTransferManager.SaveToDownloads(attachment);
+        else if (attachment.State == AttachmentState.Downloading)
+            _fileTransferManager.CancelDownload(attachment);
     }
 
     [RelayCommand]
