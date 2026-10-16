@@ -35,7 +35,7 @@ static class Program
             bool ok = args[i] switch
             {
                 "--control" => (controlPath = value) != null,
-                "--max-quality" or "--quality" => SessionCommands.TryParseQuality(value, out quality),
+                "--max-quality" => SessionCommands.TryParseQuality(value, out quality),
                 "--bandwidth" => long.TryParse(value, out bandwidthMbits) && bandwidthMbits >= 0,
                 _ => false
             };

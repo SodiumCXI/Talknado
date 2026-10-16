@@ -40,7 +40,7 @@ public sealed class SessionCommands(ServerHost host)
             "status" => Status(),
             "users" => Users(),
             "kick" => Kick(argument),
-            "max-quality" or "quality" => Quality(argument),
+            "max-quality" => Quality(argument),
             "bandwidth" => Bandwidth(argument),
             _ => $"{ErrorPrefix} Unknown command"
         };

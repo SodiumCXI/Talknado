@@ -311,7 +311,7 @@ case "$1" in
     key) show_key ;;
     users) show_users ;;
     kick) kick_user "$2" ;;
-    max-quality|quality) set_quality "$2" ;;
+    max-quality) set_quality "$2" ;;
     bandwidth) set_bandwidth "$2" ;;
     logs) show_logs "$2" ;;
     update) update_server "$2" ;;
