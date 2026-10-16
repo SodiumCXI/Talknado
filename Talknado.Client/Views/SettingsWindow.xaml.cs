@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Windows;
+using System.Windows.Input;
 using Talknado.Client.Models;
 using Talknado.Client.ViewModels;
 
@@ -16,6 +17,33 @@ public partial class SettingsWindow : TalknadoWindow, IDisposable
         InitializeComponent();
 
         DataContextChanged += OnDataContextChanged;
+    }
+
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        if (DataContext is SettingsWindowViewModel { IsCapturingKey: true } vm)
+        {
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (key == Key.Escape)
+                vm.CancelCapture();
+            else
+                vm.AssignKey(key);
+            e.Handled = true;
+            return;
+        }
+        base.OnPreviewKeyDown(e);
+    }
+
+    protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
+    {
+        if (DataContext is SettingsWindowViewModel { IsCapturingKey: true } vm
+            && e.ChangedButton is MouseButton.Middle or MouseButton.XButton1 or MouseButton.XButton2)
+        {
+            vm.AssignMouseButton(e.ChangedButton);
+            e.Handled = true;
+            return;
+        }
+        base.OnPreviewMouseDown(e);
     }
 
     protected override void OnCloseButtonClick()
@@ -59,7 +87,10 @@ public partial class SettingsWindow : TalknadoWindow, IDisposable
             Show();
         }
         else
+        {
+            vm.CancelCapture();
             Hide();
+        }
     }
 
     protected override void OnMinimizeButtonClick() { }

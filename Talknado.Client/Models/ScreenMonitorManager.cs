@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Talknado.Client.Models.Helpers.ScreenShare;
+using Talknado.Client.Properties;
 
 
 namespace Talknado.Client.Models;
@@ -19,6 +20,9 @@ public interface IScreenMonitorManager
     int GridColumns { get; set; }
     ObservableCollection<ScreenMonitorManager.MonitorSnapshot> Monitors { get; }
     ScreenMonitorManager.MonitorSnapshot? SelectedMonitor { get; set; }
+    byte MaxShareQuality { get; set; }
+    int SelectedQuality { get; set; }
+    byte AvailableQuality { get; }
 }
 
 public partial class ScreenMonitorManager : ObservableObject, IScreenMonitorManager
@@ -30,6 +34,23 @@ public partial class ScreenMonitorManager : ObservableObject, IScreenMonitorMana
     [ObservableProperty]
     private ObservableCollection<MonitorSnapshot> _monitors = [];
     public MonitorSnapshot? SelectedMonitor { get; set; }
+
+    /// <summary>Потолок качества, который прислал сервер.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AvailableQuality))]
+    private byte _maxShareQuality;
+
+    /// <summary>Выбор пользователя; выше доступного не применяется, но запоминается.</summary>
+    [ObservableProperty]
+    private int _selectedQuality = Settings.Default.ShareQuality;
+
+    public byte AvailableQuality => Math.Min(MaxShareQuality, ShareQuality.HardwareCeiling);
+
+    partial void OnSelectedQualityChanged(int value)
+    {
+        Settings.Default.ShareQuality = value;
+        Settings.Default.Save();
+    }
 
     public void CaptureAll()
     {

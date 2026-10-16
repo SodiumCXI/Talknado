@@ -48,6 +48,9 @@
     <PathGeometry x:Key="IconHostPanel" Figures="M0 0M24 24 M12 2.5l8.4 3.4v5.9c0 4.6-3.4 7.9-8.4 9.7-5-1.8-8.4-5.1-8.4-9.7V5.9z" po:Freeze="True"/>
     <!-- Исключение из сессии: знак запрета — адрес участника попадает в запрет -->
     <PathGeometry x:Key="IconKickUser" Figures="M0 0M24 24 M12 2.5a9.5 9.5 0 1 0 0 19 9.5 9.5 0 0 0 0-19z M5.3 5.3l13.4 13.4" po:Freeze="True"/>
+    <!-- Клавиша рации: клавиатура или мышь. Точки — отрезки длиной 0.01 со скруглёнными концами -->
+    <PathGeometry x:Key="IconKeyboard" Figures="M0 0M24 24 M4.5 5.5h15a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z M6.5 9.5h.01 M10 9.5h.01 M13.5 9.5h.01 M17 9.5h.01 M6.5 12.5h.01 M17 12.5h.01 M8.5 15h7" po:Freeze="True"/>
+    <PathGeometry x:Key="IconMouse" Figures="M0 0M24 24 M12 2.5a6.5 6.5 0 0 1 6.5 6.5v6a6.5 6.5 0 0 1-13 0v-6A6.5 6.5 0 0 1 12 2.5z M12 6.5v3" po:Freeze="True"/>
     <!-- Задержка связи в строке участника -->
     <PathGeometry x:Key="IconSignal" Figures="M0 0M24 24 M4 21.5v-4 M9.3 21.5v-8 M14.7 21.5v-12 M20 21.5V3.5" po:Freeze="True"/>
 

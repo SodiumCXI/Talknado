@@ -146,10 +146,11 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         private readonly byte[] _pcm = new byte[OpusCodecDecoder.FrameBytes];
         private readonly byte[] _silence = new byte[OpusCodecDecoder.FrameBytes];
         private readonly object _queueLock = new();
-        private readonly EnergyVad _energyVad = new();
+        private readonly SpeechDetector _speechDetector = new();
 
-        // Канал отдаёт пакеты только по возрастанию номера: если за недостающим
-        // уже лежат следующие, он потерян, иначе — ещё в пути.
+        // Недостающий пакет ждут, пока в устройстве есть запас: он мог быть переставлен
+        // сетью или задержан. Запас кончился — лежат следующие, значит потерян, на его
+        // место PLC; не лежит ничего — PLC сверх очереди, номер не сдвигается.
         private const int SlotCount = 64;
         private readonly PooledBuffer[] _slots = new PooledBuffer[SlotCount];
         private readonly bool[] _filled = new bool[SlotCount];
@@ -175,6 +176,14 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         private int _quietSeconds;
         private int _playbackCounter;
         private bool _hasPlayed;
+
+        // PLC без сдвига номера растит задержку. Если 10 секунд не было опустошений,
+        // а очередь всё это время не опускалась ниже N, эти N кадров лишние: они
+        // выбрасываются на тихих кадрах, где пропуск не слышен. Короче окно нельзя:
+        // при повторяющихся замираниях запас нужен как раз на следующее.
+        private const double QuietRms = 150;
+        private int _minQueued = int.MaxValue;
+        private int _excessFrames;
 
 
         public UserAudioStream(IUsersInfo usersInfo, ushort userId, string? deviceId)
@@ -250,7 +259,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                 _filled[slot] = true;
                 _queued++;
 
-                int dropThreshold = Math.Max(_targetBufferFrames * 3, 10);
+                int dropThreshold = Math.Max(_targetBufferFrames * 3, 30);
                 while (_queued > dropThreshold)
                 {
                     if (TakeNext(out var dropped))
@@ -321,15 +330,15 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                 {
                     present = _filled[_next % SlotCount];
 
+                    if (!present && WaveProvider.BufferedBytes / FRAME_BYTES >= LOW_WATER_FRAMES)
+                        break;
+
                     if (present || _queued > 0)
                     {
                         TakeNext(out packet);
                     }
                     else
                     {
-                        // Пакет в пути: PLC сверх очереди, номер не сдвигается.
-                        if (WaveProvider.BufferedBytes / FRAME_BYTES >= LOW_WATER_FRAMES)
-                            break;
                         _underruns++;
                     }
                 }
@@ -345,12 +354,18 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                         packet.Return();
                     }
 
-                    _usersInfo.UpdateSpeakingState(_userId, _energyVad.IsSpeech(_pcm));
+                    _usersInfo.UpdateSpeakingState(_userId, _speechDetector.IsSpeech(_pcm));
+                    _hasPlayed = true;
+                    _concealed = 0;
+
+                    if (_excessFrames > 0 && Rms(_pcm) < QuietRms)
+                    {
+                        _excessFrames--;
+                        continue;
+                    }
 
                     VolumeController.AdjustVolume(_pcm, userVolumeMultiplier);
                     WaveProvider.AddSamples(_pcm, 0, _pcm.Length);
-                    _hasPlayed = true;
-                    _concealed = 0;
                     continue;
                 }
 
@@ -367,15 +382,31 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                     WaveProvider.AddSamples(_silence, 0, _silence.Length);
                 }
             }
+
+            lock (_queueLock)
+                _minQueued = Math.Min(_minQueued, _queued);
+        }
+
+        private static double Rms(ReadOnlySpan<byte> pcm)
+        {
+            var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, short>(pcm);
+            double sum = 0;
+            foreach (short sample in samples)
+                sum += sample * sample;
+            return Math.Sqrt(sum / samples.Length);
         }
 
         private void AdaptBufferSize()
         {
             int underruns;
+            int minQueued;
             lock (_queueLock)
             {
                 underruns = _underruns;
                 _underruns = 0;
+                if (underruns > 0)
+                    _minQueued = int.MaxValue;
+                minQueued = _minQueued;
             }
 
             if (underruns >= 2)
@@ -387,6 +418,9 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             {
                 _targetBufferFrames = Math.Max(_targetBufferFrames - 1, MIN_BUFFER_FRAMES);
                 _quietSeconds = 0;
+                _excessFrames = minQueued == int.MaxValue ? 0 : minQueued;
+                lock (_queueLock)
+                    _minQueued = int.MaxValue;
             }
         }
 
@@ -396,6 +430,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             WasapiOut?.Dispose();
             Device?.Dispose();
             _decoder?.Dispose();
+            _speechDetector.Dispose();
 
             lock (_queueLock)
                 Clear();

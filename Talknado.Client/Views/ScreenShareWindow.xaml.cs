@@ -76,7 +76,8 @@ public partial class ScreenShareWindow : TalknadoWindow, IDisposable
 
         try
         {
-            while (!vm.ScreenSharePlayer.IsKeyFrameInitialized)
+            // Окно показывается с уже нарисованным кадром, а не с пустым или прежним.
+            while (!vm.ScreenSharePlayer.HasFrame)
             {
                 await Task.Delay(50, cts.Token);
             }
@@ -84,7 +85,11 @@ public partial class ScreenShareWindow : TalknadoWindow, IDisposable
         }
         catch (OperationCanceledException)
         {
-            if (vm.ScreenSharePlayer.HasLastKeyFrame)
+            if (vm.ScreenSharePlayer.IsKeyFrameInitialized)
+            {
+                Application.Current?.Dispatcher.Invoke(Show);
+            }
+            else if (vm.ScreenSharePlayer.HasLastKeyFrame)
             {
                 Application.Current?.Dispatcher.Invoke(Show);
                 vm.ScreenSharePlayer.UpdateSavedKeyFrame();

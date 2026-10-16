@@ -22,6 +22,7 @@ public sealed class ServerAdmin(IUsersInfo usersInfo, IClientManager clientManag
                 return;
 
             _serverInfo.MaxShareQuality = value;
+            _clientManager.BroadcastMaxShareQuality();
 
             // Кодировщик берёт ступень один раз при запуске, поэтому идущая
             // демонстрация останавливается.

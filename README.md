@@ -13,7 +13,7 @@ A lightweight, low-latency real-time communication application. Provides **voice
 - **Voice chat** with four noise suppression levels - None, Medium (RNNoise), Strong (DPDFNet-2, default) and Maximum (DPDFNet-8) - and packet loss concealment (Opus PLC)
 - **Screen sharing** up to 1080p at 60 fps with hardware H.264 encoding (NVENC → AMF → libx264 fallback)
 - **File, image and video attachments** - images and videos are shown right in the chat, videos play while still downloading and can be seeked
-- **Host panel**: kick participants, cap the screen share quality (720p30 / 1080p30 / 1080p60), limit the file transfer speed
+- **Host panel**: kick participants, set the maximum screen share quality (720p30 / 1080p30 / 1080p60), limit the file transfer speed
 - **Per-user ping** next to every nickname, color-coded by latency
 - **CoreAudio audio stack** (WASAPI/MMDevice) for low-latency capture and playback
 - **Adaptive audio playback** with jitter estimation and a buffer that holds its target depth
@@ -42,12 +42,12 @@ A lightweight, low-latency real-time communication application. Provides **voice
 - Media (audio/video) relay between participants
 - File relay over a dedicated connection with a server-wide speed limit - file contents are never decrypted either
 - Per-session AES session key, distributed via XOR with each client's ECDH shared secret
-- Screen-share slot arbitration (one presenter at a time) and screen share quality cap
+- Screen-share slot arbitration (one presenter at a time) and maximum screen share quality
 - Per-user latency broadcast every second; kicked users are banned by address until the session ends
 
 ### Dedicated Linux Server
 - Project: **[Talknado.Server.Linux](/Talknado.Server.Linux)** - built from the same server code as the embedded server, self-contained linux-x64 binary
-- Session settings from the console, like the host panel: users, kick, screen share quality cap, file bandwidth limit
+- Session settings from the console, like the host panel: users, kick, maximum screen share quality, file bandwidth limit
 - Installation:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/SodiumCXI/Talknado/main/Talknado.Server.Linux/install.sh | bash
@@ -57,7 +57,7 @@ curl -fsSL https://raw.githubusercontent.com/SodiumCXI/Talknado/main/Talknado.Se
 
 The connection handshake runs in seven steps:
 
-1. **Version check** - the server rejects clients older than 2.0.3 before any key material is shared and replies with its own version; the client refuses servers older than 1.2.3
+1. **Version check** - the server rejects clients older than 2.0.4 before any key material is shared and replies with its own version; the client refuses servers older than 1.2.4
 2. **ECDH key exchange** - client and server exchange public keys; each independently derives the shared secret
 3. **Password verification** - SHA-256(password) encrypted with AES-256-CBC using the shared secret
 4. **Session key delivery** - server XORs the 32-byte session key with the client's unique shared secret; XOR is self-inverse, so no extra decryption step is needed

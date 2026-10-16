@@ -125,8 +125,9 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
         while (await timer.WaitForNextTickAsync(token));
     }
 
+    // Порядок восстанавливает буфер получателя по номерам пакетов.
     public void BroadcastAudioPacket(ushort currentUserId, ReadOnlySpan<byte> data) =>
-        Broadcast(currentUserId, data, AudioChannel, DeliveryMethod.ReliableSequenced);
+        Broadcast(currentUserId, data, AudioChannel, DeliveryMethod.Unreliable);
 
     public Action<ushort>? KeyFrameNeeded { get; set; }
 

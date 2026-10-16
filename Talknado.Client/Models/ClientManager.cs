@@ -51,7 +51,7 @@ public class ClientManager(IUsersInfo usersInfo,
     /// Самая старая версия сервера, с которой совместим протокол клиента.
     /// Поднимается только при несовместимой правке протокола.
     /// </summary>
-    private static readonly Version MinServerVersion = new(1, 2, 3);
+    private static readonly Version MinServerVersion = new(1, 2, 4);
 
     private TcpClient _tcpMainClient = null!;
 
@@ -567,7 +567,8 @@ public class ClientManager(IUsersInfo usersInfo,
                 // Пусто — сервер прежней сборки, значит прежнее поведение.
                 var qualityCeiling = body.Length > 0 ? body[0] : (byte)0;
 
-                _screenShareManager.StartSharing(adapterIndex, outputIndex, _settingsManager.ShareScreenWithAudio, qualityCeiling);
+                var quality = (byte)Math.Min(qualityCeiling, _screenMonitorManager.SelectedQuality);
+                _screenShareManager.StartSharing(adapterIndex, outputIndex, _settingsManager.ShareScreenWithAudio, quality);
                 _ = StartMonitoringScreenShareErrors();
 
                 break;
@@ -608,6 +609,17 @@ public class ClientManager(IUsersInfo usersInfo,
                 _screenSharePlayer.IsKeyFrameInitialized = false;
                 _screenSharePlayer.ClearLastKeyFrame();
                 _usersInfo.UpdateScreenSharingState(userIdCSS, false);
+
+                break;
+
+            // Max Share Quality
+            case var _ when command.Equals("#MSQ"):
+
+                if (body.Length > 0)
+                {
+                    var maxQuality = body[0];
+                    Application.Current.Dispatcher.BeginInvoke(() => _screenMonitorManager.MaxShareQuality = maxQuality);
+                }
 
                 break;
 

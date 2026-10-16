@@ -41,6 +41,12 @@ public class OpusCodecEncoder : IDisposable
         }
     }
 
+    public void Reset()
+    {
+        lock (_encoder)
+            _encoder.ResetState();
+    }
+
     public void Dispose()
     {
         _encoder?.Dispose();

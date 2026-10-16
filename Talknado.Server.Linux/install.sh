@@ -110,7 +110,7 @@ migrate_legacy() {
         else
             echo "TALKNADO_PASSWORD='$password'"
         fi
-        echo "TALKNADO_QUALITY='${quality:-720p30}'"
+        echo "TALKNADO_QUALITY='${quality:-1080p60}'"
         echo "TALKNADO_BANDWIDTH='${bandwidth:-0}'"
     } > "$CONFIG_FILE"
     chmod 600 "$CONFIG_FILE"
@@ -135,7 +135,7 @@ install_service() {
     mkdir -p "$CONFIG_DIR"
     chmod 700 "$CONFIG_DIR"
     if [ ! -f "$CONFIG_FILE" ]; then
-        printf "TALKNADO_QUALITY='720p30'\nTALKNADO_BANDWIDTH='0'\n" > "$CONFIG_FILE"
+        printf "TALKNADO_QUALITY='1080p60'\nTALKNADO_BANDWIDTH='0'\n" > "$CONFIG_FILE"
         chmod 600 "$CONFIG_FILE"
     fi
 

@@ -25,6 +25,7 @@ public interface IScreenSharePlayer
     int FramesPerSecond { get; }
     bool IsWindowVisible { get; set; }
     bool IsKeyFrameInitialized { get; set; }
+    bool HasFrame { get; }
     bool HasLastKeyFrame { get; }
     string ScreenShareUsername { get; set; }
 }
@@ -35,6 +36,10 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     public ImageSource DisplayImage => _displayBitmap;
     public bool IsKeyFrameInitialized { get; set; } = false;
     public bool HasLastKeyFrame => _lastKeyFrameLength > 0;
+
+    /// <summary>Кадр текущего показа уже нарисован: окну есть что показать.</summary>
+    public bool HasFrame => _hasFrame;
+    private volatile bool _hasFrame;
 
     // Опорный кадр приходит раз в секунду, поэтому копируется в один и тот же
     // массив, а не в новый.
@@ -164,6 +169,7 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
             throw new ArgumentException("Data must contain at least 5 bytes");
 
         bool isKeyFrame = IsKeyFrame(h264Data);
+        bool restart = false;
 
         if (!IsKeyFrameInitialized)
         {
@@ -173,10 +179,13 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
             lock (_saveLock)
             {
                 StoreKeyFrame(h264Data);
-                _decoder.FlushBuffers();
-                _decoderCold = true;
                 IsKeyFrameInitialized = true;
             }
+
+            // Пока показ стоял, шкала отправителя не шла: прежняя статистика задержки неверна.
+            ResetTimeline();
+            _reanchor = true;
+            restart = true;
         }
 
         int deltaMs = BinaryPrimitives.ReadInt32LittleEndian(h264Data[1..]);
@@ -186,7 +195,7 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
         lock (_queueLock)
         {
             _senderMs += deltaMs;
-            _frameQueue.Enqueue(new EncodedFrame(deltaMs, data, _senderMs, arrivalMs, isKeyFrame));
+            _frameQueue.Enqueue(new EncodedFrame(deltaMs, data, _senderMs, arrivalMs, isKeyFrame, restart));
             AddOffset(arrivalMs - _senderMs, isKeyFrame);
         }
 
@@ -325,6 +334,13 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
 
         try
         {
+            // Сброс — в потоке показа: декодер нельзя трогать, пока он декодирует.
+            if (frame.Restart)
+            {
+                _decoder.FlushBuffers();
+                _decoderCold = true;
+            }
+
             long started = Stopwatch.GetTimestamp();
             if (!_decoder.Decode(frame.Data.Span))
                 return false;
@@ -363,8 +379,12 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
 
     private void Publish(CancellationToken token)
     {
+        // Кадр, декодированный заранее, не должен попасть в окно после его закрытия.
+        // Проверка под той же блокировкой, под которой Clear сбрасывает кадр.
         lock (_frontLock)
         {
+            if (!IsWindowVisible)
+                return;
             (_backPixels, _frontPixels) = (_frontPixels, _backPixels);
             _frontWidth = _backWidth;
             _frontHeight = _backHeight;
@@ -415,6 +435,7 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
                 return;
 
             CopyToBitmap(_frontPixels, width, height);
+            _hasFrame = true;
         }
     }
 
@@ -450,6 +471,13 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
 
     public void Clear()
     {
+        lock (_frontLock)
+        {
+            _frontWidth = 0;
+            _frontHeight = 0;
+            _hasFrame = false;
+        }
+
         if (!_isInitialized || _displayBitmap == null)
             return;
 
@@ -479,5 +507,5 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     }
 
     /// <summary>Данные H.264 из пула; возвращает тот, кто вынул кадр из очереди.</summary>
-    public readonly record struct EncodedFrame(int DeltaMs, PooledBuffer Data, long SenderMs, double ArrivalMs, bool IsKeyFrame);
+    public readonly record struct EncodedFrame(int DeltaMs, PooledBuffer Data, long SenderMs, double ArrivalMs, bool IsKeyFrame, bool Restart);
 }

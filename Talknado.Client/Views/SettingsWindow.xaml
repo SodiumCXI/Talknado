@@ -7,6 +7,7 @@
         xmlns:local="clr-namespace:Talknado.Client.Views"
         xmlns:vm="clr-namespace:Talknado.Client.ViewModels"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:SettingsWindowViewModel}"
         Style="{StaticResource AppWindowStyle}"
@@ -30,6 +31,10 @@
             («Микрофон (Realtek High Definition Audio)»). Обрезаются
             многоточием, полное имя — в подсказке.
         -->
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <cnv:BoolToHiddenConverter x:Key="BoolToHidden"/>
+        <cnv:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+
         <DataTemplate x:Key="DeviceNameTemplate">
             <TextBlock Text="{Binding}"
                        TextTrimming="CharacterEllipsis"
@@ -108,10 +113,66 @@
                               SelectedValue="{Binding SettingsManager.NoiseSuppression}"
                               Cursor="Hand"/>
 
-                    <CheckBox Style="{DynamicResource SettingsCheckBoxStyle}"
-                              Content="{x:Static l:Strings.ShareScreenWithAudioText}"
-                              IsChecked="{Binding SettingsManager.ShareScreenWithAudio}"
-                              Cursor="Hand"/>
+                    <!--
+                        Флажок и клавиша в одной строке. Поле скрыто, а не убрано, пока режим
+                        выключен: высота строки не меняется. Щелчок по полю — и следующее нажатие
+                        клавиши или средней, боковой кнопки мыши становится клавишей; Esc отменяет.
+                    -->
+                    <Grid Margin="{DynamicResource GapBlockTop}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <CheckBox Grid.Column="0"
+                                  Style="{DynamicResource CheckBoxStyle}"
+                                  Content="{x:Static l:Strings.PushToTalkText}"
+                                  IsChecked="{Binding SettingsManager.PushToTalk}"
+                                  Margin="{DynamicResource GapInline}"
+                                  VerticalAlignment="Center"
+                                  Cursor="Hand"/>
+                        <Button Grid.Column="1"
+                                Style="{DynamicResource KeyBindingButtonStyle}"
+                                Width="{DynamicResource KeyBindingFieldWidth}"
+                                Command="{Binding CaptureKeyCommand}"
+                                Tag="{Binding IsCapturingKey}"
+                                ToolTip="{x:Static l:Strings.PushToTalkKeyTooltip}"
+                                Visibility="{Binding SettingsManager.PushToTalk, Converter={StaticResource BoolToHidden}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Path Grid.Column="0" Margin="{DynamicResource GapInline}" VerticalAlignment="Center">
+                                    <Path.Style>
+                                        <Style TargetType="Path" BasedOn="{StaticResource IconStyle}">
+                                            <Setter Property="Data" Value="{StaticResource IconKeyboard}"/>
+                                            <Setter Property="Stroke" Value="{DynamicResource TextMutedBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseKey}" Value="True">
+                                                    <Setter Property="Data" Value="{StaticResource IconMouse}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsCapturingKey}" Value="True">
+                                                    <Setter Property="Data" Value="{StaticResource IconKeyboard}"/>
+                                                    <Setter Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Path.Style>
+                                </Path>
+                                <Border Grid.Column="1"
+                                        Style="{DynamicResource KeyCapStyle}"
+                                        Visibility="{Binding ShowKeyCap, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="{Binding PushToTalkKeyText}" TextTrimming="CharacterEllipsis"/>
+                                </Border>
+                                <TextBlock Grid.Column="1"
+                                           Style="{DynamicResource MutedTextStyle}"
+                                           Text="{Binding PushToTalkHint}"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center"
+                                           Visibility="{Binding ShowKeyCap, Converter={StaticResource InverseBoolToVisibility}}"/>
+                            </Grid>
+                        </Button>
+                    </Grid>
 
                     <CheckBox Style="{DynamicResource SettingsCheckBoxStyle}"
                               Content="{x:Static l:Strings.AutoOpenScreenShareWindowText}"

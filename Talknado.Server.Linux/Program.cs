@@ -6,7 +6,7 @@ using Talknado.Server.Core;
 namespace Talknado.Server.Linux;
 
 /// <summary>
-/// serve [--control PATH] [--quality N] [--bandwidth MBIT]
+/// serve [--control PATH] [--max-quality N] [--bandwidth MBIT]
 ///     Пароль — из TALKNADO_PASSWORD: аргументы видны в ps. С сокетом управления
 ///     ключ отдаёт команда key, а не вывод: в ключе пароль, а вывод уходит в журнал.
 /// ctl PATH COMMAND [ARG]
@@ -26,7 +26,7 @@ static class Program
     static int Serve(string[] args)
     {
         string? controlPath = null;
-        byte quality = 0;
+        byte quality = 2;
         long bandwidthMbits = 0;
 
         for (int i = 0; i < args.Length; i += 2)
@@ -35,7 +35,7 @@ static class Program
             bool ok = args[i] switch
             {
                 "--control" => (controlPath = value) != null,
-                "--quality" => SessionCommands.TryParseQuality(value, out quality),
+                "--max-quality" or "--quality" => SessionCommands.TryParseQuality(value, out quality),
                 "--bandwidth" => long.TryParse(value, out bandwidthMbits) && bandwidthMbits >= 0,
                 _ => false
             };
@@ -119,8 +119,8 @@ static class Program
 
     static int Usage()
     {
-        Console.Error.WriteLine("Usage: talknado-server-bin serve [--control PATH] [--quality 720p30|1080p30|1080p60] [--bandwidth MBIT]");
-        Console.Error.WriteLine("       talknado-server-bin ctl PATH key|status|users|kick ID|quality [VALUE]|bandwidth [MBIT]");
+        Console.Error.WriteLine("Usage: talknado-server-bin serve [--control PATH] [--max-quality 720p30|1080p30|1080p60] [--bandwidth MBIT]");
+        Console.Error.WriteLine("       talknado-server-bin ctl PATH key|status|users|kick ID|max-quality [VALUE]|bandwidth [MBIT]");
         Console.Error.WriteLine("       talknado-server-bin version");
         return 1;
     }

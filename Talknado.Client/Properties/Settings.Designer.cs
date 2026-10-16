@@ -121,6 +121,42 @@ namespace Talknado.Client.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool PushToTalk {
+            get {
+                return ((bool)(this["PushToTalk"]));
+            }
+            set {
+                this["PushToTalk"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int PushToTalkKey {
+            get {
+                return ((int)(this["PushToTalkKey"]));
+            }
+            set {
+                this["PushToTalkKey"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2")]
+        public int ShareQuality {
+            get {
+                return ((int)(this["ShareQuality"]));
+            }
+            set {
+                this["ShareQuality"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("0")]
         public int HostFileBandwidthMbits {
             get {

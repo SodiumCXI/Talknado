@@ -9,9 +9,9 @@ After=network-online.target
 
 [Service]
 Type=exec
-Environment=TALKNADO_QUALITY=720p30 TALKNADO_BANDWIDTH=0
+Environment=TALKNADO_QUALITY=1080p60 TALKNADO_BANDWIDTH=0
 EnvironmentFile=/etc/talknado/talknado.conf
-ExecStart=/usr/local/bin/talknado-server-bin serve --control /run/talknado/control.sock --quality ${TALKNADO_QUALITY} --bandwidth ${TALKNADO_BANDWIDTH}
+ExecStart=/usr/local/bin/talknado-server-bin serve --control /run/talknado/control.sock --max-quality ${TALKNADO_QUALITY} --bandwidth ${TALKNADO_BANDWIDTH}
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=10

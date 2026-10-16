@@ -15,6 +15,9 @@ public static class NoiseSuppressor
     private static extern IntPtr rnnoise_create(IntPtr model);
 
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void rnnoise_destroy(IntPtr state);
+
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
     private static extern int rnnoise_get_frame_size();
 
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
@@ -97,10 +100,30 @@ public static class NoiseSuppressor
         stale?.Dispose();
     }
 
-    public static void Warmup()
+    /// <summary>На сколько кадров выход отстаёт от входа (RNNoise — по замеру, 960 отсчётов).</summary>
+    public static int DelayFrames
+    {
+        get
+        {
+            var model = _model;
+            if (model == NoiseSuppressionModel.None)
+                return 0;
+            var loaded = _dpdfNet;
+            return loaded != null && loaded.Model == model ? DpdfNet.DelaySamples / DpdfNet.FrameSamples : 2;
+        }
+    }
+
+    /// <summary>Новое включение микрофона: звук прошлого включения не должен выйти в начале.</summary>
+    public static void Reset()
     {
         lock (_lock)
+        {
+            if (_state != IntPtr.Zero)
+                rnnoise_destroy(_state);
+            _state = IntPtr.Zero;
             EnsureCreated();
+            _activeDpdfNet = null;
+        }
     }
 
     /// <summary>Возвращает буфер, переиспользуемый между вызовами.</summary>

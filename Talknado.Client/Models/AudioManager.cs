@@ -1,4 +1,5 @@
 ﻿using System.Buffers.Binary;
+using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
@@ -40,9 +41,31 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
     private const int CaptureBufferMilliseconds = 20;
 
     private const int FrameSamples = 480;
+    // Несколько кадров: потеря одного не оставит получателя с оборванным звуком.
+    private const int EndSilenceFrames = 3;
 
     [ObservableProperty]
     private bool _isMicrophoneActive = false;
+
+    // Поток захвата читает на каждом кадре, кнопка меняет из потока UI.
+    private volatile bool _sendRequested;
+
+    partial void OnIsMicrophoneActiveChanged(bool value) => _sendRequested = value;
+
+    // Опрос состояния, а не перехват клавиатуры: виден и когда окно не в фокусе.
+    // Кадр идёт раз в 10 мс, этого хватает.
+    [LibraryImport("user32.dll")]
+    private static partial short GetAsyncKeyState(int virtualKey);
+
+    private bool IsSendAllowed()
+    {
+        if (!_sendRequested)
+            return false;
+        if (!_settingsManager.PushToTalk)
+            return true;
+        int key = _settingsManager.PushToTalkKey;
+        return key != 0 && (GetAsyncKeyState(key) & 0x8000) != 0;
+    }
 
     public AudioManager(INetworkUtils networkUtils,
         ICryptoSessionManager cryptoSessionManager,
@@ -70,18 +93,15 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         LoopbackAudioCapture.SendOpusData = SendScreenShareOpusData;
     }
 
+    // Микрофон открыт всю сессию, кнопка только разрешает отправку: повторное
+    // открытие устройства съедало начало фразы, а шумоподавление выдавало хвост
+    // прошлого включения.
     public void ToggleMicrophoneStatus()
     {
         IsMicrophoneActive = !IsMicrophoneActive;
 
-        if (IsMicrophoneActive)
-        {
+        if (IsMicrophoneActive && _audioSendThread is not { IsAlive: true })
             StartRecording();
-        }
-        else
-        {
-            StopRecording();
-        }
     }
 
     private void StartRecording()
@@ -128,7 +148,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
 
     private void HandleInputDeviceChanged()
     {
-        if (IsMicrophoneActive)
+        if (_audioSendThread is { IsAlive: true })
         {
             StopRecording();
             StartRecording();
@@ -250,7 +270,73 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
                 dataReady.Set();
             };
 
-            NoiseSuppressor.Warmup();
+            // Пока отправка запрещена, кадры не обрабатываются. Выход шумоподавления
+            // отстаёт на DelayFrames, поэтому после выключения уходит ещё столько кадров:
+            // это звук до нажатия. Последний затухает, следом тишина. При включении
+            // шумоподавление и кодировщик начинают заново, первый кадр нарастает.
+            bool sending = false;
+            int tailFrames = 0;
+
+            void SendFrame(Ramp ramp)
+            {
+                for (int i = 0; i < FrameSamples; i++)
+                {
+                    short pcmSample = (short)Math.Clamp(frameSamples[i] * 32767f, -32768f, 32767f);
+                    frameData[i * 2] = (byte)(pcmSample & 0xFF);
+                    frameData[i * 2 + 1] = (byte)(pcmSample >> 8);
+                }
+
+                var denoisedData = NoiseSuppressor.Denoise(frameData);
+                if (ramp != Ramp.None)
+                    ApplyRamp(denoisedData, ramp);
+                int opusLength = _encoder.Encode(denoisedData, opusData);
+                SendOpusPacket(opusData.AsSpan(0, opusLength), _connectionInfo.LocalUserId);
+            }
+
+            void SendSilence()
+            {
+                Array.Clear(frameData);
+                for (int i = 0; i < EndSilenceFrames; i++)
+                {
+                    int opusLength = _encoder.Encode(frameData, opusData);
+                    SendOpusPacket(opusData.AsSpan(0, opusLength), _connectionInfo.LocalUserId);
+                }
+            }
+
+            void ProcessFrame()
+            {
+                bool requested = IsSendAllowed();
+
+                // Без шумоподавления задержки нет: затухает первый кадр после нажатия.
+                if (sending && !requested)
+                {
+                    sending = false;
+                    tailFrames = Math.Max(1, NoiseSuppressor.DelayFrames);
+                }
+
+                if (tailFrames > 0)
+                {
+                    tailFrames--;
+                    SendFrame(tailFrames == 0 ? Ramp.Out : Ramp.None);
+                    if (tailFrames == 0)
+                        SendSilence();
+                    return;
+                }
+
+                if (!requested)
+                    return;
+
+                if (!sending)
+                {
+                    NoiseSuppressor.Reset();
+                    _encoder.Reset();
+                    sending = true;
+                    SendFrame(Ramp.In);
+                    return;
+                }
+
+                SendFrame(Ramp.None);
+            }
 
             capture.StartRecording();
 
@@ -268,17 +354,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
                             continue;
 
                         filled = 0;
-
-                        for (int i = 0; i < FrameSamples; i++)
-                        {
-                            short pcmSample = (short)Math.Clamp(frameSamples[i] * 32767f, -32768f, 32767f);
-                            frameData[i * 2] = (byte)(pcmSample & 0xFF);
-                            frameData[i * 2 + 1] = (byte)(pcmSample >> 8);
-                        }
-
-                        var denoisedData = NoiseSuppressor.Denoise(frameData);
-                        int opusLength = _encoder.Encode(denoisedData, opusData);
-                        SendOpusPacket(opusData.AsSpan(0, opusLength), _connectionInfo.LocalUserId);
+                        ProcessFrame();
                     }
                 }
                 catch (Exception ex)
@@ -287,6 +363,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
                     System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");
                 }
             }
+
         }
         catch (Exception ex)
         {
@@ -301,6 +378,18 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
             dataReady.Dispose();
             device?.Dispose();
             enumerator?.Dispose();
+        }
+    }
+
+    private enum Ramp { None, In, Out }
+
+    private static void ApplyRamp(Span<byte> pcm, Ramp ramp)
+    {
+        var samples = MemoryMarshal.Cast<byte, short>(pcm);
+        for (int i = 0; i < samples.Length; i++)
+        {
+            float gain = (float)i / samples.Length;
+            samples[i] = (short)(samples[i] * (ramp == Ramp.In ? gain : 1f - gain));
         }
     }
 

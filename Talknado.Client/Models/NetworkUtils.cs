@@ -112,8 +112,10 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
         while (_netManager != null && await timer.WaitForNextTickAsync(token));
     }
 
+    // Unreliable, а не Sequenced: тот выбрасывает пакет, обогнанный следующим, хотя
+    // буфер по номерам поставил бы его на место. Такие пакеты всегда приходят на канал 0.
     public void SendAudioPacket(ReadOnlySpan<byte> packet) =>
-        Send(packet, AudioChannel, DeliveryMethod.ReliableSequenced);
+        Send(packet, AudioChannel, DeliveryMethod.Unreliable);
 
     public void SendScreenSharePacket(ReadOnlySpan<byte> packet)
     {

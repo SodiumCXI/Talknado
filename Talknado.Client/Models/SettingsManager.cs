@@ -11,6 +11,9 @@ public interface ISettingsManager
 {
     bool ShareScreenWithAudio { get; set; }
     bool AutoOpenScreenShareWindow { get; set; }
+    bool PushToTalk { get; set; }
+    /// <summary>Виртуальный код клавиши или кнопки мыши; 0 — не назначена.</summary>
+    int PushToTalkKey { get; set; }
     NoiseSuppressionModel NoiseSuppression { get; set; }
     IReadOnlyList<NoiseSuppressionOption> NoiseSuppressionOptions { get; }
     string? SelectedInputDevice { get; set; }
@@ -36,6 +39,12 @@ public partial class SettingsManager : ObservableObject, ISettingsManager
 
     [ObservableProperty]
     private bool _autoOpenScreenShareWindow;
+
+    [ObservableProperty]
+    private bool _pushToTalk;
+
+    [ObservableProperty]
+    private int _pushToTalkKey;
 
     [ObservableProperty]
     private NoiseSuppressionModel _noiseSuppression;
@@ -77,6 +86,8 @@ public partial class SettingsManager : ObservableObject, ISettingsManager
     {
         ShareScreenWithAudio = Settings.Default.ShareScreenWithAudio;
         AutoOpenScreenShareWindow = Settings.Default.AutoOpenScreenShareWindow;
+        PushToTalk = Settings.Default.PushToTalk;
+        PushToTalkKey = Settings.Default.PushToTalkKey;
         NoiseSuppression = Enum.TryParse<NoiseSuppressionModel>(Settings.Default.NoiseSuppression, out var model)
             ? model
             : NoiseSuppressionModel.DPDFNet2;
@@ -148,6 +159,18 @@ public partial class SettingsManager : ObservableObject, ISettingsManager
     partial void OnShareScreenWithAudioChanged(bool value)
     {
         Settings.Default.ShareScreenWithAudio = value;
+        Settings.Default.Save();
+    }
+
+    partial void OnPushToTalkChanged(bool value)
+    {
+        Settings.Default.PushToTalk = value;
+        Settings.Default.Save();
+    }
+
+    partial void OnPushToTalkKeyChanged(int value)
+    {
+        Settings.Default.PushToTalkKey = value;
         Settings.Default.Save();
     }
 

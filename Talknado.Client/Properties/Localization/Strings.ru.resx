@@ -262,7 +262,25 @@
     <value>Панель хоста</value>
   </data>
   <data name="ShareQualityLabel" xml:space="preserve">
-    <value>Потолок качества демонстрации</value>
+    <value>Максимальное качество демонстрации</value>
+  </data>
+  <data name="PushToTalkText" xml:space="preserve">
+    <value>Режим рации</value>
+  </data>
+  <data name="PushToTalkKeyNotSet" xml:space="preserve">
+    <value>Не назначена</value>
+  </data>
+  <data name="PressKeyText" xml:space="preserve">
+    <value>Нажмите клавишу…</value>
+  </data>
+  <data name="MouseButtonText" xml:space="preserve">
+    <value>Мышь {0}</value>
+  </data>
+  <data name="PushToTalkKeyTooltip" xml:space="preserve">
+    <value>Щёлкните и нажмите клавишу, среднюю или боковую кнопку мыши. Esc — отмена</value>
+  </data>
+  <data name="ShareQualitySelectLabel" xml:space="preserve">
+    <value>Качество демонстрации</value>
   </data>
   <data name="ShareQualityLowText" xml:space="preserve">
     <value>720p, 30 FPS</value>

@@ -1,5 +1,6 @@
 ﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
     <!-- Геометрии значков: между соседними словарями одного уровня
          StaticResource не разрешается, поэтому словарь подключён сюда -->
@@ -54,6 +55,75 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!--
+        Поле назначения клавиши рации. Выглядит как поле формы, а не кнопка:
+        содержимое прижато влево. Tag = True — поле ждёт нажатия: внутри
+        акцентная рамка, не меняющая размер содержимого.
+    -->
+    <Style x:Key="KeyBindingButtonStyle" TargetType="Button">
+        <Setter Property="FontFamily" Value="{DynamicResource FontBase}"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightRegular}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
+        <Setter Property="Height" Value="{DynamicResource ControlHeight}"/>
+        <Setter Property="Padding" Value="{DynamicResource PadControl}"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRingStyle}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{DynamicResource RadiusControl}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <Border x:Name="Waiting"
+                                BorderBrush="{DynamicResource AccentBrush}"
+                                BorderThickness="{DynamicResource FocusBorderThickness}"
+                                CornerRadius="{DynamicResource RadiusControl}"
+                                SnapsToDevicePixels="True"
+                                Visibility="Collapsed"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}"/>
+                        </Trigger>
+                        <!-- Tag типа object: значение «True» строкой с bool не совпало бы -->
+                        <Trigger Property="Tag">
+                            <Trigger.Value>
+                                <sys:Boolean>True</sys:Boolean>
+                            </Trigger.Value>
+                            <Setter TargetName="Waiting" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Назначенная клавиша — плашкой, похожей на клавишу: на тон светлее поля, с тёмной кромкой снизу -->
+    <Style x:Key="KeyCapStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource ControlOnSurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SurfacePressedBrush}"/>
+        <Setter Property="BorderThickness" Value="{DynamicResource KeyCapEdge}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource RadiusKeyCap}"/>
+        <Setter Property="Padding" Value="{DynamicResource PadKeyCap}"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="TextElement.FontWeight" Value="{DynamicResource WeightMedium}"/>
     </Style>
 
     <!-- Первичное действие. Одно на экран -->

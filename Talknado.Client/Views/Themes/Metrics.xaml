@@ -23,6 +23,7 @@
         размер превью монитора ................... MonitorPreviewHeight
         обводка превью монитора .................. MonitorRing*
         расстояние между плитками мониторов ...... GapTile
+        поля под плитками мониторов .............. PadMonitorOptions
         скругление ............................... RadiusCard / RadiusControl
         полоса заголовка окна .................... TitleBar*
         кнопка воспроизведения на превью видео ... MediaBadgeSize
@@ -190,6 +191,14 @@
         как поля в остальных окнах.
     -->
     <Thickness x:Key="GapTile">6</Thickness>
+    <!-- качество и звук под плитками мониторов: края совпадают с краями плиток -->
+    <Thickness x:Key="PadMonitorOptions">6,0,6,12</Thickness>
+    <!-- поле клавиши рации в строке флажка: ширина постоянная, иначе длинная клавиша переносит подпись флажка -->
+    <sys:Double x:Key="KeyBindingFieldWidth">180</sys:Double>
+    <!-- плашка клавиши рации в поле назначения: поля, скругление и кромка снизу -->
+    <Thickness x:Key="PadKeyCap">8,1,8,1</Thickness>
+    <CornerRadius x:Key="RadiusKeyCap">4</CornerRadius>
+    <Thickness x:Key="KeyCapEdge">0,0,0,2</Thickness>
     <!-- отступ сверху между блоками: там, где нижний дал бы лишнее у края -->
     <Thickness x:Key="GapBlockTop">0,14,0,0</Thickness>
     <!-- между блоками формы -->

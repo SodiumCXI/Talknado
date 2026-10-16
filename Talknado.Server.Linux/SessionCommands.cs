@@ -40,7 +40,7 @@ public sealed class SessionCommands(ServerHost host)
             "status" => Status(),
             "users" => Users(),
             "kick" => Kick(argument),
-            "quality" => Quality(argument),
+            "max-quality" or "quality" => Quality(argument),
             "bandwidth" => Bandwidth(argument),
             _ => $"{ErrorPrefix} Unknown command"
         };
@@ -49,7 +49,7 @@ public sealed class SessionCommands(ServerHost host)
     private string Status() =>
         $"Port: {_host.Port}\n" +
         $"Users: {_admin.GetUsers().Count}\n" +
-        $"Screen share quality: {QualityNames[Math.Min(_admin.MaxShareQuality, QualityNames.Length - 1)]}\n" +
+        $"Max screen share quality: {QualityNames[Math.Min(_admin.MaxShareQuality, QualityNames.Length - 1)]}\n" +
         $"File bandwidth: {BandwidthText()}";
 
     private string Users()
@@ -85,11 +85,11 @@ public sealed class SessionCommands(ServerHost host)
         if (argument != null)
         {
             if (!TryParseQuality(argument, out var quality))
-                return $"{ErrorPrefix} Quality must be one of: {string.Join(", ", QualityNames)}";
+                return $"{ErrorPrefix} Max quality must be one of: {string.Join(", ", QualityNames)}";
 
             _admin.MaxShareQuality = quality;
         }
-        return $"Screen share quality: {QualityNames[Math.Min(_admin.MaxShareQuality, QualityNames.Length - 1)]}";
+        return $"Max screen share quality: {QualityNames[Math.Min(_admin.MaxShareQuality, QualityNames.Length - 1)]}";
     }
 
     private string Bandwidth(string? argument)

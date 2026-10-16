@@ -12,6 +12,7 @@ public interface IClientManager
     void ReconnectClient(TcpClient tcpClient, ushort userId, CancellationToken token);
     void KickUser(ushort userId);
     void StopScreenShare();
+    void BroadcastMaxShareQuality();
 }
 
 public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
@@ -68,6 +69,7 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
 
             SendClientsList(stream, token);
             _readyIds[userId] = 0;
+            SendMaxShareQuality(stream, token);
         }
         catch
         {
@@ -90,6 +92,7 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
             var data = _cryptoSessionManager.EncryptMessage(Encoding.UTF8.GetBytes("#CTU"));
             _networkUtils.WritePacketAsync(stream, data, token).GetAwaiter().GetResult();
             _readyIds[userId] = 0;
+            SendMaxShareQuality(stream, token);
         }
         catch
         {
@@ -151,6 +154,30 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
         }
         catch { /* ignore */ }
     }
+
+    // Потолок нужен до запроса демонстрации: по нему клиент показывает доступное качество.
+    private void SendMaxShareQuality(NetworkStream stream, CancellationToken token)
+    {
+        var message = _cryptoSessionManager.EncryptMessage(MaxShareQualityMessage());
+        _networkUtils.WritePacketAsync(stream, message, token).GetAwaiter().GetResult();
+    }
+
+    // Только вошедшим: остальные получат потолок в конце входа.
+    public void BroadcastMaxShareQuality()
+    {
+        var message = _cryptoSessionManager.EncryptMessage(MaxShareQualityMessage());
+        foreach (var userId in _readyIds.Keys)
+        {
+            try
+            {
+                var (stream, token) = _usersInfo.GetUserStreamAndToken(userId);
+                _ = _networkUtils.WritePacketAsync(stream, message, token);
+            }
+            catch { /* участник уходит или переподключается: потолок придёт при входе */ }
+        }
+    }
+
+    private byte[] MaxShareQualityMessage() => [.. "#MSQ"u8, _serverInfo.MaxShareQuality];
 
     private bool ValidatePassword(NetworkStream stream, ushort userId, CancellationToken token)
     {

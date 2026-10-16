@@ -14,7 +14,8 @@ Dedicated server with the same session handling and media relay as the server em
 | v1.2.0         | v2.0.0                         |
 | v1.2.1         | v2.0.1                         |
 | v1.2.2         | v2.0.2                         |
-| v1.2.3         | v2.0.3 and newer               |
+| v1.2.3         | v2.0.3                         |
+| v1.2.4         | v2.0.4 and newer               |
 
 ## Installation
 
@@ -45,12 +46,12 @@ talknado stop                      # stops the server and turns off autostart
 
 ### Session settings
 
-The same settings as the host panel in the desktop app. Quality and bandwidth are saved in `/etc/talknado/talknado.conf` and apply right away if the server is running.
+The same settings as the host panel in the desktop app. Max quality and bandwidth are saved in `/etc/talknado/talknado.conf` and apply right away if the server is running.
 
 ```bash
 talknado users                 # connected users: ID, ping, address, name
 talknado kick 3                # kick a user and ban their address until restart
-talknado quality 1080p60       # screen share quality cap: 720p30, 1080p30, 1080p60
+talknado max-quality 1080p30   # maximum screen share quality: 720p30, 1080p30, 1080p60 (default)
 talknado bandwidth 25          # file transfer limit in Mbit/s, 0 = unlimited
 ```
 

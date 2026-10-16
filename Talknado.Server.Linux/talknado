@@ -131,7 +131,7 @@ set_password() {
 }
 
 print_settings() {
-    echo "Screen share quality: $(get_setting TALKNADO_QUALITY 720p30)"
+    echo "Max screen share quality: $(get_setting TALKNADO_QUALITY 1080p60)"
     BANDWIDTH=$(get_setting TALKNADO_BANDWIDTH 0)
     if [ "$BANDWIDTH" = "0" ]; then
         echo "File bandwidth: unlimited"
@@ -186,9 +186,9 @@ kick_user() {
 set_quality() {
     if [ -z "$1" ]; then
         if is_running; then
-            control quality
+            control max-quality
         else
-            echo "Screen share quality: $(get_setting TALKNADO_QUALITY 720p30)"
+            echo "Max screen share quality: $(get_setting TALKNADO_QUALITY 1080p60)"
         fi
         return $?
     fi
@@ -196,15 +196,15 @@ set_quality() {
     case "$1" in
         720p30|1080p30|1080p60) ;;
         *)
-            echo "Error: Quality must be one of: $QUALITIES"
+            echo "Error: Max quality must be one of: $QUALITIES"
             return 1
             ;;
     esac
 
     if is_running; then
-        control quality "$1" || return 1
+        control max-quality "$1" || return 1
     else
-        echo "Screen share quality: $1 (applies on start)"
+        echo "Max screen share quality: $1 (applies on start)"
     fi
     save_setting TALKNADO_QUALITY "$1"
 }
@@ -269,22 +269,22 @@ show_help() {
     cat << EOF
 Usage: talknado <command> [options]
 Commands:
-  start              Start the server and turn on autostart after a reboot
-  stop               Stop the server and turn off autostart
-  restart            Restart the server
-  status             Show server status and session settings
-  key                Show connection key
-  set-password 'pwd' Set server password
-  users              List connected users with ID, ping and address
-  kick ID            Kick a user and ban their address until restart
-  quality [VALUE]    Show or set the screen share quality cap: $QUALITIES
-  bandwidth [MBIT]   Show or set the file transfer limit in Mbit/s, 0 = unlimited
-  logs [-f]          Show the server log, -f to follow it
-  update [vX.X.X]    Update to the latest or the given server version
-  version            Show version information
-  uninstall          Uninstall Talknado Server
-  help               Show this help
-Quality and bandwidth are saved and apply right away if the server is running.
+  start               Start the server and turn on autostart after a reboot
+  stop                Stop the server and turn off autostart
+  restart             Restart the server
+  status              Show server status and session settings
+  key                 Show connection key
+  set-password 'pwd'  Set server password
+  users               List connected users with ID, ping and address
+  kick ID             Kick a user and ban their address until restart
+  max-quality [VALUE] Show or set the maximum screen share quality: $QUALITIES
+  bandwidth [MBIT]    Show or set the file transfer limit in Mbit/s, 0 = unlimited
+  logs [-f]           Show the server log, -f to follow it
+  update [vX.X.X]     Update to the latest or the given server version
+  version             Show version information
+  uninstall           Uninstall Talknado Server
+  help                Show this help
+Max quality and bandwidth are saved and apply right away if the server is running.
 EOF
 }
 
@@ -311,7 +311,7 @@ case "$1" in
     key) show_key ;;
     users) show_users ;;
     kick) kick_user "$2" ;;
-    quality) set_quality "$2" ;;
+    max-quality|quality) set_quality "$2" ;;
     bandwidth) set_bandwidth "$2" ;;
     logs) show_logs "$2" ;;
     update) update_server "$2" ;;

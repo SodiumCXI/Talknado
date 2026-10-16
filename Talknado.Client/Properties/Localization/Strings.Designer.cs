@@ -494,7 +494,7 @@ namespace Talknado.Client.Properties.Localization {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Screen share quality limit.
+        ///   Ищет локализованную строку, похожую на Maximum screen share quality.
         /// </summary>
         public static string ShareQualityLabel {
             get {
@@ -502,6 +502,60 @@ namespace Talknado.Client.Properties.Localization {
             }
         }
         
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Push to talk.
+        /// </summary>
+        public static string PushToTalkText {
+            get {
+                return ResourceManager.GetString("PushToTalkText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Not set.
+        /// </summary>
+        public static string PushToTalkKeyNotSet {
+            get {
+                return ResourceManager.GetString("PushToTalkKeyNotSet", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Press a key….
+        /// </summary>
+        public static string PressKeyText {
+            get {
+                return ResourceManager.GetString("PressKeyText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Mouse {0}.
+        /// </summary>
+        public static string MouseButtonText {
+            get {
+                return ResourceManager.GetString("MouseButtonText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Click, then press a key or the middle or side mouse button. Esc cancels.
+        /// </summary>
+        public static string PushToTalkKeyTooltip {
+            get {
+                return ResourceManager.GetString("PushToTalkKeyTooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Screen share quality.
+        /// </summary>
+        public static string ShareQualitySelectLabel {
+            get {
+                return ResourceManager.GetString("ShareQualitySelectLabel", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Ищет локализованную строку, похожую на 720p, 30 FPS.
         /// </summary>
