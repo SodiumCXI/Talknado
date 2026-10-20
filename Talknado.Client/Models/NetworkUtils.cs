@@ -69,10 +69,13 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
         var serverEndPoint = IPEndPoint.Parse($"{_connectionInfo.ServerIP}:{_connectionInfo.ServerPort}");
 
         _netManager?.Stop();
+        // Приём — сразу из потока сокета, а не через PollEvents на пуле: занятый пул
+        // задерживал пакеты, и они приходили пачкой. Обработчик только кладёт копию в очередь.
         _netManager = new NetManager(this)
         {
             AutoRecycle = true,
             ChannelsCount = 1 + ScreenShareChannels,
+            UnsyncedReceiveEvent = true,
         };
         _netManager.Start(_connectionInfo.Port);
 

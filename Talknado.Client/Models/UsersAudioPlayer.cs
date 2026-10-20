@@ -23,7 +23,12 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
     // только с приходом и уходом участника.
     private volatile UserAudioStream[] _streams = [];
     private readonly object _streamsLock = new();
-    private readonly Timer _playbackTimer;
+    // Свой поток, а не таймер пула: пул делят сеть и передача файлов, и когда они его
+    // занимают, тик опаздывает, устройство пустеет и щёлкает, а срабатывания таймера,
+    // накопившиеся в очереди, идут внахлёст и декодируют одним декодером из двух потоков.
+    private const int PlaybackTickMilliseconds = 10;
+    private readonly Thread _playbackThread;
+    private volatile bool _disposed;
 
     private event Action<ushort>? UserAdded;
     private event Action<ushort>? UserRemoved;
@@ -33,7 +38,13 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         _usersInfo = usersInfo;
 
         _settingsManager = settingsManager;
-        _playbackTimer = new(PlaybackTick, null, 0, 10);
+        _playbackThread = new Thread(PlaybackLoop)
+        {
+            IsBackground = true,
+            Priority = ThreadPriority.Highest,
+            Name = "Audio playback"
+        };
+        _playbackThread.Start();
         _settingsManager.OutputDeviceChanged += HandleOutputDeviceChanged;
 
         UserAdded += userId => _usersInfo.UpdateMicrophoneState(userId, true);
@@ -73,7 +84,16 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             _streams = [.. _userAudioStreams.Values];
     }
 
-    private void PlaybackTick(object? state)
+    private void PlaybackLoop()
+    {
+        while (!_disposed)
+        {
+            PlaybackTick();
+            Thread.Sleep(PlaybackTickMilliseconds);
+        }
+    }
+
+    private void PlaybackTick()
     {
         var streams = _streams;
 
@@ -118,11 +138,13 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
+        _playbackThread.Join();
+
         foreach (var stream in _userAudioStreams.Values)
             stream.Dispose();
 
         _userAudioStreams.Clear();
-        _playbackTimer.Dispose();
         _settingsManager.OutputDeviceChanged -= HandleOutputDeviceChanged;
 
         UserAdded = null;

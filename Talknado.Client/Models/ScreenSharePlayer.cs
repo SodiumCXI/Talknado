@@ -72,7 +72,9 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     private readonly object _queueLock = new();
     private readonly Queue<EncodedFrame> _frameQueue = new();
     private readonly CancellationTokenSource _playbackCts = new();
-    private readonly Task _playbackTask;
+    // Свой поток, а не задача пула: пул делят сеть и передача файлов, и когда они его
+    // занимают, ожидание срока кадра затягивается и показ идёт рывками.
+    private readonly Thread _playbackThread;
     private readonly SemaphoreSlim _frameSignal = new(0);
 
     // Кадр показывается в «время отправителя + задержка показа». Задержка —
@@ -119,7 +121,13 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
         }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
 
         _renderAction = RenderFrame;
-        _playbackTask = Task.Run(() => PlaybackLoop(_playbackCts.Token));
+        _playbackThread = new Thread(() => PlaybackLoop(_playbackCts.Token))
+        {
+            IsBackground = true,
+            Priority = ThreadPriority.AboveNormal,
+            Name = "Screen share playback"
+        };
+        _playbackThread.Start();
     }
 
     private static bool IsKeyFrame(ReadOnlySpan<byte> h264Data) => h264Data.Length >= 5 && h264Data[0] == 1;
@@ -244,7 +252,16 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
         }
     }
 
-    private async Task PlaybackLoop(CancellationToken token)
+    private void PlaybackLoop(CancellationToken token)
+    {
+        try
+        {
+            RunPlayback(token);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void RunPlayback(CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
@@ -260,7 +277,7 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
 
             if (!hasFrame)
             {
-                await _frameSignal.WaitAsync(token);
+                _frameSignal.Wait(token);
                 continue;
             }
 
@@ -279,8 +296,8 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
             double dueMs = frame.SenderMs + _playOffsetMs;
             double leadMs = frame.IsKeyFrame ? Math.Max(DecodeLeadMs, _keyDecodeMs + DecodeMarginMs) : DecodeLeadMs;
             double waitMs = dueMs - leadMs - NowMs;
-            if (waitMs >= 1)
-                await Task.Delay(TimeSpan.FromMilliseconds(waitMs), token);
+            if (waitMs >= 1 && token.WaitHandle.WaitOne(TimeSpan.FromMilliseconds(waitMs)))
+                return;
 
             lock (_queueLock)
                 _frameQueue.TryDequeue(out _);
@@ -310,8 +327,8 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
                 continue;
 
             waitMs = dueMs - NowMs;
-            if (waitMs >= 1)
-                await Task.Delay(TimeSpan.FromMilliseconds(waitMs), token);
+            if (waitMs >= 1 && token.WaitHandle.WaitOne(TimeSpan.FromMilliseconds(waitMs)))
+                return;
 
             Publish(token);
         }
@@ -493,7 +510,10 @@ public partial class ScreenSharePlayer : ObservableObject, IScreenSharePlayer, I
     public void Dispose()
     {
         _playbackCts.Cancel();
-        _playbackCts.Dispose();
+        // Декодер освобождается ниже, поэтому поток показа сначала дожидаемся. Не дольше
+        // секунды: он может стоять в Dispatcher.Invoke, а Dispose бывает из потока UI.
+        if (_playbackThread.Join(TimeSpan.FromSeconds(1)))
+            _playbackCts.Dispose();
 
         lock (_queueLock)
         {

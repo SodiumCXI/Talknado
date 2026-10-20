@@ -100,10 +100,13 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
         _serverInfo = serverInfo;
         _cryptoSessionManager = cryptoSessionManager;
 
+        // Приём — сразу из потока сокета, а не через PollEvents на пуле: занятый пул
+        // задерживал пакеты, и они приходили пачкой. Обработчик только кладёт копию в очередь.
         _netManager = new NetManager(this)
         {
             AutoRecycle = true,
-            ChannelsCount = 1 + ScreenShareChannels
+            ChannelsCount = 1 + ScreenShareChannels,
+            UnsyncedReceiveEvent = true
         };
     }
 
