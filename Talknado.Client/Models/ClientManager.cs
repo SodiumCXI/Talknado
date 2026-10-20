@@ -51,7 +51,7 @@ public class ClientManager(IUsersInfo usersInfo,
     /// Самая старая версия сервера, с которой совместим протокол клиента.
     /// Поднимается только при несовместимой правке протокола.
     /// </summary>
-    private static readonly Version MinServerVersion = new(1, 2, 4);
+    private static readonly Version MinServerVersion = new(1, 2, 5);
 
     private TcpClient _tcpMainClient = null!;
 
@@ -120,6 +120,7 @@ public class ClientManager(IUsersInfo usersInfo,
             };
             _receiveThread.Start();
 
+            _audioManager.TransmittingChanged += SendMicrophoneState;
             _audioManager.ToggleMicrophoneStatus();
 
             return null;
@@ -375,6 +376,18 @@ public class ClientManager(IUsersInfo usersInfo,
         }
     }
 
+    // Значок микрофона у остальных — по команде: она доходит наверняка и сразу,
+    // а не тогда, когда перестанут приходить пакеты звука.
+    private void SendMicrophoneState(bool transmitting)
+    {
+        _usersInfo.UpdateMicrophoneState(_connectionInfo.LocalUserId, transmitting);
+        try
+        {
+            SendCommand(transmitting ? "#MIC1" : "#MIC0");
+        }
+        catch { /* связь переподключается: состояние уйдёт после переподключения */ }
+    }
+
     public void SendCommand(string command)
     {
         var headerBytes = Encoding.UTF8.GetBytes("CMD");
@@ -449,6 +462,9 @@ public class ClientManager(IUsersInfo usersInfo,
                         MessageBox.Show(Strings.ConnectionLostText, Strings.ConnectionErrorText, MessageBoxButton.OK, MessageBoxImage.Error));
                     break;
                 }
+
+                // Пока связи не было, команда могла не уйти
+                SendMicrophoneState(_audioManager.IsTransmitting);
             }
             catch
             {
@@ -546,6 +562,14 @@ public class ClientManager(IUsersInfo usersInfo,
                 break;
 
             // Remove user
+            // Microphone: номер участника и включён ли
+            case var _ when command.Equals("#MIC"):
+
+                if (body.Length >= 3)
+                    _usersInfo.UpdateMicrophoneState(BitConverter.ToUInt16(body), body[2] != 0);
+
+                break;
+
             case var _ when command.Equals("#REM"):
 
                 var userIdREM = BitConverter.ToUInt16(body);

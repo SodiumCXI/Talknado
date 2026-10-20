@@ -106,7 +106,8 @@ public partial class UsersInfo(IConnectionInfo connectionInfo) : ObservableObjec
     {
         if (_userLookup.TryGetValue(userId, out var user))
         {
-            Application.Current?.Dispatcher.Invoke(() =>
+            // Зовут потоки приёма, захвата и воспроизведения: ждать поток UI им нельзя
+            Application.Current?.Dispatcher.BeginInvoke(() =>
             {
                 user.IsMicrophoneActive = isActive;
             });

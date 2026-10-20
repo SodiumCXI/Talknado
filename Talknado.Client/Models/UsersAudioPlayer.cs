@@ -30,8 +30,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
     private readonly Thread _playbackThread;
     private volatile bool _disposed;
 
-    private event Action<ushort>? UserAdded;
-    private event Action<ushort>? UserRemoved;
 
     public UsersAudioPlayer(ISettingsManager settingsManager, IUsersInfo usersInfo)
     {
@@ -47,8 +45,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         _playbackThread.Start();
         _settingsManager.OutputDeviceChanged += HandleOutputDeviceChanged;
 
-        UserAdded += userId => _usersInfo.UpdateMicrophoneState(userId, true);
-        UserRemoved += userId => _usersInfo.UpdateMicrophoneState(userId, false);
     }
 
     public void Play(ushort userId, ushort sequence, ReadOnlySpan<byte> opusData)
@@ -62,7 +58,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             value = new UserAudioStream(_usersInfo, userId, deviceId);
             _userAudioStreams[userId] = value;
             UpdateStreams();
-            UserAdded?.Invoke(userId);
         }
 
         value.AddPacket(sequence, opusData);
@@ -74,7 +69,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         {
             UpdateStreams();
             stream.Dispose();
-            UserRemoved?.Invoke(userId);
         }
     }
 
@@ -147,8 +141,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         _userAudioStreams.Clear();
         _settingsManager.OutputDeviceChanged -= HandleOutputDeviceChanged;
 
-        UserAdded = null;
-        UserRemoved = null;
 
         GC.SuppressFinalize(this);
     }

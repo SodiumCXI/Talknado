@@ -14,6 +14,10 @@ namespace Talknado.Client.Models;
 public interface IAudioManager
 {
     void ToggleMicrophoneStatus();
+    /// <summary>Звук уходит в сеть: микрофон включён и, в режиме рации, клавиша зажата.</summary>
+    bool IsTransmitting { get; }
+    /// <summary>Из потока захвата.</summary>
+    event Action<bool>? TransmittingChanged;
 }
 
 public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
@@ -51,6 +55,16 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
     private volatile bool _sendRequested;
 
     partial void OnIsMicrophoneActiveChanged(bool value) => _sendRequested = value;
+
+    private volatile bool _transmitting;
+    public bool IsTransmitting => _transmitting;
+    public event Action<bool>? TransmittingChanged;
+
+    private void SetTransmitting(bool value)
+    {
+        _transmitting = value;
+        TransmittingChanged?.Invoke(value);
+    }
 
     // Опрос состояния, а не перехват клавиатуры: виден и когда окно не в фокусе.
     // Кадр идёт раз в 10 мс, этого хватает.
@@ -311,6 +325,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
                 if (sending && !requested)
                 {
                     sending = false;
+                    SetTransmitting(false);
                     tailFrames = Math.Max(1, NoiseSuppressor.DelayFrames);
                 }
 
@@ -331,6 +346,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
                     NoiseSuppressor.Reset();
                     _encoder.Reset();
                     sending = true;
+                    SetTransmitting(true);
                     SendFrame(Ramp.In);
                     return;
                 }
@@ -373,6 +389,10 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
         }
         finally
         {
+            // Захват оборвался на ошибке устройства, а остальные видят микрофон включённым
+            if (_transmitting)
+                SetTransmitting(false);
+
             capture?.StopRecording();
             capture?.Dispose();
             dataReady.Dispose();

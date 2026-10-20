@@ -33,6 +33,8 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
     // сервера строго определённых ответов, и рассылка задержек, попавшая
     // между ними, сорвала бы вход.
     private readonly ConcurrentDictionary<ushort, byte> _readyIds = [];
+    // Состояние микрофонов: вошедший получает его сразу, а не когда участники заговорят
+    private readonly ConcurrentDictionary<ushort, bool> _microphones = [];
     private readonly object _lockCommandExecution = new();
 
     private readonly IUsersInfo _usersInfo = usersInfo;
@@ -70,6 +72,7 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
             SendClientsList(stream, token);
             _readyIds[userId] = 0;
             SendMaxShareQuality(stream, token);
+            SendMicrophones(stream, userId, token);
         }
         catch
         {
@@ -93,6 +96,7 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
             _networkUtils.WritePacketAsync(stream, data, token).GetAwaiter().GetResult();
             _readyIds[userId] = 0;
             SendMaxShareQuality(stream, token);
+            SendMicrophones(stream, userId, token);
         }
         catch
         {
@@ -162,22 +166,38 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
         _networkUtils.WritePacketAsync(stream, message, token).GetAwaiter().GetResult();
     }
 
-    // Только вошедшим: остальные получат потолок в конце входа.
-    public void BroadcastMaxShareQuality()
+    public void BroadcastMaxShareQuality() =>
+        SendToReady(_cryptoSessionManager.EncryptMessage(MaxShareQualityMessage()), except: 0);
+
+    private byte[] MaxShareQualityMessage() => [.. "#MSQ"u8, _serverInfo.MaxShareQuality];
+
+    private void SendMicrophones(NetworkStream stream, ushort userId, CancellationToken token)
     {
-        var message = _cryptoSessionManager.EncryptMessage(MaxShareQualityMessage());
+        foreach (var (id, active) in _microphones)
+        {
+            if (id != userId && active)
+                _networkUtils.WritePacketAsync(stream, _cryptoSessionManager.EncryptMessage(MicrophoneMessage(id, true)), token).GetAwaiter().GetResult();
+        }
+    }
+
+    private static byte[] MicrophoneMessage(ushort userId, bool active) =>
+        [.. "#MIC"u8, .. BitConverter.GetBytes(userId), active ? (byte)1 : (byte)0];
+
+    // Только вошедшим: остальные получат своё в конце входа.
+    private void SendToReady(byte[] message, ushort except)
+    {
         foreach (var userId in _readyIds.Keys)
         {
+            if (userId == except)
+                continue;
             try
             {
                 var (stream, token) = _usersInfo.GetUserStreamAndToken(userId);
                 _ = _networkUtils.WritePacketAsync(stream, message, token);
             }
-            catch { /* участник уходит или переподключается: потолок придёт при входе */ }
+            catch { /* участник уходит или переподключается: состояние придёт при входе */ }
         }
     }
-
-    private byte[] MaxShareQualityMessage() => [.. "#MSQ"u8, _serverInfo.MaxShareQuality];
 
     private bool ValidatePassword(NetworkStream stream, ushort userId, CancellationToken token)
     {
@@ -392,6 +412,7 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
             _networkUtils.BroadcastMessage(userId, _cryptoSessionManager.EncryptMessage(message), CancellationToken.None);
         }    
         _readyIds.TryRemove(userId, out _);
+        _microphones.TryRemove(userId, out _);
         _usersInfo.DisconnectUser(userId, false);
         _fileChannel.RemoveUser(userId);
         _cryptoSessionManager.TryRemoveSharedSecret(userId);
@@ -472,6 +493,14 @@ public class ClientManager(IUsersInfo usersInfo, INetworkUtils networkUtils,
             case var _ when command.Equals("#STO"):
 
                 StopScreenShare();
+
+                break;
+
+            case "#MIC1" or "#MIC0":
+
+                bool active = command == "#MIC1";
+                _microphones[userId] = active;
+                SendToReady(_cryptoSessionManager.EncryptMessage(MicrophoneMessage(userId, active)), except: userId);
 
                 break;
 
