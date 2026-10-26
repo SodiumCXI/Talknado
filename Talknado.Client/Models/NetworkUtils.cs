@@ -117,13 +117,20 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
 
     // Unreliable, а не Sequenced: тот выбрасывает пакет, обогнанный следующим, хотя
     // буфер по номерам поставил бы его на место. Такие пакеты всегда приходят на канал 0.
-    public void SendAudioPacket(ReadOnlySpan<byte> packet) =>
+    public void SendAudioPacket(ReadOnlySpan<byte> packet)
+    {
         Send(packet, AudioChannel, DeliveryMethod.Unreliable);
+        _netManager?.TriggerUpdate();
+    }
 
     public void SendScreenSharePacket(ReadOnlySpan<byte> packet)
     {
-        if (ScreenFrame.TryRead(packet, out var header))
-            Send(packet, (byte)(FirstScreenShareChannel + (header.Number + header.Index) % ScreenShareChannels), DeliveryMethod.ReliableOrdered);
+        if (!ScreenFrame.TryRead(packet, out var header))
+            return;
+
+        Send(packet, (byte)(FirstScreenShareChannel + (header.Number + header.Index) % ScreenShareChannels), DeliveryMethod.ReliableOrdered);
+        if (header.Index == header.Count - 1)
+            _netManager?.TriggerUpdate();
     }
 
     public int ScreenShareBacklog
@@ -141,6 +148,8 @@ public class NetworkUtils(IConnectionInfo connectionInfo) : INetworkUtils, INetE
         }
     }
 
+    // LiteNetLib копит отправленное до своего обновления раз в UpdateTime (15 мс):
+    // звук и кадры будятся TriggerUpdate сразу после отправки.
     private void Send(ReadOnlySpan<byte> packet, byte channel, DeliveryMethod method)
     {
         var peer = _serverPeer;

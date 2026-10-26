@@ -130,8 +130,19 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
     }
 
     // Порядок восстанавливает буфер получателя по номерам пакетов.
-    public void BroadcastAudioPacket(ushort currentUserId, ReadOnlySpan<byte> data) =>
+    public void BroadcastAudioPacket(ushort currentUserId, ReadOnlySpan<byte> data)
+    {
         Broadcast(currentUserId, data, AudioChannel, DeliveryMethod.Unreliable);
+        FlushWhenIdle(_audioSemaphore);
+    }
+
+    // LiteNetLib копит отправленное до своего обновления раз в UpdateTime (15 мс). Будить его,
+    // когда очередь пересылки пуста: пачка, пришедшая разом, уходит одним пробуждением.
+    private void FlushWhenIdle(SemaphoreSlim pending)
+    {
+        if (pending.CurrentCount == 0)
+            _netManager.TriggerUpdate();
+    }
 
     public Action<ushort>? KeyFrameNeeded { get; set; }
 
@@ -189,6 +200,8 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
             }
             catch { /* ignore */ }
         }
+
+        FlushWhenIdle(_screenSemaphore);
     }
 
     private void Broadcast(ushort currentUserId, ReadOnlySpan<byte> data, byte channel, DeliveryMethod method)
