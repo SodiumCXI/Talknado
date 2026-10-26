@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using LiteNetLib;
 using Talknado.Server.Core.Helpers;
@@ -370,11 +371,20 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
     {
     }
 
-    // NetPeer.Ping не годится: потерянный ответ LiteNetLib усредняет как замер
-    // в секунду. latency — половина времени туда и обратно.
+    // NetPeer.Ping не годится: потерянный ответ LiteNetLib усредняет как замер.
+    // latency — половина замера с округлением вниз, удвоенная всегда чётна; полный замер лежит
+    // в закрытом секундомере пинга, а без него (другая версия библиотеки) остаётся удвоение.
+    private static readonly FieldInfo? PingTimerField =
+        typeof(NetPeer).GetField("_pingTimer", BindingFlags.NonPublic | BindingFlags.Instance);
+
     public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
     {
-        _usersInfo.AddPingSample(peer, latency * 2);
+        int roundTrip = latency * 2;
+        if (PingTimerField?.GetValue(peer) is Stopwatch { IsRunning: false } timer
+            && (int)timer.ElapsedMilliseconds / 2 == latency)
+            roundTrip = (int)Math.Round(timer.Elapsed.TotalMilliseconds);
+
+        _usersInfo.AddPingSample(peer, roundTrip);
     }
 
     public void OnConnectionRequest(ConnectionRequest request)
