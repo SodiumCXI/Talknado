@@ -14,8 +14,13 @@ public partial class MonitorSelectionViewModel : ObservableObject
     public ISettingsManager SettingsManager { get; }
 
     // Поле выбора в шаблоне темы показывает ToString, а не DisplayMemberPath.
-    public record QualityOption(string Text, bool IsAvailable)
+    public partial class QualityOption(string text) : ObservableObject
     {
+        public string Text { get; } = text;
+
+        [ObservableProperty]
+        private bool _isAvailable;
+
         public override string ToString() => Text;
     }
 
@@ -25,16 +30,21 @@ public partial class MonitorSelectionViewModel : ObservableObject
         _screenMonitorManager = screenMonitorManager;
         SettingsManager = settingsManager;
 
+        UpdateAvailability();
         if (screenMonitorManager is INotifyPropertyChanged notifier)
             notifier.PropertyChanged += OnManagerPropertyChanged;
     }
 
-    /// <summary>Выше потолка сервера и возможностей этой машины варианты недоступны.</summary>
-    public QualityOption[] QualityOptions =>
+    /// <summary>
+    /// Выше потолка сервера и возможностей этой машины варианты недоступны.
+    /// Список не пересоздаётся: при смене ItemsSource поле выбора теряет
+    /// выбранный элемент и остаётся пустым.
+    /// </summary>
+    public QualityOption[] QualityOptions { get; } =
     [
-        new(Strings.ShareQualityLowText, true),
-        new(Strings.ShareQualityMediumText, _screenMonitorManager.AvailableQuality >= 1),
-        new(Strings.ShareQualityHighText, _screenMonitorManager.AvailableQuality >= 2)
+        new(Strings.ShareQualityLowText),
+        new(Strings.ShareQualityMediumText),
+        new(Strings.ShareQualityHighText)
     ];
 
     public int SelectedQuality
@@ -42,10 +52,15 @@ public partial class MonitorSelectionViewModel : ObservableObject
         get => Math.Min(_screenMonitorManager.SelectedQuality, _screenMonitorManager.AvailableQuality);
         set
         {
-            // -1 приходит, пока список вариантов пересоздаётся
             if (value >= 0 && value <= _screenMonitorManager.AvailableQuality)
                 _screenMonitorManager.SelectedQuality = value;
         }
+    }
+
+    private void UpdateAvailability()
+    {
+        for (int i = 0; i < QualityOptions.Length; i++)
+            QualityOptions[i].IsAvailable = i <= _screenMonitorManager.AvailableQuality;
     }
 
     private void OnManagerPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -53,7 +68,7 @@ public partial class MonitorSelectionViewModel : ObservableObject
         if (e.PropertyName != nameof(IScreenMonitorManager.AvailableQuality))
             return;
 
-        OnPropertyChanged(nameof(QualityOptions));
+        UpdateAvailability();
         OnPropertyChanged(nameof(SelectedQuality));
     }
 
