@@ -117,7 +117,7 @@
                                                    Style="{DynamicResource MutedTextStyle}"
                                                    Text="{Binding Id}"
                                                    TextAlignment="Right"
-                                                   Margin="{DynamicResource GapInline}"
+                                                   Margin="{DynamicResource GapUserId}"
                                                    VerticalAlignment="Center"/>
 
                                         <TextBlock Grid.Column="1"
