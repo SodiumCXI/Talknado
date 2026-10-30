@@ -215,7 +215,9 @@ public partial class MediaViewerViewModel(IMediaViewerManager mediaViewerManager
         _positionTimer.Stop();
         _positionTimer.Tick -= OnPositionTick;
 
-        _player?.Dispose();
+        // Закрытие ждёт затухания звука — не в потоке UI
+        if (_player is { } player)
+            Task.Run(player.Dispose);
         _player = null;
         VideoSurface = null;
         IsPlaying = false;

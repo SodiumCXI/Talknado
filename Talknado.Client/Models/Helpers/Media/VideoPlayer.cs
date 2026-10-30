@@ -23,6 +23,10 @@ public sealed unsafe class VideoPlayer : IDisposable
     private static readonly TimeSpan ResumeAbove = TimeSpan.FromMilliseconds(300);
     private const int SampleRate = 48000;
     private static readonly TimeSpan AudioAhead = TimeSpan.FromMilliseconds(400);
+    // Бикубический: билинейный мылит при уменьшении, Lanczos на 4K60 съедает половину кадра.
+    private const int ScaleFilter = ffmpeg.SWS_BICUBIC;
+    // Задержка устройства 100 мс плюс затухание 10 мс
+    private const int FadeOutTimeoutMs = 300;
 
     /// <summary>На сколько отрезков делится дорожка для отметки загруженного.</summary>
     public const int BufferedBins = 200;
@@ -245,16 +249,30 @@ public sealed unsafe class VideoPlayer : IDisposable
             bins[i] = _reader.Has(_binStarts[i], _binStarts[i + 1]);
     }
 
-    /// <summary>Вписывает кадр в область, не крупнее исходного. Новые кадры идут уже такими.</summary>
+    /// <summary>
+    /// Вписывает кадр в область пикселей экрана. Новые кадры идут уже такими.
+    /// Кадр не больше области, и окно выводит его один к одному, не растягивая
+    /// (иначе пересчёт каждого пикселя и мыло по всей картинке).
+    /// Ширина чётная: на нечётной sws уходит в медленный путь — 1080p в 1919×1079
+    /// стоит 19 мс на кадр против 3 мс в 1918×1078, и разбор перестаёт успевать.
+    /// </summary>
     public void SetOutputSize(int maxWidth, int maxHeight)
     {
         if (maxWidth <= 0 || maxHeight <= 0)
             return;
 
-        double scale = Math.Min(1, Math.Min((double)maxWidth / _sourceWidth, (double)maxHeight / _sourceHeight));
-        int width = Math.Max(2, (int)(_sourceWidth * scale) & ~1);
-        int height = Math.Max(2, (int)(_sourceHeight * scale) & ~1);
-        Volatile.Write(ref _outputSize, (long)width << 32 | (uint)height);
+        int width, height;
+        if ((long)maxWidth * _sourceHeight <= (long)maxHeight * _sourceWidth)
+        {
+            width = maxWidth & ~1;
+            height = (int)((long)_sourceHeight * width / _sourceWidth);
+        }
+        else
+        {
+            height = maxHeight;
+            width = (int)((long)_sourceWidth * maxHeight / _sourceHeight) & ~1;
+        }
+        Volatile.Write(ref _outputSize, (long)Math.Max(2, width) << 32 | (uint)Math.Max(2, height));
     }
 
     public float Volume
@@ -531,7 +549,7 @@ public sealed unsafe class VideoPlayer : IDisposable
             var pixels = TakeBuffer(stride * height);
 
             _sws = ffmpeg.sws_getCachedContext(_sws, source->width, source->height, (AVPixelFormat)source->format,
-                width, height, AVPixelFormat.AV_PIX_FMT_BGRA, ffmpeg.SWS_BILINEAR, null, null, null);
+                width, height, AVPixelFormat.AV_PIX_FMT_BGRA, ScaleFilter, null, null, null);
 
             for (uint i = 0; i < 4; i++)
             {
@@ -608,6 +626,7 @@ public sealed unsafe class VideoPlayer : IDisposable
         }
     }
 
+    /// <summary>Ждёт, пока доиграет затухание звука, поэтому не из потока UI.</summary>
     public void Dispose()
     {
         if (_disposed)
@@ -618,6 +637,16 @@ public sealed unsafe class VideoPlayer : IDisposable
 
         if (_decodeThread != null && _decodeThread.IsAlive)
             _decodeThread.Join();
+
+        // Остановка посреди звука обрывает уже отданное устройству — щелчок.
+        // Звук затухает, как на паузе, и устройство само встаёт после затухания.
+        if (_output?.PlaybackState == PlaybackState.Playing)
+        {
+            _declick?.Hold();
+            var fading = Stopwatch.StartNew();
+            while (_output.PlaybackState == PlaybackState.Playing && fading.ElapsedMilliseconds < FadeOutTimeoutMs)
+                Thread.Sleep(5);
+        }
 
         _output?.Stop();
         _output?.Dispose();

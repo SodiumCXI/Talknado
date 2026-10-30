@@ -114,9 +114,15 @@
                 </Image.Style>
             </Image>
 
-            <!-- Поверхность видео: без эффектов, прозрачности и трансформаций -->
+            <!--
+                Поверхность видео: без эффектов, прозрачности и трансформаций.
+                Кадр уже по размеру области, только ширина бывает на пиксель меньше
+                (она чётная) — его не растягивать, иначе мылится вся картинка.
+                Пока окно тянут, до нового размера кадра он только уменьшается.
+            -->
             <Image Source="{Binding VideoSurface}"
                    Stretch="Uniform"
+                   StretchDirection="DownOnly"
                    RenderOptions.BitmapScalingMode="LowQuality"
                    MouseLeftButtonUp="Video_MouseLeftButtonUp"/>
 
