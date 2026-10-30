@@ -198,6 +198,8 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         private const double QuietRms = 150;
         private int _minQueued = int.MaxValue;
         private int _excessFrames;
+        // Громкость, с которой ушёл прошлый кадр; -1 — кадров ещё не было
+        private float _appliedVolume = -1;
 
 
         public UserAudioStream(IUsersInfo usersInfo, ushort userId, string? deviceId)
@@ -310,6 +312,12 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             _queued = 0;
         }
 
+        private void ApplyVolume(float target)
+        {
+            VolumeController.AdjustVolume(_pcm, _appliedVolume, target);
+            _appliedVolume = target;
+        }
+
         /// <summary>
         /// Скорость воспроизведения задаёт устройство, поэтому тик не выдаёт пакет,
         /// а доливает буфер до целевого запаса.
@@ -317,6 +325,8 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         public void Playback()
         {
             var userVolumeMultiplier = _usersInfo.GetVolumeByUserId(_userId) / 50f;
+            if (_appliedVolume < 0)
+                _appliedVolume = userVolumeMultiplier;
 
             bool empty;
             lock (_queueLock)
@@ -378,7 +388,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                         continue;
                     }
 
-                    VolumeController.AdjustVolume(_pcm, userVolumeMultiplier);
+                    ApplyVolume(userVolumeMultiplier);
                     WaveProvider.AddSamples(_pcm, 0, _pcm.Length);
                     continue;
                 }
@@ -387,7 +397,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                 if (_hasPlayed && _concealed++ < MAX_CONCEALED_FRAMES)
                 {
                     _decoder.DecodePLC(_pcm);
-                    VolumeController.AdjustVolume(_pcm, userVolumeMultiplier);
+                    ApplyVolume(userVolumeMultiplier);
                     WaveProvider.AddSamples(_pcm, 0, _pcm.Length);
                 }
                 else
