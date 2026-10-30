@@ -39,6 +39,12 @@ public partial class MainWindowViewModel(IClientManager clientManager,
     public IHostPanelManager HostPanelManager => _hostPanelManager;
 
     public ObservableCollection<MessagesManager.Message> Messages => _messagesManager.Messages;
+
+    public event Action? MessageReceived
+    {
+        add => _messagesManager.MessageReceived += value;
+        remove => _messagesManager.MessageReceived -= value;
+    }
     public ObservableCollection<UsersInfo.UserItem> Users => _usersInfo.Users;
 
     [ObservableProperty]

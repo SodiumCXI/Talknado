@@ -1,9 +1,11 @@
 ﻿using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
@@ -30,7 +32,47 @@ public partial class MainWindow : TalknadoWindow, IMainWindow, IDisposable
         UseStateAnimations = false;
 
         InitializeComponent();
+
+        DataContextChanged += (_, e) =>
+        {
+            if (e.OldValue is MainWindowViewModel oldVm)
+                oldVm.MessageReceived -= FlashIfInactive;
+            if (e.NewValue is MainWindowViewModel newVm)
+                newVm.MessageReceived += FlashIfInactive;
+        };
     }
+
+    // Кнопка на панели задач мигает и остаётся подсвеченной, пока окно не станет активным.
+    private void FlashIfInactive()
+    {
+        if (IsActive)
+            return;
+
+        var info = new FLASHWINFO
+        {
+            cbSize = (uint)Marshal.SizeOf<FLASHWINFO>(),
+            hwnd = new WindowInteropHelper(this).Handle,
+            dwFlags = FLASHW_TRAY | FLASHW_TIMERNOFG
+        };
+        FlashWindowEx(ref info);
+    }
+
+    private const uint FLASHW_TRAY = 0x2;
+    private const uint FLASHW_TIMERNOFG = 0xC;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FLASHWINFO
+    {
+        public uint cbSize;
+        public IntPtr hwnd;
+        public uint dwFlags;
+        public uint uCount;
+        public uint dwTimeout;
+    }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool FlashWindowEx(ref FLASHWINFO info);
 
     // Фокус возвращается в поле ввода до открытия диалога: после его закрытия
     // окно восстановит фокус туда, и Enter отправит сообщение, а не нажмёт

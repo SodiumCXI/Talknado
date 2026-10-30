@@ -8,10 +8,15 @@ public interface IMessagesManager
 {
     void AddMessage(ushort userId, string message, Attachment? attachment = null);
     ObservableCollection<MessagesManager.Message> Messages { get; }
+    /// <summary>Сообщение от другого участника; из потока UI.</summary>
+    event Action? MessageReceived;
 }
-public partial class MessagesManager(IUsersInfo usersInfo) : ObservableObject, IMessagesManager
+public partial class MessagesManager(IUsersInfo usersInfo, IConnectionInfo connectionInfo) : ObservableObject, IMessagesManager
 {
     private readonly IUsersInfo _usersInfo = usersInfo;
+    private readonly IConnectionInfo _connectionInfo = connectionInfo;
+
+    public event Action? MessageReceived;
 
     [ObservableProperty]
     private ObservableCollection<Message> _messages = [];
@@ -39,6 +44,9 @@ public partial class MessagesManager(IUsersInfo usersInfo) : ObservableObject, I
                 var username = _usersInfo.GetUsernameByUserId(userId);
                 Messages.Add(new(userId, username, message, timestamp, attachment));
             }
+
+            if (userId != _connectionInfo.LocalUserId)
+                MessageReceived?.Invoke();
         });
     }
 
