@@ -2,7 +2,9 @@
 
 ## Description
 
-A lightweight, low-latency real-time communication application. Provides **voice chat, text messaging with file and media attachments, and hardware-accelerated screen sharing** in a single executable with an embedded server - no separate server installation required.
+A lightweight, low-latency real-time communication application. Provides **voice chat, text chat, file transfer and hardware-accelerated screen sharing** in a single executable with an embedded server - no separate server installation required.
+
+One participant hosts a session and shares the connection key, the others join with it. Files of any size are sent right in the chat and downloaded from the sender without being uploaded to a server first. Images and videos open in the built-in viewer. All traffic is encrypted, and the server only relays it without decrypting. The app works on a local network and over the internet with UPnP, ZeroTier or a dedicated Linux server.
 
 <p align="center">
   <img src="/docs/MainWindow-en.png" alt="Main window screenshot">
@@ -10,20 +12,15 @@ A lightweight, low-latency real-time communication application. Provides **voice
 
 ## Key Features
 
-- **Voice chat** with four noise suppression levels - None, Medium (RNNoise), Strong (DPDFNet-2, default) and Maximum (DPDFNet-8) - and packet loss concealment (Opus PLC)
-- **Screen sharing** up to 1080p at 60 fps with hardware H.264 encoding (NVENC → AMF → libx264 fallback)
-- **File, image and video attachments** - images and videos are shown right in the chat, videos play while still downloading and can be seeked
-- **Host panel**: kick participants, set the maximum screen share quality (720p30 / 1080p30 / 1080p60), limit the file transfer speed
-- **Per-user ping** next to every nickname, color-coded by latency
-- **CoreAudio audio stack** (WASAPI/MMDevice) for low-latency capture and playback
-- **Adaptive audio playback** with jitter estimation and a buffer that holds its target depth
-- **Adaptive screen-share playback** with per-frame delta timing and target-buffer logic
-- **UPnP automatic port forwarding** via Open.NAT (optional, one click)
-- **Encrypted traffic**: ECDH key exchange → AES-256-CBC session key for the whole session, delivered to each participant through their own ECDH secret; the server only relays messages, media and files and never decrypts them
-- **TCP + UDP transport on a single port** (LiteNetLib): control over TCP, files over a second TCP connection, media over UDP
-- **Transparent reconnect**: 5-second grace window on connection loss, no re-authentication
-- **Embedded server** - starts only when the user chooses to host; zero startup cost otherwise
-- **MVVM architecture** with dynamic DI containers (Microsoft.Extensions.DependencyInjection)
+- **Voice chat** with noise suppression (RNNoise, DPDFNet) and push-to-talk
+- **Text chat**
+- **File transfer** - send any file to the chat; others download it straight from you through the server, with no upload step and no size limit; images and videos open in the built-in viewer, videos can be watched before the download finishes
+- **Screen sharing** up to 1080p at 60 fps with hardware H.264 encoding and system audio
+- **Host panel** - participants, kick, maximum screen share quality, file transfer speed limit
+- **Encryption** - the server only relays messages, media and files and never decrypts them
+- **Embedded server** - host a session in one click, or use the **dedicated Linux server**
+- **UPnP port forwarding** and **automatic reconnect**
+- **Per-user ping** next to every nickname
 
 ## System Components
 
