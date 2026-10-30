@@ -311,16 +311,37 @@
     </Style>
 
     <!--
-        Разрыв связи. Не залит красным: постоянная красная плашка в окне,
-        где сидят часами, читается как тревога. Опасность проявляется
-        при наведении.
+        Отключиться, исключить из сессии. В покое не залита: постоянная красная
+        плашка в окне, где сидят часами, читается как тревога. Под курсором
+        значок красный на красноватой подложке: на серой подложке остальных
+        значковых кнопок красный тускнеет.
     -->
     <Style x:Key="DangerIconButtonStyle" TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Foreground" Value="{DynamicResource DangerBrightBrush}"/>
-            </Trigger>
-        </Style.Triggers>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{DynamicResource RadiusControl}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DangerIconHoverSurfaceBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource DangerIconBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DangerIconPressedSurfaceBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 

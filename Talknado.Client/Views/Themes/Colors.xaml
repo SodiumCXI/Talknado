@@ -54,8 +54,14 @@
     <!-- Состояния -->
     <Color x:Key="SpeakingColor">#35C2A8</Color>
     <Color x:Key="DangerColor">#EE7480</Color>
-    <!-- Значок разрыва связи под курсором: ярче обычного опасного -->
-    <Color x:Key="DangerBrightColor">#FF8F9B</Color>
+    <!--
+        Значки «отключиться» и «исключить из сессии» под курсором. Подложка
+        красноватая, а не серая: на сером красный значок тускнеет и сливается.
+        Светлее строки участника (SurfaceRaised), иначе на ней подложка — провал.
+    -->
+    <Color x:Key="DangerIconColor">#FF4D57</Color>
+    <Color x:Key="DangerIconHoverSurfaceColor">#4A3038</Color>
+    <Color x:Key="DangerIconPressedSurfaceColor">#3A252C</Color>
     <!--
         Заливка кнопки закрытия под курсором. Тёмная намеренно: на светлом
         красном крестик пришлось бы делать тёмным, а он должен остаться белым.

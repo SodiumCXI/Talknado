@@ -37,7 +37,9 @@
     <SolidColorBrush x:Key="IconActiveBrush" Color="{StaticResource IconActiveColor}" po:Freeze="True"/>
     <SolidColorBrush x:Key="SpeakingBrush" Color="{StaticResource SpeakingColor}" po:Freeze="True"/>
     <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" po:Freeze="True"/>
-    <SolidColorBrush x:Key="DangerBrightBrush" Color="{StaticResource DangerBrightColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="DangerIconBrush" Color="{StaticResource DangerIconColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="DangerIconHoverSurfaceBrush" Color="{StaticResource DangerIconHoverSurfaceColor}" po:Freeze="True"/>
+    <SolidColorBrush x:Key="DangerIconPressedSurfaceBrush" Color="{StaticResource DangerIconPressedSurfaceColor}" po:Freeze="True"/>
     <SolidColorBrush x:Key="DangerSurfaceBrush" Color="{StaticResource DangerSurfaceColor}" po:Freeze="True"/>
 
     <SolidColorBrush x:Key="ScrollThumbBrush" Color="{StaticResource ScrollThumbColor}" po:Freeze="True"/>
