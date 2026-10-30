@@ -35,6 +35,9 @@ public partial class MediaViewerViewModel(IMediaViewerManager mediaViewerManager
     private int _maxHeight;
     private int _viewportWidth;
     private int _viewportHeight;
+    private double _dpiScale = 1;
+    // Картинка пересчитывается под новый размер окна, когда изменение размера закончилось
+    private DispatcherTimer? _imageResizeTimer;
     private bool _rendering;
     private bool _isSeeking;
 
@@ -42,6 +45,10 @@ public partial class MediaViewerViewModel(IMediaViewerManager mediaViewerManager
 
     [ObservableProperty]
     private ImageSource? _image;
+
+    /// <summary>Картинка уже точно под область: окно выводит её один к одному, а не растягивает.</summary>
+    [ObservableProperty]
+    private bool _isImageFitted;
 
     [ObservableProperty]
     private WriteableBitmap? _videoSurface;
@@ -86,6 +93,7 @@ public partial class MediaViewerViewModel(IMediaViewerManager mediaViewerManager
             return;
 
         Image = _attachment.Thumbnail;
+        IsImageFitted = false;
         _attachment.PropertyChanged += OnAttachmentChanged;
 
         if (_attachment.IsVideo)
@@ -100,15 +108,33 @@ public partial class MediaViewerViewModel(IMediaViewerManager mediaViewerManager
             _attachment.PropertyChanged -= OnAttachmentChanged;
 
         StopVideo();
+        _imageResizeTimer?.Stop();
         _attachment = null;
         Image = null;
+        IsImageFitted = false;
     }
 
-    /// <summary>Размер области под видео в пикселях экрана.</summary>
-    public void SetViewport(int width, int height)
+    /// <summary>Размер области под картинку и видео в пикселях экрана.</summary>
+    public void SetViewport(int width, int height, double dpiScale)
     {
         _viewportWidth = width;
         _viewportHeight = height;
+        _dpiScale = dpiScale;
+
+        if (_attachment is not { IsImage: true })
+            return;
+
+        if (_imageResizeTimer == null)
+        {
+            _imageResizeTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(200) };
+            _imageResizeTimer.Tick += (_, _) =>
+            {
+                _imageResizeTimer.Stop();
+                LoadImage();
+            };
+        }
+        _imageResizeTimer.Stop();
+        _imageResizeTimer.Start();
     }
 
     private void OnAttachmentChanged(object? sender, PropertyChangedEventArgs e)
@@ -123,15 +149,20 @@ public partial class MediaViewerViewModel(IMediaViewerManager mediaViewerManager
         if (attachment?.State != AttachmentState.Ready || attachment.LocalPath is not { } path)
             return;
 
-        int width = _maxWidth;
+        int width = _viewportWidth > 0 ? _viewportWidth : _maxWidth;
+        int height = _viewportHeight > 0 ? _viewportHeight : _maxHeight;
+        double dpiScale = _dpiScale;
         Task.Run(() =>
         {
-            try { return MediaProbe.LoadImage(path, width); }
+            try { return MediaProbe.LoadImageFit(path, width, height, dpiScale); }
             catch { return null; }
         }).ContinueWith(t =>
         {
             if (t.Result != null && _attachment == attachment)
+            {
                 Image = t.Result;
+                IsImageFitted = true;
+            }
         }, TaskScheduler.FromCurrentSynchronizationContext());
     }
 

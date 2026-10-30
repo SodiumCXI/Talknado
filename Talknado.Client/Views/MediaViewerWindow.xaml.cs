@@ -177,7 +177,7 @@ public partial class MediaViewerWindow : TalknadoWindow
             return;
 
         var size = target.TransformToDevice.Transform(new Point(e.NewSize.Width, e.NewSize.Height));
-        vm.SetViewport((int)size.X, (int)size.Y);
+        vm.SetViewport((int)size.X, (int)size.Y, target.TransformToDevice.M11);
     }
 
     /// <summary>Рабочая область монитора в единицах WPF и размер монитора в пикселях.</summary>

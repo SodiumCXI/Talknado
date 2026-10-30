@@ -58,6 +58,63 @@ public static unsafe class MediaProbe
         return image;
     }
 
+    /// <summary>
+    /// Картинка точно под область в пикселях экрана, не крупнее своего размера.
+    /// Уменьшение WPF при выводе мягкое, поэтому окну отдаётся готовый размер
+    /// (Lanczos), и оно рисует картинку один к одному.
+    /// </summary>
+    public static BitmapSource LoadImageFit(string path, int maxWidth, int maxHeight, double dpiScale)
+    {
+        var (sourceWidth, sourceHeight) = ReadImageSize(path);
+        int width = sourceWidth, height = sourceHeight;
+        if (sourceWidth > maxWidth || sourceHeight > maxHeight)
+        {
+            if ((long)maxWidth * sourceHeight <= (long)maxHeight * sourceWidth)
+                (width, height) = (maxWidth, (int)((long)sourceHeight * maxWidth / sourceWidth));
+            else
+                (width, height) = ((int)((long)sourceWidth * maxHeight / sourceHeight), maxHeight);
+        }
+        width = Math.Max(1, width);
+        height = Math.Max(1, height);
+
+        // Большой снимок декодируется сразу вдвое крупнее нужного: целиком 50 Мп — это 200 МБ.
+        var source = new FormatConvertedBitmap(LoadImage(path, width * 2), PixelFormats.Pbgra32, null, 0);
+        int decodedWidth = source.PixelWidth, decodedHeight = source.PixelHeight;
+        var pixels = new byte[decodedWidth * decodedHeight * 4];
+        source.CopyPixels(pixels, decodedWidth * 4, 0);
+
+        var result = pixels;
+        if (decodedWidth != width || decodedHeight != height)
+        {
+            result = new byte[width * height * 4];
+            var context = ffmpeg.sws_getContext(decodedWidth, decodedHeight, AVPixelFormat.AV_PIX_FMT_BGRA,
+                width, height, AVPixelFormat.AV_PIX_FMT_BGRA, ffmpeg.SWS_LANCZOS, null, null, null);
+            if (context == null)
+                throw new InvalidOperationException();
+            try
+            {
+                fixed (byte* from = pixels)
+                fixed (byte* to = result)
+                {
+                    var sourceData = new byte_ptrArray4 { [0] = from };
+                    var sourceLines = new int_array4 { [0] = decodedWidth * 4 };
+                    var targetData = new byte_ptrArray4 { [0] = to };
+                    var targetLines = new int_array4 { [0] = width * 4 };
+                    ffmpeg.sws_scale(context, sourceData, sourceLines, 0, decodedHeight, targetData, targetLines);
+                }
+            }
+            finally
+            {
+                ffmpeg.sws_freeContext(context);
+            }
+        }
+
+        // Плотность под масштаб экрана: тогда размер картинки в единицах WPF равен области
+        var bitmap = BitmapSource.Create(width, height, 96 * dpiScale, 96 * dpiScale, PixelFormats.Pbgra32, null, result, width * 4);
+        bitmap.Freeze();
+        return bitmap;
+    }
+
     public static BitmapSource LoadImage(byte[] data)
     {
         using var stream = new MemoryStream(data);

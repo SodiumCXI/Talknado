@@ -77,6 +77,8 @@
                 Картинка вписывается в окно, но не крупнее своего размера. Рамка задана
                 размером из объявления, поэтому превью и догрузившаяся картинка
                 занимают одно и то же место, а не прыгают по своим размерам.
+                Догрузившаяся уже точно под область и только уменьшается — пока окно
+                тянут, до пересчёта под новый размер: так она выводится один к одному.
             -->
             <Image Source="{Binding Image}"
                    Stretch="Uniform"
@@ -88,6 +90,9 @@
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding Manager.Current.IsVideo}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsImageFitted}" Value="True">
+                                <Setter Property="StretchDirection" Value="DownOnly"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
