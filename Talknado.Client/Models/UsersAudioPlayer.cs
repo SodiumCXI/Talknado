@@ -1,6 +1,7 @@
 ﻿using NAudio.Wave;
 using NAudio.CoreAudioApi;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using Talknado.Client.Models.Helpers.Audio;
 using Talknado.Client.Models.Helpers.Network;
 using Talknado.Client.Properties.Localization;
@@ -80,6 +81,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
 
     private void PlaybackLoop()
     {
+        ProAudioThread.Enter();
         while (!_disposed)
         {
             PlaybackTick();
@@ -176,28 +178,24 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
         // его задержки, иначе устройство голодает. Здесь вдвое больше: 20 мс против 40.
         private const int OutputLatencyMilliseconds = 20;
         private const int MIN_BUFFER_FRAMES = 4;
-        private const int MAX_BUFFER_FRAMES = 20;
+        private const int MAX_BUFFER_FRAMES = 30;
         private const int FRAME_BYTES = 960;
+        private const int FRAME_MILLISECONDS = 10;
 
         private const int LOW_WATER_FRAMES = 2;
 
         // Дальше PLC тянет гул.
         private const int MAX_CONCEALED_FRAMES = 10;
 
-        private int _targetBufferFrames = 5;
+        // Запас — разброс задержки пакетов за минуту и ещё два кадра: пакеты идут
+        // парами раз в 20 мс, и вывод забирает звук порциями. PLC без сдвига номера
+        // растит задержку сверх запаса; лишнее уходит сжатием кадров, не чаще
+        // одного кадра из двух.
+        private readonly DelaySpread _delaySpread = new();
+        private int _targetBufferFrames = MIN_BUFFER_FRAMES;
+        private bool _compressedLast;
         private int _concealed;
-        private int _underruns;
-        private int _quietSeconds;
-        private int _playbackCounter;
         private bool _hasPlayed;
-
-        // PLC без сдвига номера растит задержку. Если 10 секунд не было опустошений,
-        // а очередь всё это время не опускалась ниже N, эти N кадров лишние: они
-        // выбрасываются на тихих кадрах, где пропуск не слышен. Короче окно нельзя:
-        // при повторяющихся замираниях запас нужен как раз на следующее.
-        private const double QuietRms = 150;
-        private int _minQueued = int.MaxValue;
-        private int _excessFrames;
         // Громкость, с которой ушёл прошлый кадр; -1 — кадров ещё не было
         private float _appliedVolume = -1;
 
@@ -225,8 +223,8 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                     Device = enumerator.GetDevice(deviceId);
                 }
 
-                WasapiOut = new WasapiOut(Device, AudioClientShareMode.Shared, false, OutputLatencyMilliseconds);
-                WasapiOut.Init(WaveProvider);
+                WasapiOut = new WasapiOut(Device, AudioClientShareMode.Shared, true, OutputLatencyMilliseconds);
+                WasapiOut.Init(new ProAudioWaveProvider(WaveProvider));
                 WasapiOut.Play();
             }
             catch (Exception ex)
@@ -237,8 +235,8 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                 {
                     var enumerator = new MMDeviceEnumerator();
                     Device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-                    WasapiOut = new WasapiOut(Device, AudioClientShareMode.Shared, false, OutputLatencyMilliseconds);
-                    WasapiOut.Init(WaveProvider);
+                    WasapiOut = new WasapiOut(Device, AudioClientShareMode.Shared, true, OutputLatencyMilliseconds);
+                    WasapiOut.Init(new ProAudioWaveProvider(WaveProvider));
                     WasapiOut.Play();
                 }
                 catch { /* ignore */ }
@@ -254,6 +252,8 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                     _next = sequence;
                     _started = true;
                 }
+
+                _delaySpread.Add(sequence, DelaySpread.NowMilliseconds());
 
                 int ahead = (short)(sequence - _next);
 
@@ -275,7 +275,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                 _filled[slot] = true;
                 _queued++;
 
-                int dropThreshold = Math.Max(_targetBufferFrames * 3, 30);
+                int dropThreshold = Math.Min(Math.Max(_targetBufferFrames * 3, 30), SlotCount - 4);
                 while (_queued > dropThreshold)
                 {
                     if (TakeNext(out var dropped))
@@ -312,9 +312,9 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
             _queued = 0;
         }
 
-        private void ApplyVolume(float target)
+        private void ApplyVolume(float target, int length)
         {
-            VolumeController.AdjustVolume(_pcm, _appliedVolume, target);
+            VolumeController.AdjustVolume(_pcm.AsSpan(0, length), _appliedVolume, target);
             _appliedVolume = target;
         }
 
@@ -329,8 +329,13 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                 _appliedVolume = userVolumeMultiplier;
 
             bool empty;
+            int spread;
             lock (_queueLock)
+            {
                 empty = _queued == 0;
+                spread = _delaySpread.Spread(DelaySpread.NowMilliseconds());
+            }
+            _targetBufferFrames = Math.Clamp(spread / FRAME_MILLISECONDS + 2, MIN_BUFFER_FRAMES, MAX_BUFFER_FRAMES);
 
             // Счёт ведётся по приходу пакетов, а не по факту выдачи: при полном
             // буфере тик ничего не берёт из очереди, и это не потеря.
@@ -338,12 +343,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                 ConsecutiveLosses++;
             else
                 ConsecutiveLosses = 0;
-
-            if (++_playbackCounter >= 100)
-            {
-                AdaptBufferSize();
-                _playbackCounter = 0;
-            }
 
             while (WaveProvider.BufferedBytes / FRAME_BYTES < _targetBufferFrames)
             {
@@ -360,10 +359,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                     if (present || _queued > 0)
                     {
                         TakeNext(out packet);
-                    }
-                    else
-                    {
-                        _underruns++;
                     }
                 }
 
@@ -382,14 +377,15 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                     _hasPlayed = true;
                     _concealed = 0;
 
-                    if (_excessFrames > 0 && Rms(_pcm) < QuietRms)
-                    {
-                        _excessFrames--;
-                        continue;
-                    }
+                    int length = _pcm.Length;
+                    bool compress = !_compressedLast
+                        && WaveProvider.BufferedBytes / FRAME_BYTES + Volatile.Read(ref _queued) > _targetBufferFrames + 1;
+                    if (compress)
+                        length = FrameCompressor.Compress(MemoryMarshal.Cast<byte, short>(_pcm.AsSpan())) * 2;
+                    _compressedLast = length < _pcm.Length;
 
-                    ApplyVolume(userVolumeMultiplier);
-                    WaveProvider.AddSamples(_pcm, 0, _pcm.Length);
+                    ApplyVolume(userVolumeMultiplier, length);
+                    WaveProvider.AddSamples(_pcm, 0, length);
                     continue;
                 }
 
@@ -397,7 +393,7 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                 if (_hasPlayed && _concealed++ < MAX_CONCEALED_FRAMES)
                 {
                     _decoder.DecodePLC(_pcm);
-                    ApplyVolume(userVolumeMultiplier);
+                    ApplyVolume(userVolumeMultiplier, _pcm.Length);
                     WaveProvider.AddSamples(_pcm, 0, _pcm.Length);
                 }
                 else
@@ -407,45 +403,6 @@ public class UsersAudioPlayer : IUsersAudioPlayer, IDisposable
                 }
             }
 
-            lock (_queueLock)
-                _minQueued = Math.Min(_minQueued, _queued);
-        }
-
-        private static double Rms(ReadOnlySpan<byte> pcm)
-        {
-            var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, short>(pcm);
-            double sum = 0;
-            foreach (short sample in samples)
-                sum += sample * sample;
-            return Math.Sqrt(sum / samples.Length);
-        }
-
-        private void AdaptBufferSize()
-        {
-            int underruns;
-            int minQueued;
-            lock (_queueLock)
-            {
-                underruns = _underruns;
-                _underruns = 0;
-                if (underruns > 0)
-                    _minQueued = int.MaxValue;
-                minQueued = _minQueued;
-            }
-
-            if (underruns >= 2)
-            {
-                _targetBufferFrames = Math.Min(_targetBufferFrames + 1, MAX_BUFFER_FRAMES);
-                _quietSeconds = 0;
-            }
-            else if (underruns == 0 && ++_quietSeconds >= 10)
-            {
-                _targetBufferFrames = Math.Max(_targetBufferFrames - 1, MIN_BUFFER_FRAMES);
-                _quietSeconds = 0;
-                _excessFrames = minQueued == int.MaxValue ? 0 : minQueued;
-                lock (_queueLock)
-                    _minQueued = int.MaxValue;
-            }
         }
 
         public void Dispose()

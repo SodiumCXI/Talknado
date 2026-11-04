@@ -173,6 +173,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
     // буфер под расшифровку общий на все пакеты.
     private void HandleReceiveAudio(CancellationToken token)
     {
+        ProAudioThread.Enter();
         var plain = new byte[CryptoSessionManager.EncryptedLength(HeaderSize + OpusCodecEncoder.MaxPacketSize)];
 
         while (!token.IsCancellationRequested)
@@ -212,6 +213,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
 
     private void HandleSendAudio(string? deviceId, CancellationToken token)
     {
+        ProAudioThread.Enter();
         MMDeviceEnumerator? enumerator = null;
         MMDevice? device = null;
         WasapiCapture? capture = null;
@@ -248,7 +250,8 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
             }
 
             // По умолчанию WASAPI отдаёт блоки по 50 мс, и кадры уходят в сеть пачками.
-            capture = new WasapiCapture(device, false, CaptureBufferMilliseconds);
+            // Чтение по сигналу устройства: сон в 10 мс таймер Windows растягивает до 15,6.
+            capture = new WasapiCapture(device, true, CaptureBufferMilliseconds);
 
             int targetSampleRate = 48000;
             int sourceSampleRate = capture.WaveFormat.SampleRate;
@@ -280,6 +283,7 @@ public partial class AudioManager : ObservableObject, IAudioManager, IDisposable
             // устройства, и буфер захвата переполняется.
             capture.DataAvailable += (s, e) =>
             {
+                ProAudioThread.Enter();
                 captureBuffer.AddSamples(e.Buffer, 0, e.BytesRecorded);
                 dataReady.Set();
             };

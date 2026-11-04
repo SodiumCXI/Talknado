@@ -58,6 +58,7 @@ public partial class LoopbackAudioCapture
 
     private static void OnAudioReceived(IntPtr data, int length)
     {
+        ProAudioThread.Enter();
         if (!_isEnabled) return;
 
         try
