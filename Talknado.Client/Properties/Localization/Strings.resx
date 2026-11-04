@@ -375,4 +375,13 @@
   <data name="ServerVersionUnsupportedText" xml:space="preserve">
     <value>The host runs an outdated Talknado version. The host needs to update the app.</value>
   </data>
+  <data name="UpdateInstallToolTip" xml:space="preserve">
+    <value>Update to version {0}</value>
+  </data>
+  <data name="UpdateDownloadToolTip" xml:space="preserve">
+    <value>Download version {0}</value>
+  </data>
+  <data name="UpdateFailedText" xml:space="preserve">
+    <value>Could not download the update</value>
+  </data>
 </root>

@@ -375,4 +375,13 @@
   <data name="ServerVersionUnsupportedText" xml:space="preserve">
     <value>主机的 Talknado 版本过旧。主机需要更新应用。</value>
   </data>
+  <data name="UpdateInstallToolTip" xml:space="preserve">
+    <value>更新到版本 {0}</value>
+  </data>
+  <data name="UpdateDownloadToolTip" xml:space="preserve">
+    <value>下载版本 {0}</value>
+  </data>
+  <data name="UpdateFailedText" xml:space="preserve">
+    <value>无法下载更新</value>
+  </data>
 </root>

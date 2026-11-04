@@ -375,4 +375,13 @@
   <data name="ServerVersionUnsupportedText" xml:space="preserve">
     <value>У хоста устаревшая версия Talknado. Хосту нужно обновить приложение.</value>
   </data>
+  <data name="UpdateInstallToolTip" xml:space="preserve">
+    <value>Обновить до версии {0}</value>
+  </data>
+  <data name="UpdateDownloadToolTip" xml:space="preserve">
+    <value>Скачать версию {0}</value>
+  </data>
+  <data name="UpdateFailedText" xml:space="preserve">
+    <value>Не удалось загрузить обновление</value>
+  </data>
 </root>

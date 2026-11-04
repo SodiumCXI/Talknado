@@ -834,5 +834,33 @@ namespace Talknado.Client.Properties.Localization {
                 return ResourceManager.GetString("ServerVersionUnsupportedText", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Update to version {0}.
+        /// </summary>
+        public static string UpdateInstallToolTip {
+            get {
+                return ResourceManager.GetString("UpdateInstallToolTip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Download version {0}.
+        /// </summary>
+        public static string UpdateDownloadToolTip {
+            get {
+                return ResourceManager.GetString("UpdateDownloadToolTip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Could not download the update.
+        /// </summary>
+        public static string UpdateFailedText {
+            get {
+                return ResourceManager.GetString("UpdateFailedText", resourceCulture);
+            }
+        }
+        
     }
 }

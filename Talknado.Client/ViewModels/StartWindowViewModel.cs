@@ -1,7 +1,11 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.ComponentModel;
+using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
+using Talknado.Client.Models;
 using Talknado.Client.Properties;
 using Talknado.Client.Properties.Localization;
 using Talknado.Server;
@@ -34,6 +38,13 @@ public partial class StartWindowViewModel : ObservableObject
     private bool _isUpnpEnabled;
     [ObservableProperty]
     private bool _isWaitingForConnection;
+    // Пустая строка — кнопки обновления нет
+    [ObservableProperty]
+    private string _updateButtonText = string.Empty;
+    [ObservableProperty]
+    private string _updateToolTip = string.Empty;
+
+    private AppUpdate? _update;
 
     public StartWindowViewModel()
     {
@@ -74,6 +85,50 @@ public partial class StartWindowViewModel : ObservableObject
             System.Diagnostics.Process.Start(Environment.ProcessPath!);
             Application.Current.Dispatcher.Invoke(Application.Current.Shutdown);
         }
+    }
+
+    public async Task CheckForUpdateAsync()
+    {
+        _update = await AppUpdate.FindNewerAsync();
+        if (_update == null)
+            return;
+
+        string version = _update.Version.ToString(3);
+        UpdateToolTip = string.Format(CanInstall(_update) ? Strings.UpdateInstallToolTip : Strings.UpdateDownloadToolTip, version);
+        UpdateButtonText = "v" + version;
+    }
+
+    private static bool CanInstall(AppUpdate update) => AppUpdate.IsInstalled && update.InstallerUrl != null;
+
+    [RelayCommand]
+    private async Task Update()
+    {
+        if (_update == null)
+            return;
+
+        ErrorMessage = string.Empty;
+        string versionText = UpdateButtonText;
+        try
+        {
+            if (!CanInstall(_update))
+                _update.OpenPage();
+            else
+            {
+                // Пока идёт загрузка, вместо версии на кнопке процент
+                UpdateButtonText = "0";
+                if (await _update.InstallAsync(new Progress<int>(percent => UpdateButtonText = percent.ToString())))
+                {
+                    _ = Application.Current.Dispatcher.BeginInvoke(Application.Current.Shutdown);
+                    return;
+                }
+            }
+        }
+        catch (Exception e) when (e is HttpRequestException or IOException or InvalidDataException
+                                      or TaskCanceledException or Win32Exception)
+        {
+            ErrorMessage = Strings.UpdateFailedText;
+        }
+        UpdateButtonText = versionText;
     }
 
     [RelayCommand]

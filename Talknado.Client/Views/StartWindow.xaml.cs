@@ -22,6 +22,7 @@ public partial class StartWindow : TalknadoWindow, IDisposable
         var startWindowViewModel = new StartWindowViewModel();
         startWindowViewModel.SetDispatcher(Dispatcher);
         DataContext = startWindowViewModel;
+        Loaded += async (_, _) => await startWindowViewModel.CheckForUpdateAsync();
 
         startWindowViewModel.PropertyChanged += (s, e) =>
         {

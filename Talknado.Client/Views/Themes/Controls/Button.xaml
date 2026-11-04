@@ -126,8 +126,9 @@
         <Setter Property="TextElement.FontWeight" Value="{DynamicResource WeightMedium}"/>
     </Style>
 
-    <!-- Первичное действие. Одно на экран -->
+    <!-- Первичное действие. Одно на экран, полужирное: читается первым -->
     <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+        <Setter Property="FontWeight" Value="{DynamicResource WeightMedium}"/>
         <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
         <Setter Property="Template">
@@ -150,9 +151,13 @@
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentPressedBrush}"/>
                         </Trigger>
+                        <!--
+                            Цвет недоступной — у самой кнопки, а не у ContentPresenter:
+                            разметка внутри кнопки наследует цвет от кнопки, минуя его.
+                        -->
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
-                            <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource TextDisabledBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

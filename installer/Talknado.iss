@@ -52,3 +52,7 @@ Name: "startmenuicon"; Description: "{cm:StartMenuIcon}"; GroupDescription: "{cm
 [Icons]
 Name: "{commondesktop}\Talknado"; Filename: "{app}\Talknado.Client.exe"; Tasks: desktopicon
 Name: "{autoprograms}\Talknado"; Filename: "{app}\Talknado.Client.exe"; Tasks: startmenuicon
+
+[Run]
+; Без skipifsilent: тихое обновление из программы тоже запускает её после установки.
+Filename: "{app}\Talknado.Client.exe"; Description: "{cm:LaunchProgram,Talknado}"; Flags: nowait postinstall

@@ -188,16 +188,37 @@
                        HorizontalAlignment="Center"
                        Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
 
-            <ComboBox Style="{DynamicResource ComboBoxStyle}"
-                      ItemContainerStyle="{DynamicResource ComboBoxItemStyle}"
-                      SelectedIndex="{Binding SelectedLanguageIndex}"
-                      Margin="{DynamicResource GapBlockTop}"
-                      HorizontalAlignment="Center"
-                      MinWidth="130">
-                <ComboBoxItem Content="English" Tag="en"/>
-                <ComboBoxItem Content="Русский" Tag="ru"/>
-                <ComboBoxItem Content="中文" Tag="zh"/>
-            </ComboBox>
+            <!-- Кнопка новой версии появляется, только если на GitHub есть релиз новее -->
+            <StackPanel Orientation="Horizontal"
+                        Margin="{DynamicResource GapBlockTop}"
+                        HorizontalAlignment="Center">
+                <Button Style="{DynamicResource PrimaryButtonStyle}"
+                        ToolTip="{Binding UpdateToolTip}"
+                        Command="{Binding UpdateCommand}"
+                        Margin="{DynamicResource GapBlockInline}"
+                        Cursor="Hand"
+                        Visibility="{Binding UpdateButtonText, Converter={StaticResource StringToVisibilityConverter}}">
+                    <!-- Во время загрузки — процент; знак берёт цвет числа, в том числе недоступный -->
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="UpdateButtonLabel"
+                                   Text="{Binding UpdateButtonText}"
+                                   VerticalAlignment="Center"/>
+                        <Path Style="{DynamicResource PercentGlyphStyle}"
+                              Data="{StaticResource IconPercent}"
+                              Stroke="{Binding Foreground, ElementName=UpdateButtonLabel}"
+                              Visibility="{Binding UpdateCommand.IsRunning, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    </StackPanel>
+                </Button>
+
+                <ComboBox Style="{DynamicResource ComboBoxStyle}"
+                          ItemContainerStyle="{DynamicResource ComboBoxItemStyle}"
+                          SelectedIndex="{Binding SelectedLanguageIndex}"
+                          MinWidth="130">
+                    <ComboBoxItem Content="English" Tag="en"/>
+                    <ComboBoxItem Content="Русский" Tag="ru"/>
+                    <ComboBoxItem Content="中文" Tag="zh"/>
+                </ComboBox>
+            </StackPanel>
         </StackPanel>
     </Grid>
 </local:TalknadoWindow>
