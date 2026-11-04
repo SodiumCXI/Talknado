@@ -13,6 +13,8 @@
         <Setter Property="FontWeight" Value="{DynamicResource WeightRegular}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="Padding" Value="{DynamicResource PadControl}"/>
+        <!-- Недоступный вариант мышь не получает, и над ним остаётся стрелка -->
+        <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBoxItem">
@@ -30,6 +32,7 @@
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
+                            <Setter Property="FontWeight" Value="{DynamicResource WeightMedium}"/>
                         </Trigger>
                         <!-- Недоступный вариант: виден, но не выбирается -->
                         <Trigger Property="IsEnabled" Value="False">

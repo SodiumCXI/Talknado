@@ -59,7 +59,7 @@
         красноватая, а не серая: на сером красный значок тускнеет и сливается.
         Светлее строки участника (SurfaceRaised), иначе на ней подложка — провал.
     -->
-    <Color x:Key="DangerIconColor">#FF4D57</Color>
+    <Color x:Key="DangerIconColor">#FF616A</Color>
     <Color x:Key="DangerIconHoverSurfaceColor">#4A3038</Color>
     <Color x:Key="DangerIconPressedSurfaceColor">#3A252C</Color>
     <!--
