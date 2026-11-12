@@ -146,7 +146,7 @@
 
 
                             <Button Grid.Column="2"
-                                    Margin="{DynamicResource GapInline}"
+                                    Margin="{DynamicResource GapUserButtons}"
                                     Style="{DynamicResource IconButtonRaisedStyle}"
                                     Click="ViewScreenShareButton_Click"
                                     Cursor="Hand"
