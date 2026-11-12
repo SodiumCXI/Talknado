@@ -26,6 +26,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ArchitecturesAllowed=x64compatible
 SetupIconFile=..\Talknado.Client\Resources\talknado_1.ico
 UninstallDisplayIcon={app}\Talknado.Client.exe
+; В конце установки Explorer сбрасывает кэш значков: иначе ярлык на прежнем
+; месте показывает значок старой версии программы.
+ChangesAssociations=yes
 ShowLanguageDialog=auto
 
 [Languages]
