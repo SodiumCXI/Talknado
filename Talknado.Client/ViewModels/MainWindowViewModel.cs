@@ -150,16 +150,9 @@ public partial class MainWindowViewModel(IClientManager clientManager,
     {
         if (!_screenShareManager.IsSharing)
         {
+            // Окно выбора и при одном мониторе: в нём ещё звук и качество показа
             _screenMonitorManager.CaptureAll();
-
-            if (_screenMonitorManager.Monitors.Count == 1)
-            {
-                _clientManager.ToggleScreenShare();
-            }
-            else
-            {
-                _screenMonitorManager.IsWindowVisible = true;
-            }
+            _screenMonitorManager.IsWindowVisible = true;
         }
         else
             _clientManager.ToggleScreenShare();
