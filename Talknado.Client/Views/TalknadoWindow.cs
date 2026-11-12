@@ -385,8 +385,6 @@ public partial class TalknadoWindow : Window
         }
     }
 
-    // ---------- Системный заголовок ----------
-
     private const int WM_GETMINMAXINFO = 0x0024;
     private const int WM_NCHITTEST = 0x0084;
     private const int WM_NCLBUTTONDOWN = 0x00A1;

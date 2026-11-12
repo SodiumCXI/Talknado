@@ -1,7 +1,4 @@
-﻿; Установщик Talknado для Inno Setup 7.
-; Собирается из папки публикации клиента (профиль win-x64-portable):
-;   ISCC.exe /DAppVersion=2.0.0 installer\Talknado.iss
-; Пути — от папки этого файла.
+﻿; Собирается из папки публикации клиента, профиль win-x64-portable.
 
 #ifndef AppVersion
   #error Pass the version: ISCC /DAppVersion=X.Y.Z installer\Talknado.iss
@@ -11,8 +8,8 @@
 #endif
 
 [Setup]
-; AppId совпадает с прежним значением по умолчанию (AppName): иначе Windows
-; не узнала бы уже установленную программу и поставила вторую копию.
+; AppId равен AppName: под этим ключом записаны уже установленные копии,
+; с другим Windows поставила бы вторую.
 AppId=Talknado
 AppName=Talknado
 AppVersion={#AppVersion}

@@ -9,7 +9,6 @@ public partial class MonitorSelectionWindow : TalknadoWindow, IDisposable
 {
     public MonitorSelectionWindow()
     {
-        // Своя анимация свёртывания требует AllowsTransparency, которого у окна нет.
         UseSystemCaption = true;
         UseStateAnimations = false;
 

@@ -69,7 +69,6 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Полоса заголовка -->
         <Grid Grid.Row="0" x:Name="TitleBar"
               Height="{DynamicResource TitleBarHeight}"
               Background="{DynamicResource ChromeBrush}">
@@ -100,7 +99,6 @@
             </Button>
         </Grid>
 
-        <!-- Содержимое -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="286" MinWidth="286" MaxWidth="482"/>

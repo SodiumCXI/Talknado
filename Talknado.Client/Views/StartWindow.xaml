@@ -188,7 +188,6 @@
                        HorizontalAlignment="Center"
                        Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
 
-            <!-- Кнопка новой версии появляется, только если на GitHub есть релиз новее -->
             <StackPanel Orientation="Horizontal"
                         Margin="{DynamicResource GapBlockTop}"
                         HorizontalAlignment="Center">

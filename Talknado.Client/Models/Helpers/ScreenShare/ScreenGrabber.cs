@@ -34,7 +34,7 @@ public static class ScreenGrabber
     private static int _lastWidth;
     private static int _lastHeight;
     private static long _lastFrameTimestamp = 0;
-    private static readonly long _forceFrameInterval = Stopwatch.Frequency; // 1 сек
+    private static readonly long _forceFrameInterval = Stopwatch.Frequency;
 
     /// <summary>Когда содержимое последнего кадра появилось на экране, в тиках <see cref="Stopwatch"/>.</summary>
     public static long FrameTimestamp { get; private set; }

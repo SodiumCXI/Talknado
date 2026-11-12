@@ -84,7 +84,6 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
-                            <!-- Аватар: цвет по нику, при перезапуске тот же -->
                             <Grid Grid.Column="0"
                                   Width="{DynamicResource AvatarSize}"
                                   Height="{DynamicResource AvatarSize}"
@@ -107,7 +106,6 @@
                                             Orientation="Horizontal"
                                             VerticalAlignment="Center"
                                             Margin="{DynamicResource GapInline}">
-                                    <!-- Виден только выключенный микрофон -->
                                     <Path x:Name="MicOffIcon"
                                           Style="{DynamicResource IconStyle}"
                                           Data="{StaticResource IconMicOff}"
@@ -147,7 +145,6 @@
                             </DockPanel>
 
 
-                            <!-- Смотреть демонстрацию экрана -->
                             <Button Grid.Column="2"
                                     Margin="{DynamicResource GapInline}"
                                     Style="{DynamicResource IconButtonRaisedStyle}"

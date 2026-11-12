@@ -13,7 +13,6 @@ public partial class StartWindow : TalknadoWindow, IDisposable
 
     public StartWindow()
     {
-        // Своя анимация свёртывания требует AllowsTransparency, которого у окна нет.
         UseSystemCaption = true;
         UseStateAnimations = false;
 

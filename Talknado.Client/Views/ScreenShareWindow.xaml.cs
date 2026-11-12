@@ -10,7 +10,6 @@ public partial class ScreenShareWindow : TalknadoWindow, IDisposable
 {
     public ScreenShareWindow()
     {
-        // Своя анимация свёртывания требует AllowsTransparency, которого у окна нет.
         UseSystemCaption = true;
         UseStateAnimations = false;
 

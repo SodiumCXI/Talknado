@@ -18,7 +18,6 @@ public partial class MediaViewerWindow : TalknadoWindow
 
     public MediaViewerWindow()
     {
-        // Своя анимация свёртывания требует AllowsTransparency, которого у окна нет.
         UseSystemCaption = true;
         UseStateAnimations = false;
 

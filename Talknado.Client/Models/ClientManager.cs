@@ -561,7 +561,6 @@ public class ClientManager(IUsersInfo usersInfo,
 
                 break;
 
-            // Remove user
             // Microphone: номер участника и включён ли
             case var _ when command.Equals("#MIC"):
 
@@ -570,6 +569,7 @@ public class ClientManager(IUsersInfo usersInfo,
 
                 break;
 
+            // Remove user
             case var _ when command.Equals("#REM"):
 
                 var userIdREM = BitConverter.ToUInt16(body);

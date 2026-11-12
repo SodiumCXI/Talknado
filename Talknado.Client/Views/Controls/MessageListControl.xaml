@@ -16,7 +16,6 @@
         <cnv:UsernameToAvatarBrushConverter x:Key="AvatarBrushConverter"/>
         <cnv:ImageFillConverter x:Key="ImageFillConverter"/>
 
-        <!-- Полоса загрузки вложения: видна только пока идёт загрузка -->
         <Style x:Key="AttachmentProgressStyle" TargetType="ProgressBar" BasedOn="{StaticResource ThinProgressBarStyle}">
             <Setter Property="Visibility" Value="Collapsed"/>
             <Style.Triggers>
@@ -345,7 +344,6 @@
             </ListBox.ItemTemplate>
         </ListBox>
 
-        <!-- Пустое состояние: не забытый серый прямоугольник -->
         <TextBlock Text="{x:Static l:Strings.EmptyMessagesText}"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"

@@ -27,7 +27,6 @@ public partial class MainWindow : TalknadoWindow, IMainWindow, IDisposable
 
     public MainWindow()
     {
-        // Своя анимация свёртывания требует AllowsTransparency, которого у окна нет.
         UseSystemCaption = true;
         UseStateAnimations = false;
 
