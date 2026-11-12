@@ -111,21 +111,59 @@ public partial class MainWindow : TalknadoWindow, IMainWindow, IDisposable
                 vm.Attach(files[0]!);
                 e.Handled = true;
             }
-            else if (Clipboard.ContainsImage() && Clipboard.GetImage() is { } image)
+            else if (SaveClipboardImage() is { } path)
             {
-                Directory.CreateDirectory(FileTransferManager.CacheDirectory);
-                var path = Path.Combine(FileTransferManager.CacheDirectory, $"image_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-
-                var encoder = new PngBitmapEncoder();
-                encoder.Frames.Add(BitmapFrame.Create(image));
-                using (var stream = File.Create(path))
-                    encoder.Save(stream);
-
                 vm.Attach(path);
                 e.Handled = true;
             }
         }
         catch { /* буфер обмена занят другим приложением: вставка не происходит */ }
+    }
+
+    /// <summary>
+    /// Готовый PNG из буфера сохраняется как есть. Иначе берётся растр (DIB): у
+    /// 32-битного DIB многие программы, Telegram и браузеры, оставляют альфу нулевой,
+    /// WPF читает такую картинку полностью прозрачной, и вложение выходит пустым.
+    /// </summary>
+    private static string? SaveClipboardImage()
+    {
+        var png = Clipboard.GetData("PNG") as MemoryStream ?? Clipboard.GetData("image/png") as MemoryStream;
+        BitmapSource? image = null;
+        if (png == null)
+        {
+            if (!Clipboard.ContainsImage() || Clipboard.GetImage() is not { } bitmap)
+                return null;
+            image = bitmap.Format == PixelFormats.Bgra32 && IsFullyTransparent(bitmap)
+                ? new FormatConvertedBitmap(bitmap, PixelFormats.Bgr32, null, 0)
+                : bitmap;
+        }
+
+        Directory.CreateDirectory(FileTransferManager.CacheDirectory);
+        var path = Path.Combine(FileTransferManager.CacheDirectory, $"image_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+        using var file = File.Create(path);
+        if (png != null)
+        {
+            png.CopyTo(file);
+        }
+        else
+        {
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(image!));
+            encoder.Save(file);
+        }
+        return path;
+    }
+
+    private static bool IsFullyTransparent(BitmapSource image)
+    {
+        var pixels = new byte[image.PixelWidth * image.PixelHeight * 4];
+        image.CopyPixels(pixels, image.PixelWidth * 4, 0);
+        for (int i = 3; i < pixels.Length; i += 4)
+        {
+            if (pixels[i] != 0)
+                return false;
+        }
+        return true;
     }
 
     protected override void OnCloseButtonClick()
