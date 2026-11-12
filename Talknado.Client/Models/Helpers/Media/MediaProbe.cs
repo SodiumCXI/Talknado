@@ -58,14 +58,9 @@ public static unsafe class MediaProbe
         return image;
     }
 
-    /// <summary>
-    /// Картинка точно под область в пикселях экрана, не крупнее своего размера.
-    /// Уменьшение WPF при выводе мягкое, поэтому окну отдаётся готовый размер
-    /// (Lanczos), и оно рисует картинку один к одному.
-    /// </summary>
-    public static BitmapSource LoadImageFit(string path, int maxWidth, int maxHeight, double dpiScale)
+    /// <summary>Размер картинки, вписанной в область, в пикселях; не крупнее своего.</summary>
+    public static (int Width, int Height) FitSize(int sourceWidth, int sourceHeight, int maxWidth, int maxHeight)
     {
-        var (sourceWidth, sourceHeight) = ReadImageSize(path);
         int width = sourceWidth, height = sourceHeight;
         if (sourceWidth > maxWidth || sourceHeight > maxHeight)
         {
@@ -74,45 +69,93 @@ public static unsafe class MediaProbe
             else
                 (width, height) = ((int)((long)sourceWidth * maxHeight / sourceHeight), maxHeight);
         }
-        width = Math.Max(1, width);
-        height = Math.Max(1, height);
+        return (Math.Max(1, width), Math.Max(1, height));
+    }
 
-        // Большой снимок декодируется сразу вдвое крупнее нужного: целиком 50 Мп — это 200 МБ.
-        var source = new FormatConvertedBitmap(LoadImage(path, width * 2), PixelFormats.Pbgra32, null, 0);
-        int decodedWidth = source.PixelWidth, decodedHeight = source.PixelHeight;
-        var pixels = new byte[decodedWidth * decodedHeight * 4];
-        source.CopyPixels(pixels, decodedWidth * 4, 0);
+    /// <summary>
+    /// Уровни для приближения: вся картинка и её уменьшения вдвое, вдвое… — пока
+    /// больше <paramref name="minWidth"/>; первым идёт самый крупный. Видеокарта
+    /// уменьшает простой выборкой, а она больше чем вдвое даёт ступеньки и рябь,
+    /// поэтому окно выводит ближайший уровень не меньше нужного размера.
+    /// Длинная сторона не больше <paramref name="maxSide"/>: крупнее видеокарта может
+    /// не принять текстурой, и WPF рисовал бы её процессором.
+    /// </summary>
+    public static List<BitmapSource> LoadZoomLevels(string path, int maxSide, int minWidth)
+    {
+        var (sourceWidth, sourceHeight) = ReadImageSize(path);
+        int longest = Math.Max(sourceWidth, sourceHeight);
+        var levels = new List<BitmapSource> { LoadImage(path, longest > maxSide ? (int)((long)sourceWidth * maxSide / longest) : 0) };
 
-        var result = pixels;
-        if (decodedWidth != width || decodedHeight != height)
+        int width = levels[0].PixelWidth, height = levels[0].PixelHeight;
+        if (width / 2 <= minWidth)
+            return levels;
+
+        var pixels = CopyPixels(levels[0]);
+        while (width / 2 > minWidth)
         {
-            result = new byte[width * height * 4];
-            var context = ffmpeg.sws_getContext(decodedWidth, decodedHeight, AVPixelFormat.AV_PIX_FMT_BGRA,
-                width, height, AVPixelFormat.AV_PIX_FMT_BGRA, ffmpeg.SWS_LANCZOS, null, null, null);
-            if (context == null)
-                throw new InvalidOperationException();
-            try
-            {
-                fixed (byte* from = pixels)
-                fixed (byte* to = result)
-                {
-                    var sourceData = new byte_ptrArray4 { [0] = from };
-                    var sourceLines = new int_array4 { [0] = decodedWidth * 4 };
-                    var targetData = new byte_ptrArray4 { [0] = to };
-                    var targetLines = new int_array4 { [0] = width * 4 };
-                    ffmpeg.sws_scale(context, sourceData, sourceLines, 0, decodedHeight, targetData, targetLines);
-                }
-            }
-            finally
-            {
-                ffmpeg.sws_freeContext(context);
-            }
+            int halfWidth = width / 2, halfHeight = Math.Max(1, height / 2);
+            pixels = Resize(pixels, width, height, halfWidth, halfHeight);
+            (width, height) = (halfWidth, halfHeight);
+            levels.Add(CreateBitmap(pixels, width, height));
         }
+        return levels;
+    }
 
-        // Плотность под масштаб экрана: тогда размер картинки в единицах WPF равен области
-        var bitmap = BitmapSource.Create(width, height, 96 * dpiScale, 96 * dpiScale, PixelFormats.Pbgra32, null, result, width * 4);
+    /// <summary>
+    /// Картинка ровно заданного размера в пикселях экрана. Уменьшение WPF при
+    /// выводе мягкое, поэтому окну отдаётся готовый размер (Lanczos), и оно
+    /// рисует картинку один к одному.
+    /// </summary>
+    public static BitmapSource LoadImageScaled(string path, int width, int height)
+    {
+        // Большой снимок декодируется сразу вдвое крупнее нужного: целиком 50 Мп — это 200 МБ.
+        var decoded = LoadImage(path, width * 2);
+        var pixels = CopyPixels(decoded);
+        if (decoded.PixelWidth != width || decoded.PixelHeight != height)
+            pixels = Resize(pixels, decoded.PixelWidth, decoded.PixelHeight, width, height);
+        return CreateBitmap(pixels, width, height);
+    }
+
+    private static byte[] CopyPixels(BitmapSource image)
+    {
+        var source = new FormatConvertedBitmap(image, PixelFormats.Pbgra32, null, 0);
+        var pixels = new byte[source.PixelWidth * source.PixelHeight * 4];
+        source.CopyPixels(pixels, source.PixelWidth * 4, 0);
+        return pixels;
+    }
+
+    private static BitmapSource CreateBitmap(byte[] pixels, int width, int height)
+    {
+        var bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Pbgra32, null, pixels, width * 4);
         bitmap.Freeze();
         return bitmap;
+    }
+
+    /// <summary>Lanczos: BGRA <paramref name="width"/>×<paramref name="height"/> в новый размер.</summary>
+    private static byte[] Resize(byte[] pixels, int width, int height, int newWidth, int newHeight)
+    {
+        var result = new byte[newWidth * newHeight * 4];
+        var context = ffmpeg.sws_getContext(width, height, AVPixelFormat.AV_PIX_FMT_BGRA,
+            newWidth, newHeight, AVPixelFormat.AV_PIX_FMT_BGRA, ffmpeg.SWS_LANCZOS, null, null, null);
+        if (context == null)
+            throw new InvalidOperationException();
+        try
+        {
+            fixed (byte* from = pixels)
+            fixed (byte* to = result)
+            {
+                var sourceData = new byte_ptrArray4 { [0] = from };
+                var sourceLines = new int_array4 { [0] = width * 4 };
+                var targetData = new byte_ptrArray4 { [0] = to };
+                var targetLines = new int_array4 { [0] = newWidth * 4 };
+                ffmpeg.sws_scale(context, sourceData, sourceLines, 0, height, targetData, targetLines);
+            }
+        }
+        finally
+        {
+            ffmpeg.sws_freeContext(context);
+        }
+        return result;
     }
 
     public static BitmapSource LoadImage(byte[] data)

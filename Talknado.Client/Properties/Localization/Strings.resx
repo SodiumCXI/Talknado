@@ -249,6 +249,9 @@
   <data name="ScreenShareTooltip" xml:space="preserve">
     <value>Share screen</value>
   </data>
+  <data name="ZoomTooltip" xml:space="preserve">
+    <value>Zoom</value>
+  </data>
   <data name="VolumeTooltip" xml:space="preserve">
     <value>Volume</value>
   </data>

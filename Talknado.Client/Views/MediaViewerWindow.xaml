@@ -8,6 +8,7 @@
         xmlns:vm="clr-namespace:Talknado.Client.ViewModels"
         xmlns:m="clr-namespace:Talknado.Client.Models"
         xmlns:cnv="clr-namespace:Talknado.Client.Views.Converters"
+        xmlns:ctl="clr-namespace:Talknado.Client.Views.Controls"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MediaViewerViewModel}"
@@ -28,6 +29,7 @@
     <local:TalknadoWindow.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <cnv:BufferedRangesBrushConverter x:Key="BufferedRangesBrushConverter" Fill="{StaticResource TrackBufferedBrush}"/>
+        <cnv:ZoomSliderConverter x:Key="ZoomSliderConverter"/>
     </local:TalknadoWindow.Resources>
 
     <!--
@@ -74,30 +76,49 @@
         <!-- Область под картинку: по её размеру плеер выбирает размер кадра -->
         <Grid Grid.Row="1" SizeChanged="MediaArea_SizeChanged">
             <!--
-                Картинка вписывается в окно, но не крупнее своего размера. Рамка задана
-                размером из объявления, поэтому превью и догрузившаяся картинка
-                занимают одно и то же место, а не прыгают по своим размерам.
-                Догрузившаяся уже точно под область и только уменьшается — пока окно
-                тянут, до пересчёта под новый размер: так она выводится один к одному.
+                Рамка картинки — размер исходника, вписанный в окно и не крупнее его самого;
+                считает её ViewModel. Превью, вписанная и приближенная растягиваются ровно
+                в эту рамку (Fill), поэтому при смене одной на другую ничего не сдвигается:
+                собственные пропорции у каждой из-за округления свои, на доли пикселя,
+                а ZoomPanel эту разницу увеличивает.
+                Вписанная загружена ровно под рамку и выводится один к одному. Под ней
+                с самого открытия лежат уровни для приближения (ZoomLayersView): вся картинка
+                и её уменьшения вдвое. Масштабирует их видеокарта простой выборкой
+                (LowQuality) — без подготовки процессором на каждом новом масштабе; уровень
+                выбирается так, что уменьшать приходится не больше чем вдвое, и ряби нет.
+                При приближении вписанная прячется.
+                Пока окно тянут, картинка растягивается под новую рамку до пересчёта.
             -->
-            <Image Source="{Binding Image}"
-                   Stretch="Uniform"
-                   MaxWidth="{Binding Manager.Current.PixelWidth}"
-                   MaxHeight="{Binding Manager.Current.PixelHeight}"
-                   RenderOptions.BitmapScalingMode="HighQuality">
-                <Image.Style>
-                    <Style TargetType="Image">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Manager.Current.IsVideo}" Value="True">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IsImageFitted}" Value="True">
-                                <Setter Property="StretchDirection" Value="DownOnly"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Image.Style>
-            </Image>
+            <ctl:ZoomPanel Zoom="{Binding ImageZoom}">
+                <Grid Width="{Binding ImageWidth}"
+                      Height="{Binding ImageHeight}">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Manager.Current.IsVideo}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <ctl:ZoomLayersView Layers="{Binding ZoomLayers}"
+                                        ShownLayer="{Binding ShownZoomLayer}"
+                                        RenderOptions.BitmapScalingMode="LowQuality"/>
+                    <Image Source="{Binding Image}"
+                           Stretch="Fill"
+                           RenderOptions.BitmapScalingMode="HighQuality">
+                        <Image.Style>
+                            <Style TargetType="Image">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsZoomImageShown}" Value="True">
+                                        <Setter Property="Visibility" Value="Hidden"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Image.Style>
+                    </Image>
+                </Grid>
+            </ctl:ZoomPanel>
 
             <!-- Превью видео, пока плеер открывает файл -->
             <Image Source="{Binding Image}"
@@ -168,6 +189,31 @@
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
+            </Border>
+
+            <!-- Масштаб картинки; колесо мыши приближает к курсору, приближенное тянется мышью -->
+            <Border Style="{DynamicResource RaisedStyle}"
+                    Padding="{DynamicResource PadControl}"
+                    Height="{DynamicResource ControlHeight}"
+                    Margin="{DynamicResource ZoomBarMargin}"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Visibility="{Binding IsImageFitted, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Orientation="Horizontal">
+                    <Path Style="{DynamicResource IconStyle}"
+                          Stroke="{DynamicResource TextMutedBrush}"
+                          Data="{StaticResource IconZoom}"
+                          Margin="{DynamicResource GapInline}"
+                          VerticalAlignment="Center"/>
+                    <Slider Style="{DynamicResource VolumeSliderStyle}"
+                            Width="{DynamicResource ZoomSliderWidth}"
+                            Minimum="0"
+                            Maximum="1"
+                            SmallChange="0.1" LargeChange="0.25"
+                            Value="{Binding ImageZoom, Converter={StaticResource ZoomSliderConverter}}"
+                            VerticalAlignment="Center"
+                            ToolTip="{x:Static l:Strings.ZoomTooltip}"/>
+                </StackPanel>
             </Border>
         </Grid>
 

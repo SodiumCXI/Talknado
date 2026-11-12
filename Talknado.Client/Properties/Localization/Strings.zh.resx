@@ -249,6 +249,9 @@
   <data name="ScreenShareTooltip" xml:space="preserve">
     <value>共享屏幕</value>
   </data>
+  <data name="ZoomTooltip" xml:space="preserve">
+    <value>缩放</value>
+  </data>
   <data name="VolumeTooltip" xml:space="preserve">
     <value>音量</value>
   </data>

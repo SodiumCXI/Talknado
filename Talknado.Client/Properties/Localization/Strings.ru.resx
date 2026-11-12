@@ -249,6 +249,9 @@
   <data name="ScreenShareTooltip" xml:space="preserve">
     <value>Демонстрация экрана</value>
   </data>
+  <data name="ZoomTooltip" xml:space="preserve">
+    <value>Масштаб</value>
+  </data>
   <data name="VolumeTooltip" xml:space="preserve">
     <value>Громкость</value>
   </data>

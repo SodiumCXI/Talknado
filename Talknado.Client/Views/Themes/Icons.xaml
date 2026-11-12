@@ -28,6 +28,8 @@
     <!-- Демонстрация экрана -->
     <PathGeometry x:Key="IconScreenShare" Figures="M0 0M24 24 M2.5 3.6h19v13.2h-19z M7.6 21.5h8.8 M12 16.8v4.7 M12 13.6V5.8 M9 8.8L12 5.8l3 3" po:Freeze="True"/>
     <PathGeometry x:Key="IconScreenShareStop" Figures="M0 0M24 24 M2.5 3.6h19v13.2h-19z M7.6 21.5h8.8 M12 16.8v4.7 M8.9 6.9h6.2v6.2h-6.2z" po:Freeze="True"/>
+    <!-- Лупа: масштаб картинки в окне просмотра -->
+    <PathGeometry x:Key="IconZoom" Figures="M0 0M24 24 M10.5 2.5a8 8 0 1 0 0 16 8 8 0 1 0 0-16z M16.2 16.2l5.3 5.3" po:Freeze="True"/>
     <!-- Две диагональные стрелки наружу: значок «раскрыть» -->
     <PathGeometry x:Key="IconExpand" Figures="M0 0M24 24 M14.5 2.5h7v7 M21.5 2.5l-8 8 M9.5 21.5h-7v-7 M2.5 21.5l8-8" po:Freeze="True"/>
 

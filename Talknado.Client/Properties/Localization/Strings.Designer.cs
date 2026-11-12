@@ -862,5 +862,14 @@ namespace Talknado.Client.Properties.Localization {
             }
         }
         
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Zoom.
+        /// </summary>
+        public static string ZoomTooltip {
+            get {
+                return ResourceManager.GetString("ZoomTooltip", resourceCulture);
+            }
+        }
+        
     }
 }

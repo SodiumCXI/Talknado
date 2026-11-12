@@ -36,19 +36,59 @@ public partial class MediaViewerViewModel(IMediaViewerManager mediaViewerManager
     private int _viewportWidth;
     private int _viewportHeight;
     private double _dpiScale = 1;
-    // Картинка пересчитывается под новый размер окна, когда изменение размера закончилось
+    // Наибольшая сторона картинки для приближения: предел текстуры с запасом на видеокарты попроще
+    private const int ZoomImageMaxSide = 8192;
+
+    // Вписанная картинка пересчитывается под новый размер окна, когда его перестали менять
     private DispatcherTimer? _imageResizeTimer;
+    private int _imageLoads;
+    // Вписанный размер картинки в пикселях экрана
+    private (int Width, int Height) _fit;
+    private bool _zoomImageLoading;
     private bool _rendering;
     private bool _isSeeking;
 
     public IMediaViewerManager Manager => _mediaViewerManager;
 
+    /// <summary>Превью из сообщения, затем вписанная — для масштаба 1, один к одному.</summary>
     [ObservableProperty]
     private ImageSource? _image;
 
-    /// <summary>Картинка уже точно под область: окно выводит её один к одному, а не растягивает.</summary>
+    /// <summary>
+    /// Уровни для приближения, крупный первым; масштабирует их видеокарта. Готовятся
+    /// сразу после вписанной и лежат в окне под ней: первое приближение не ждёт ни
+    /// декодирования, ни передачи в видеокарту.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsZoomImageShown))]
+    private IReadOnlyList<BitmapSource>? _zoomLayers;
+
+    /// <summary>Номер выведенного уровня: самый мелкий, который не меньше картинки на экране.</summary>
+    [ObservableProperty]
+    private int _shownZoomLayer;
+
+    /// <summary>Показана сама картинка, а не превью из сообщения.</summary>
     [ObservableProperty]
     private bool _isImageFitted;
+
+    /// <summary>
+    /// Рамка картинки в единицах WPF — по исходнику, а не по загруженной картинке:
+    /// превью, вписанная и приближенная растягиваются в одну и ту же рамку и не
+    /// сдвигаются друг относительно друга. NaN — размер ещё неизвестен.
+    /// </summary>
+    [ObservableProperty]
+    private double _imageWidth = double.NaN;
+
+    [ObservableProperty]
+    private double _imageHeight = double.NaN;
+
+    /// <summary>Во сколько раз картинка крупнее вписанной в окно.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsZoomImageShown))]
+    private double _imageZoom = 1;
+
+    /// <summary>Приближено, и вся картинка готова: вписанная поверх неё прячется.</summary>
+    public bool IsZoomImageShown => ImageZoom > 1 && ZoomLayers != null;
 
     [ObservableProperty]
     private WriteableBitmap? _videoSurface;
@@ -94,6 +134,7 @@ public partial class MediaViewerViewModel(IMediaViewerManager mediaViewerManager
 
         Image = _attachment.Thumbnail;
         IsImageFitted = false;
+        UpdateImageFrame();
         _attachment.PropertyChanged += OnAttachmentChanged;
 
         if (_attachment.IsVideo)
@@ -111,7 +152,11 @@ public partial class MediaViewerViewModel(IMediaViewerManager mediaViewerManager
         _imageResizeTimer?.Stop();
         _attachment = null;
         Image = null;
+        ZoomLayers = null;
+        _zoomImageLoading = false;
         IsImageFitted = false;
+        ImageZoom = 1;
+        ImageWidth = ImageHeight = double.NaN;
     }
 
     /// <summary>Размер области под картинку и видео в пикселях экрана.</summary>
@@ -121,6 +166,38 @@ public partial class MediaViewerViewModel(IMediaViewerManager mediaViewerManager
         _viewportHeight = height;
         _dpiScale = dpiScale;
 
+        UpdateImageFrame();
+        ScheduleImageLoad();
+    }
+
+    private void UpdateImageFrame()
+    {
+        if (_attachment is not { IsImage: true, PixelWidth: > 0, PixelHeight: > 0 } attachment)
+            return;
+
+        _fit = MediaProbe.FitSize(attachment.PixelWidth, attachment.PixelHeight,
+            _viewportWidth > 0 ? _viewportWidth : _maxWidth, _viewportHeight > 0 ? _viewportHeight : _maxHeight);
+        ImageWidth = _fit.Width / _dpiScale;
+        ImageHeight = _fit.Height / _dpiScale;
+        UpdateZoomLayers();
+    }
+
+    partial void OnImageZoomChanged(double value) => UpdateZoomLayers();
+
+    private void UpdateZoomLayers()
+    {
+        if (ZoomLayers is not { } layers)
+            return;
+
+        double shown = _fit.Width * ImageZoom;
+        int chosen = 0;
+        for (int i = 1; i < layers.Count && layers[i].PixelWidth >= shown; i++)
+            chosen = i;
+        ShownZoomLayer = chosen;
+    }
+
+    private void ScheduleImageLoad()
+    {
         if (_attachment is not { IsImage: true })
             return;
 
@@ -146,23 +223,48 @@ public partial class MediaViewerViewModel(IMediaViewerManager mediaViewerManager
     private void LoadImage()
     {
         var attachment = _attachment;
-        if (attachment?.State != AttachmentState.Ready || attachment.LocalPath is not { } path)
+        if (attachment?.State != AttachmentState.Ready || attachment.LocalPath is not { } path || _fit.Width == 0)
             return;
 
-        int width = _viewportWidth > 0 ? _viewportWidth : _maxWidth;
-        int height = _viewportHeight > 0 ? _viewportHeight : _maxHeight;
-        double dpiScale = _dpiScale;
+        var (width, height) = _fit;
+        int load = ++_imageLoads;
         Task.Run(() =>
         {
-            try { return MediaProbe.LoadImageFit(path, width, height, dpiScale); }
+            try { return MediaProbe.LoadImageScaled(path, width, height); }
             catch { return null; }
         }).ContinueWith(t =>
         {
-            if (t.Result != null && _attachment == attachment)
+            if (t.Result != null && _attachment == attachment && load == _imageLoads)
             {
                 Image = t.Result;
                 IsImageFitted = true;
+                LoadZoomLayers();
             }
+        }, TaskScheduler.FromCurrentSynchronizationContext());
+    }
+
+    private void LoadZoomLayers()
+    {
+        var attachment = _attachment;
+        if (_zoomImageLoading || ZoomLayers != null || attachment?.State != AttachmentState.Ready
+            || attachment.LocalPath is not { } path)
+            return;
+
+        _zoomImageLoading = true;
+        int minWidth = _fit.Width;
+        Task.Run(() =>
+        {
+            try { return MediaProbe.LoadZoomLevels(path, ZoomImageMaxSide, minWidth); }
+            catch { return null; }
+        }).ContinueWith(t =>
+        {
+            if (_attachment != attachment)
+                return;
+
+            ZoomLayers = t.Result;
+            UpdateZoomLayers();
+            // Не загрузились — остаётся вписанная, без повторных попыток
+            _zoomImageLoading = t.Result == null;
         }, TaskScheduler.FromCurrentSynchronizationContext());
     }
 

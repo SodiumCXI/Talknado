@@ -33,6 +33,7 @@
         значок задержки в строке участника ....... StatusIconSize
         выключенный микрофон в строке участника .. MicOffIconSize
         поля окна просмотра картинок и видео ..... PadViewer
+        полоса масштаба в углу картинки .......... ZoomBarMargin, ZoomSliderWidth
 
         Связка, которую правят вместе: PadFeed, GapRow и GapRowTrim.
         Поля списка видны всегда, а промежуток между строками — только когда
@@ -102,6 +103,8 @@
     <sys:Double x:Key="ProgressBarHeight">4</sys:Double>
     <!-- ширина регулятора громкости в окне просмотра -->
     <sys:Double x:Key="ViewerVolumeWidth">120</sys:Double>
+    <!-- ширина ползунка масштаба картинки в окне просмотра -->
+    <sys:Double x:Key="ZoomSliderWidth">120</sys:Double>
 
     <!-- ПАНЕЛЬ ХОСТА -->
     <!-- шесть строк участников: дальше список прокручивается, а окно не растёт -->
@@ -163,6 +166,8 @@
     <Thickness x:Key="MessageCaptionMargin">-2,6,0,0</Thickness>
     <!-- поля окна просмотра вокруг картинки и видео -->
     <Thickness x:Key="PadViewer">24</Thickness>
+    <!-- полоса масштаба: отступ от правого и нижнего края картинки -->
+    <Thickness x:Key="ZoomBarMargin">0,0,12,12</Thickness>
     <!-- поля плашки длительности поверх превью видео -->
     <Thickness x:Key="PadBadge">6,2</Thickness>
 
