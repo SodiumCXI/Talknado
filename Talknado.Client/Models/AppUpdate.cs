@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -18,6 +20,13 @@ public sealed record AppUpdate(Version Version, string PageUrl, string? Installe
     private const string LatestReleaseUrl = "https://api.github.com/repos/SodiumCXI/Talknado/releases/latest";
     private const string InstallerSuffix = "_x64_setup.exe";
     private const int ErrorCancelled = 1223;
+
+    // Соединение с хранилищем GitHub изредка застревает на низкой скорости на всю
+    // загрузку, а новое идёт нормально. Медленнее MinBytesPerWindow за SpeedWindow —
+    // соединение меняется, загрузка продолжается с того же места.
+    private static readonly TimeSpan SpeedWindow = TimeSpan.FromSeconds(5);
+    private const long MinBytesPerWindow = 1024 * 1024;
+    private const int MaxReconnects = 5;
 
     private static readonly HttpClient Http = CreateClient();
 
@@ -68,37 +77,7 @@ public sealed record AppUpdate(Version Version, string PageUrl, string? Installe
     {
         // Имя одно на все версии: в папке временных файлов остаётся не больше одного установщика.
         string path = Path.Combine(Path.GetTempPath(), "Talknado_update" + InstallerSuffix);
-
-        using (var response = await Http.GetAsync(InstallerUrl, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
-        {
-            response.EnsureSuccessStatusCode();
-            long total = response.Content.Headers.ContentLength ?? 0;
-
-            await using var source = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-            await using var file = File.Create(path);
-            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            var buffer = new byte[81920];
-            long done = 0;
-            int percent = -1;
-            int read;
-            while ((read = await source.ReadAsync(buffer).ConfigureAwait(false)) > 0)
-            {
-                await file.WriteAsync(buffer.AsMemory(0, read)).ConfigureAwait(false);
-                hash.AppendData(buffer, 0, read);
-                done += read;
-
-                // Не чаще раза на процент: каждый отчёт — обращение к потоку окна.
-                if (total > 0 && done * 100 / total != percent)
-                {
-                    percent = (int)(done * 100 / total);
-                    progress.Report(percent);
-                }
-            }
-
-            if (InstallerSha256 != null
-                && !Convert.ToHexString(hash.GetHashAndReset()).Equals(InstallerSha256, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("Installer hash mismatch");
-        }
+        await DownloadAsync(path, progress).ConfigureAwait(false);
 
         try
         {
@@ -112,6 +91,87 @@ public sealed record AppUpdate(Version Version, string PageUrl, string? Installe
         {
             return false;
         }
+    }
+
+    private async Task DownloadAsync(string path, IProgress<int> progress)
+    {
+        await using var file = File.Create(path);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[81920];
+        long done = 0, total = 0;
+        int percent = -1;
+
+        for (int reconnects = 0; ; reconnects++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, InstallerUrl);
+            if (done > 0)
+                request.Headers.Range = new RangeHeaderValue(done, null);
+
+            using var stall = new CancellationTokenSource();
+            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+
+            // Сервер не продолжил с места — загрузка с начала
+            if (done > 0 && response.StatusCode != HttpStatusCode.PartialContent)
+            {
+                file.SetLength(0);
+                hash.GetHashAndReset();
+                done = 0;
+            }
+            if (done == 0)
+                total = response.Content.Headers.ContentLength ?? 0;
+
+            await using var source = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            bool slow = false;
+            long windowStart = Stopwatch.GetTimestamp(), windowBytes = 0;
+            while (true)
+            {
+                int read;
+                if (reconnects < MaxReconnects)
+                    stall.CancelAfter(SpeedWindow);
+                try
+                {
+                    read = await source.ReadAsync(buffer, stall.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    slow = true;
+                    break;
+                }
+                if (read == 0)
+                    break;
+
+                await file.WriteAsync(buffer.AsMemory(0, read)).ConfigureAwait(false);
+                hash.AppendData(buffer, 0, read);
+                done += read;
+                windowBytes += read;
+
+                // Не чаще раза на процент: каждый отчёт — обращение к потоку окна.
+                if (total > 0 && done * 100 / total != percent)
+                {
+                    percent = (int)(done * 100 / total);
+                    progress.Report(percent);
+                }
+
+                if (Stopwatch.GetElapsedTime(windowStart) >= SpeedWindow)
+                {
+                    if (windowBytes < MinBytesPerWindow && reconnects < MaxReconnects && total - done > MinBytesPerWindow)
+                    {
+                        slow = true;
+                        break;
+                    }
+                    windowStart = Stopwatch.GetTimestamp();
+                    windowBytes = 0;
+                }
+            }
+
+            if (!slow)
+                break;
+        }
+
+        if (InstallerSha256 != null
+            && !Convert.ToHexString(hash.GetHashAndReset()).Equals(InstallerSha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Installer hash mismatch");
     }
 
     private static HttpClient CreateClient()
