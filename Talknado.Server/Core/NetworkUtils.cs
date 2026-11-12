@@ -113,7 +113,9 @@ public class NetworkUtils : INetworkUtils, INetEventListener, IDisposable
 
     public void Start(CancellationToken token)
     {
-        _netManager.Start(IPAddress.Any, IPAddress.IPv6Any, _serverInfo.Port);
+        // Занятый UDP-порт LiteNetLib не считает ошибкой: сервер поднялся бы без голоса и видео.
+        if (!_netManager.Start(IPAddress.Any, IPAddress.IPv6Any, _serverInfo.Port))
+            throw new SocketException((int)SocketError.AddressAlreadyInUse);
 
         _ = Task.Run(() => PollLoop(token), token);
     }

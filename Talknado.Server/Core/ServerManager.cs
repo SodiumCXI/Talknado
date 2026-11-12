@@ -32,7 +32,7 @@ public class ServerManager(INetworkUtils networkUtils,
     {
         try
         {
-            _listener = new(IPAddress.Any, 0);
+            _listener = new(IPAddress.Any, _serverInfo.Port);
             _listener.Start(5);
 
             _serverInfo.Port = ((IPEndPoint)_listener.LocalEndpoint).Port;

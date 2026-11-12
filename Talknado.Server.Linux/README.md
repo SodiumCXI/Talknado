@@ -41,10 +41,21 @@ The server runs as the systemd service `talknado`: it starts again after a reboo
 
 ```bash
 talknado set-password 'password'   # required before the first start
-talknado start                     # starts the server, turns on autostart and prints the connection key
+talknado start                     # starts the server, turns on autostart and prints the connection key and port
 talknado status
 talknado stop                      # stops the server and turns off autostart
 ```
+
+### Port
+
+The server listens on one port for both TCP and UDP. It is picked at random from 49152-65535 on install and kept, so the connection key does not change after a restart.
+
+```bash
+talknado port                  # show the port
+talknado port 40000            # set a port from 1024 to 65535, applies after 'talknado restart'
+```
+
+If ufw or firewalld is on, the port is opened in it while the server runs and closed when the server stops. Rules that were already there for this port are left as they are. A firewall at your hosting provider (a security group in the control panel) has to be opened by hand for TCP and UDP.
 
 ### Session settings
 

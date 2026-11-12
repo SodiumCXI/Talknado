@@ -31,8 +31,10 @@ public sealed class ServerHost : IDisposable
 
     public int Port => _provider.GetRequiredService<IServerInfo>().Port;
 
-    public (bool, string) StartServer(string password, bool withPortForwarding)
+    /// <summary>port 0 — свободный порт, который выдаст система.</summary>
+    public (bool, string) StartServer(string password, bool withPortForwarding, int port = 0)
     {
+        _provider.GetRequiredService<IServerInfo>().Port = port;
         var serverManager = _provider.GetRequiredService<IServerManager>();
         var serverResult = password != string.Empty ? serverManager.Start(password) : serverManager.Start(null);
 

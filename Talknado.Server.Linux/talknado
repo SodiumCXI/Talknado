@@ -5,6 +5,7 @@ BINARY_PATH="/usr/local/bin/talknado-server-bin"
 CONFIG_DIR="/etc/talknado"
 CONFIG_FILE="$CONFIG_DIR/talknado.conf"
 SOCKET_FILE="/run/talknado/control.sock"
+FIREWALL_STATE="$CONFIG_DIR/firewall"
 INSTALL_URL="https://raw.githubusercontent.com/SodiumCXI/Talknado/main/Talknado.Server.Linux/install.sh"
 
 QUALITIES="720p30, 1080p30, 1080p60"
@@ -43,6 +44,102 @@ is_running() {
     systemctl is-active --quiet "$SERVICE"
 }
 
+port_in_use() {
+    command -v ss > /dev/null && [ -n "$(ss -Hlntu "sport = :$1")" ]
+}
+
+# Порт выбирается случайно один раз и дальше сам не меняется: ключ
+# переживает перезапуск, а у разных серверов порты разные.
+ensure_port() {
+    [ -n "$(get_setting TALKNADO_PORT)" ] && return 0
+    local port
+    for i in $(seq 20); do
+        port=$(shuf -i 49152-65535 -n 1)
+        port_in_use "$port" || break
+    done
+    save_setting TALKNADO_PORT "$port"
+}
+
+active_firewall() {
+    if command -v ufw > /dev/null && ufw status 2>/dev/null | grep -q "^Status: active"; then
+        echo ufw
+    elif command -v firewall-cmd > /dev/null && firewall-cmd --state > /dev/null 2>&1; then
+        echo firewalld
+    fi
+}
+
+# Открывается только то, что ещё закрыто, и закрывается только открытое здесь:
+# чужие правила на этом же порту не трогаются. Что открыто — в FIREWALL_STATE.
+# firewalld получает правила до перезагрузки: после неё их снова откроет служба.
+firewall_open() {
+    firewall_close
+    local port tool opened="" p
+    port=$(get_setting TALKNADO_PORT 0)
+    tool=$(active_firewall)
+    if [ "$port" = "0" ] || [ -z "$tool" ]; then
+        return 0
+    fi
+
+    for p in tcp udp; do
+        case "$tool" in
+            ufw)
+                ufw show added | grep -qE "^ufw allow $port(/$p)?( |$)" && continue
+                ufw allow "$port/$p" comment Talknado > /dev/null || continue
+                ;;
+            firewalld)
+                firewall-cmd --query-port="$port/$p" > /dev/null && continue
+                firewall-cmd --add-port="$port/$p" > /dev/null || continue
+                ;;
+        esac
+        opened="$opened $p"
+    done
+
+    if [ -n "$opened" ]; then
+        echo "$tool $port$opened" > "$FIREWALL_STATE"
+        echo "Opened port $port (${opened# }) in $tool"
+    fi
+    return 0
+}
+
+firewall_close() {
+    [ -f "$FIREWALL_STATE" ] || return 0
+    local tool port protocols p
+    read -r tool port protocols < "$FIREWALL_STATE"
+    for p in $protocols; do
+        case "$tool" in
+            ufw) ufw delete allow "$port/$p" > /dev/null ;;
+            firewalld) firewall-cmd --remove-port="$port/$p" > /dev/null ;;
+        esac
+    done
+    rm -f "$FIREWALL_STATE"
+    echo "Closed port $port in $tool"
+    return 0
+}
+
+print_port() {
+    echo "Port: $(get_setting TALKNADO_PORT) (TCP and UDP)"
+    print_firewall
+}
+
+print_firewall() {
+    if [ -f "$FIREWALL_STATE" ]; then
+        local tool
+        read -r tool _ < "$FIREWALL_STATE"
+        echo "Firewall: port opened in $tool"
+    fi
+}
+
+# Порт держит запущенный сервер, поэтому проверка — только перед запуском
+check_port_free() {
+    local port
+    port=$(get_setting TALKNADO_PORT)
+    if ! is_running && port_in_use "$port"; then
+        echo "Error: Port $port is already in use. Choose another with 'talknado port NUMBER'"
+        return 1
+    fi
+    return 0
+}
+
 control() {
     "$BINARY_PATH" ctl "$SOCKET_FILE" "$@"
 }
@@ -60,6 +157,7 @@ wait_for_key() {
     for i in $(seq 100); do
         if key=$(control key 2>/dev/null); then
             echo "Key: $key"
+            print_port
             return 0
         fi
         sleep 0.1
@@ -76,9 +174,12 @@ start_server() {
         return 1
     fi
 
+    ensure_port
     if is_running; then
         echo "Server already running"
     else
+        check_port_free || return 1
+        systemctl reset-failed "$SERVICE" 2>/dev/null
         systemctl enable --now --quiet "$SERVICE" || return 1
         echo "Server started, it will also start after a reboot"
     fi
@@ -96,6 +197,9 @@ restart_server() {
         return 1
     fi
 
+    ensure_port
+    check_port_free || return 1
+    systemctl reset-failed "$SERVICE" 2>/dev/null
     systemctl enable --quiet "$SERVICE"
     systemctl restart "$SERVICE" || return 1
     echo "Server restarted"
@@ -131,6 +235,9 @@ set_password() {
 }
 
 print_settings() {
+    if [ -n "$(get_setting TALKNADO_PORT)" ]; then
+        echo "Port: $(get_setting TALKNADO_PORT) (TCP and UDP)"
+    fi
     echo "Max screen share quality: $(get_setting TALKNADO_QUALITY 1080p60)"
     BANDWIDTH=$(get_setting TALKNADO_BANDWIDTH 0)
     if [ "$BANDWIDTH" = "0" ]; then
@@ -145,6 +252,7 @@ show_status() {
         echo "Running since $(systemctl show -p ActiveEnterTimestamp --value "$SERVICE")"
         show_key
         control status
+        print_firewall
     elif systemctl is-failed --quiet "$SERVICE"; then
         echo "Failed, see 'talknado logs'"
         print_settings
@@ -232,6 +340,31 @@ set_bandwidth() {
     save_setting TALKNADO_BANDWIDTH "$1"
 }
 
+set_port() {
+    if [ -z "$1" ]; then
+        ensure_port
+        print_port
+        return 0
+    fi
+
+    if ! [[ "$1" =~ ^[0-9]{1,5}$ ]] || [ "$1" -lt 1024 ] || [ "$1" -gt 65535 ]; then
+        echo "Error: Port must be a number from 1024 to 65535"
+        return 1
+    fi
+
+    local port=$((10#$1))
+    if [ "$port" != "$(get_setting TALKNADO_PORT)" ] && port_in_use "$port"; then
+        echo "Error: Port $port is already in use"
+        return 1
+    fi
+
+    save_setting TALKNADO_PORT "$port"
+    echo "Port: $port (TCP and UDP)"
+    if is_running; then
+        echo "To apply changes, run: talknado restart"
+    fi
+}
+
 show_logs() {
     if [ "$1" = "-f" ]; then
         journalctl -u "$SERVICE" -f -o short-iso
@@ -275,6 +408,7 @@ Commands:
   status              Show server status and session settings
   key                 Show connection key
   set-password 'pwd'  Set server password
+  port [NUMBER]       Show or set the server port, TCP and UDP: 1024-65535
   users               List connected users with ID, ping and address
   kick ID             Kick a user and ban their address until restart
   max-quality [VALUE] Show or set the maximum screen share quality: $QUALITIES
@@ -285,6 +419,8 @@ Commands:
   uninstall           Uninstall Talknado Server
   help                Show this help
 Max quality and bandwidth are saved and apply right away if the server is running.
+A new port applies on restart. If ufw or firewalld is on, the port is opened
+while the server runs and closed when it stops.
 EOF
 }
 
@@ -307,6 +443,7 @@ case "$1" in
     stop) stop_server ;;
     restart) restart_server ;;
     set-password) set_password "$2" ;;
+    port) set_port "$2" ;;
     status) show_status ;;
     key) show_key ;;
     users) show_users ;;
@@ -316,6 +453,9 @@ case "$1" in
     logs) show_logs "$2" ;;
     update) update_server "$2" ;;
     uninstall) uninstall ;;
+    # Зовёт служба при запуске и остановке
+    firewall-open) firewall_open ;;
+    firewall-close) firewall_close ;;
     *)
         show_help
         exit 1

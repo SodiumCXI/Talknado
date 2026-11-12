@@ -6,12 +6,18 @@ Documentation=https://github.com/SodiumCXI/Talknado
 # Внешний адрес для ключа узнаётся при запуске по сети
 Wants=network-online.target
 After=network-online.target
+# Занятый порт не освободится сам: после пяти попыток служба останавливается
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=exec
-Environment=TALKNADO_QUALITY=1080p60 TALKNADO_BANDWIDTH=0
+Environment=TALKNADO_QUALITY=1080p60 TALKNADO_BANDWIDTH=0 TALKNADO_PORT=0
 EnvironmentFile=/etc/talknado/talknado.conf
-ExecStart=/usr/local/bin/talknado-server-bin serve --control /run/talknado/control.sock --max-quality ${TALKNADO_QUALITY} --bandwidth ${TALKNADO_BANDWIDTH}
+# «+» — от root и без ограничений ниже: брандмауэр правит только root
+ExecStartPre=+/usr/local/bin/talknado firewall-open
+ExecStart=/usr/local/bin/talknado-server-bin serve --port ${TALKNADO_PORT} --control /run/talknado/control.sock --max-quality ${TALKNADO_QUALITY} --bandwidth ${TALKNADO_BANDWIDTH}
+ExecStopPost=+/usr/local/bin/talknado firewall-close
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=10

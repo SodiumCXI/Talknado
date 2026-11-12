@@ -75,4 +75,4 @@ When starting a server, check **"UPnP Port Forwarding"**. Talknado will attempt 
 3. Start Talknado and enter the connection key from the host's application.
 
 ### Option C - Dedicated Linux Server
-Install the **[dedicated server](/Talknado.Server.Linux)** on a machine with a public IP, for example a VPS, and share the key from `talknado start`. The server picks a new port on every start, so incoming TCP and UDP connections must not be blocked by a firewall.
+Install the **[dedicated server](/Talknado.Server.Linux)** on a machine with a public IP, for example a VPS, and share the key from `talknado start`. The server listens on one port for TCP and UDP: it is picked at random on install and kept, and `talknado port NUMBER` changes it. If ufw or firewalld is on, the port is opened while the server runs; a firewall at your hosting provider has to be opened by hand.

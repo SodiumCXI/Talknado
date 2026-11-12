@@ -141,14 +141,14 @@ install_service() {
 
     systemctl daemon-reload
 
-    if $was_running || $LEGACY_WAS_RUNNING; then
-        if grep -q '^TALKNADO_PASSWORD=' "$CONFIG_FILE"; then
-            "$INSTALL_DIR/talknado" restart
-        else
-            echo "Set a password with 'talknado set-password', then run 'talknado start'"
+    if { $was_running || $LEGACY_WAS_RUNNING; } && grep -q '^TALKNADO_PASSWORD=' "$CONFIG_FILE"; then
+        "$INSTALL_DIR/talknado" restart
+    else
+        # Порт выбирается сразу: его может понадобиться открыть у хостера до запуска
+        "$INSTALL_DIR/talknado" port
+        if ! grep -q '^TALKNADO_PASSWORD=' "$CONFIG_FILE"; then
+            echo "Next: talknado set-password 'password', then talknado start"
         fi
-    elif ! grep -q '^TALKNADO_PASSWORD=' "$CONFIG_FILE"; then
-        echo "Next: talknado set-password 'password', then talknado start"
     fi
 }
 

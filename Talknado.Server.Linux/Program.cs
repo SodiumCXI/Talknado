@@ -1,4 +1,5 @@
-﻿using System.Net.Sockets;
+﻿using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using Talknado.Server.Core;
@@ -6,7 +7,8 @@ using Talknado.Server.Core;
 namespace Talknado.Server.Linux;
 
 /// <summary>
-/// serve [--control PATH] [--max-quality N] [--bandwidth MBIT]
+/// serve [--port N] [--control PATH] [--max-quality N] [--bandwidth MBIT]
+///     Порт один на TCP и UDP; без --port — свободный, который выдаст система.
 ///     Пароль — из TALKNADO_PASSWORD: аргументы видны в ps. С сокетом управления
 ///     ключ отдаёт команда key, а не вывод: в ключе пароль, а вывод уходит в журнал.
 /// ctl PATH COMMAND [ARG]
@@ -26,6 +28,7 @@ static class Program
     static int Serve(string[] args)
     {
         string? controlPath = null;
+        int port = 0;
         byte quality = 2;
         long bandwidthMbits = 0;
 
@@ -34,6 +37,7 @@ static class Program
             var value = i + 1 < args.Length ? args[i + 1] : null;
             bool ok = args[i] switch
             {
+                "--port" => int.TryParse(value, out port) && port is >= 0 and <= IPEndPoint.MaxPort,
                 "--control" => (controlPath = value) != null,
                 "--max-quality" => SessionCommands.TryParseQuality(value, out quality),
                 "--bandwidth" => long.TryParse(value, out bandwidthMbits) && bandwidthMbits >= 0,
@@ -66,10 +70,10 @@ static class Program
         }
         using var _ = control;
 
-        var (failed, result) = host.StartServer(Environment.GetEnvironmentVariable("TALKNADO_PASSWORD") ?? string.Empty, withPortForwarding: false);
+        var (failed, result) = host.StartServer(Environment.GetEnvironmentVariable("TALKNADO_PASSWORD") ?? string.Empty, withPortForwarding: false, port);
         if (failed)
         {
-            Console.Error.WriteLine(result);
+            Console.Error.WriteLine(port != 0 ? $"Error: port {port}: {result}" : result);
             return 1;
         }
         commands.Key = result;
@@ -119,7 +123,7 @@ static class Program
 
     static int Usage()
     {
-        Console.Error.WriteLine("Usage: talknado-server-bin serve [--control PATH] [--max-quality 720p30|1080p30|1080p60] [--bandwidth MBIT]");
+        Console.Error.WriteLine("Usage: talknado-server-bin serve [--port N] [--control PATH] [--max-quality 720p30|1080p30|1080p60] [--bandwidth MBIT]");
         Console.Error.WriteLine("       talknado-server-bin ctl PATH key|status|users|kick ID|max-quality [VALUE]|bandwidth [MBIT]");
         Console.Error.WriteLine("       talknado-server-bin version");
         return 1;

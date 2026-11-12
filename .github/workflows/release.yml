@@ -86,10 +86,16 @@ jobs:
           bin=Talknado.Server.Linux/bin/Release/net8.0/linux-x64/publish/talknado-server-bin
           sock=/tmp/talknado.sock
           $bin version
-          TALKNADO_PASSWORD=ci $bin serve --control $sock --max-quality 1080p60 --bandwidth 10 > /tmp/server.log 2>&1 &
+          TALKNADO_PASSWORD=ci $bin serve --port 47000 --control $sock --max-quality 1080p60 --bandwidth 10 > /tmp/server.log 2>&1 &
           pid=$!
           for i in $(seq 100); do $bin ctl $sock key > /dev/null 2>&1 && break; sleep 0.1; done
           echo "Key: $($bin ctl $sock key)"
+          $bin ctl $sock status | grep -q "Port: 47000"
+          [ "$(ss -Hlntu 'sport = :47000' | wc -l)" -ge 2 ]
+          if TALKNADO_PASSWORD=ci timeout 30 $bin serve --port 47000; then
+            echo "Second server started on a busy port"
+            exit 1
+          fi
           $bin ctl $sock status
           $bin ctl $sock users
           $bin ctl $sock max-quality 720p30
@@ -128,6 +134,29 @@ jobs:
           sudo talknado bandwidth 25
           sudo talknado users
           sudo talknado key
+
+          # Порт сохраняется: ключ после перезапуска прежний
+          key=$(sudo talknado key)
+          sudo talknado restart
+          [ "$(sudo talknado key)" = "$key" ]
+          if sudo talknado port 80; then exit 1; fi
+          sudo talknado port 47001
+          sudo talknado restart
+          [ "$(ss -Hlntu 'sport = :47001' | wc -l)" -ge 2 ]
+
+          # Брандмауэр: открывается недостающее, своё правило хозяина остаётся
+          sudo ufw allow 22/tcp
+          sudo ufw allow 47002/udp
+          sudo ufw --force enable
+          sudo talknado port 47002
+          sudo talknado restart | tee /tmp/start.txt
+          grep -q "Firewall: port opened in ufw" /tmp/start.txt
+          sudo ufw status | grep -q "^47002/tcp .*ALLOW"
+          sudo talknado stop
+          if sudo ufw status | grep -q "^47002/tcp "; then exit 1; fi
+          sudo ufw status | grep -q "^47002/udp .*ALLOW"
+          sudo ufw --force disable
+          sudo talknado start
 
           sudo systemctl kill -s KILL talknado
           for i in $(seq 30); do sudo talknado key && break; sleep 1; done
