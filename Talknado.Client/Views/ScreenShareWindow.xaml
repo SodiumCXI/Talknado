@@ -27,13 +27,17 @@
         <cnv:FpsTextConverter x:Key="FpsTextConverter"/>
     </local:TalknadoWindow.Resources>
 
-    <Grid Background="{DynamicResource WindowBackgroundBrush}">
+    <!-- Двойной щелчок по картинке и по полям вокруг неё — во весь экран и обратно -->
+    <Grid Background="{DynamicResource WindowBackgroundBrush}"
+          MouseLeftButtonDown="VideoArea_MouseLeftButtonDown">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
+        <!-- Во весь экран заголовок лежит поверх картинки и прячется, пока мышь стоит -->
         <Grid Grid.Row="0" x:Name="TitleBar"
+              Panel.ZIndex="1"
               Height="{DynamicResource TitleBarHeight}"
               Background="{DynamicResource ChromeBrush}">
             <Grid.ColumnDefinitions>
@@ -65,6 +69,7 @@
                     VerticalAlignment="Center"
                     shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
 
+            <!-- Разворот здесь — во весь экран -->
             <Button Grid.Column="2" x:Name="MaximizeButton"
                     Style="{DynamicResource TitleBarMaximizeButtonStyle}"
                     Click="MaximizeButton_Click">
@@ -83,7 +88,7 @@
             каждое из них заставляет WPF пересобирать слой на каждом кадре,
             а кадров тридцать в секунду.
         -->
-        <Image Grid.Row="1"
+        <Image Grid.Row="1" x:Name="VideoImage"
                Source="{Binding ScreenSharePlayer.DisplayImage}"
                Stretch="Uniform"
                RenderOptions.BitmapScalingMode="LowQuality"/>

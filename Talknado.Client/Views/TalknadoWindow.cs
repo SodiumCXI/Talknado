@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Shell;
 using System.Windows.Threading;
 
 namespace Talknado.Client.Views;
@@ -27,6 +28,63 @@ public partial class TalknadoWindow : Window
     /// CaptionHeight: перетаскивание, разворот и прилипание делает Windows.
     /// </summary>
     protected bool UseSystemCaption { get; set; }
+
+    private bool _isFullScreen;
+    private RECT _boundsBeforeFullScreen;
+    private int _styleBeforeFullScreen;
+    private double _captionHeight;
+    private Thickness _resizeBorder;
+
+    /// <summary>
+    /// Во весь монитор, поверх панели задач. Не разворотом: развёрнутое окно с рамкой
+    /// Windows всегда урезает до рабочей области. Рамка снимается, окно ставится
+    /// ровно на монитор, заголовок его не тянет и края не меняют размер. Выход —
+    /// в обычное окно на прежнем месте.
+    /// </summary>
+    protected bool IsFullScreen
+    {
+        get => _isFullScreen;
+        set
+        {
+            if (value == _isFullScreen)
+                return;
+
+            _isFullScreen = value;
+            var handle = new WindowInteropHelper(this).Handle;
+            var chrome = WindowChrome.GetWindowChrome(this);
+            if (value)
+            {
+                if (WindowState != WindowState.Normal)
+                    WindowState = WindowState.Normal;
+                GetWindowRect(handle, out _boundsBeforeFullScreen);
+
+                _captionHeight = chrome.CaptionHeight;
+                _resizeBorder = chrome.ResizeBorderThickness;
+                chrome.CaptionHeight = 0;
+                chrome.ResizeBorderThickness = default;
+
+                _styleBeforeFullScreen = GetWindowLong(handle, GWL_STYLE);
+                SetWindowLong(handle, GWL_STYLE, _styleBeforeFullScreen & ~(WS_CAPTION | WS_THICKFRAME));
+
+                var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                GetMonitorInfo(MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST), ref info);
+                var monitor = info.Monitor;
+                SetWindowPos(handle, IntPtr.Zero, monitor.Left, monitor.Top,
+                    monitor.Right - monitor.Left, monitor.Bottom - monitor.Top, SWP_NOZORDER | SWP_FRAMECHANGED);
+            }
+            else
+            {
+                SetWindowLong(handle, GWL_STYLE, _styleBeforeFullScreen);
+                chrome.CaptionHeight = _captionHeight;
+                chrome.ResizeBorderThickness = _resizeBorder;
+
+                var bounds = _boundsBeforeFullScreen;
+                SetWindowPos(handle, IntPtr.Zero, bounds.Left, bounds.Top,
+                    bounds.Right - bounds.Left, bounds.Bottom - bounds.Top, SWP_NOZORDER | SWP_FRAMECHANGED);
+            }
+            _previousWindowState = WindowState;
+        }
+    }
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -399,6 +457,15 @@ public partial class TalknadoWindow : Window
     private const int SM_CXPADDEDBORDER = 92;
     private const int GWL_STYLE = -16;
     private const int WS_CAPTION = 0x00C00000;
+    private const int WS_THICKFRAME = 0x00040000;
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_FRAMECHANGED = 0x0020;
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT { public int X, Y; }
